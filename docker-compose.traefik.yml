@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      # --- TCP CONNECTION FIX ---
+      - --providers.docker.endpoint=tcp://host.docker.internal:2375
+      # ---------------------------
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    # VOLUMES are no longer needed for the docker.sock/npipe!
+    networks:
+      - traefik
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  traefik:
+    name: ${TRAEFIK_NETWORK:-web}
