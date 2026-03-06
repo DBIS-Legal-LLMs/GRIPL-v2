@@ -7,10 +7,11 @@ Identifying GDPR-Critical Tasks in Business Processes using Large Language Model
 This repository contains the source code and research artifacts for the GRIPL framework. The system consists of a frontend, a backend, and a PostgreSQL database.
 
 In addition to the code, the repository includes:
-- A labeled dataset of BPMN files in `experiments/labeled-test-dataset/` for reproducing the evaluation
+- A labeled dataset of BPMN files in `dataset/` for reproducing the evaluation
 - Experiment configurations and results in `experiments/`
+- A system demo in `system demo/`
 
-The datasets are provided as CSV exports of the database and can be imported to run the application with the same data used in the thesis.
+The datasets are provided as CSV exports of the database and can be imported to run the application with the same data used in the experiments.
 
 ## Docker Setup
 
