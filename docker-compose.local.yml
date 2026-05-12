@@ -1,32 +1,12 @@
 services:
-  traefik:
-    image: traefik:v3.7
-    container_name: traefik-local
-    restart: unless-stopped
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-    ports:
-      - "80:80"
-      - "8080:8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - app
-
   gripl-frontend:
     build:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://gripl-backend:8080}
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.gripl-frontend.rule=Host(`localhost`)
-      - traefik.http.routers.gripl-frontend.entrypoints=web
-      - traefik.http.services.gripl-frontend.loadbalancer.server.port=${FRONTEND_PORT:-3000}
     networks:
       - app
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
 
   gripl-backend:
     env_file:
@@ -38,15 +18,10 @@ services:
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-postgres}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.gripl-backend.rule=Host(`localhost`) && PathPrefix(`/api`)
-      - traefik.http.routers.gripl-backend.entrypoints=web
-      - traefik.http.middlewares.gripl-backend-strip-prefix.stripprefix.prefixes=/api
-      - traefik.http.routers.gripl-backend.middlewares=gripl-backend-strip-prefix
-      - traefik.http.services.gripl-backend.loadbalancer.server.port=${BACKEND_PORT:-8080}
     networks:
       - app
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
 
   gripl-postgres:
     env_file:

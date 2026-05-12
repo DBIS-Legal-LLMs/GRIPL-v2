@@ -55,8 +55,8 @@ docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.loc
 
 You will then have:
 
-* frontend: [http://localhost](http://localhost)
-* backend: [http://localhost/api](http://localhost/api)
+* frontend: [http://localhost:3000](http://localhost:3000)
+* backend: [http://localhost:8080/api](http://localhost:8080/api)
 * Postgres: localhost:5432
 
 ### 3. Run in production (server already has Traefik + Watchtower)
