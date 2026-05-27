@@ -2,11 +2,13 @@
 
 The **GRIPL Backend** is a Spring Boot application that provides a REST API for analyzing BPMN files and evaluating labeled datasets of processes. It also includes full CRUD endpoints for managing the test dataset. While it is designed to work seamlessly with the GRIPL frontend, it can also be used independently via a command-line interface (CLI).
 
-## Prerequisites
+## Prerequisites 
+Please ensure that you have the following installed and configured on your system before running the backend:
+- Postgres Database (Version 15 or higher recommended)
+- Java JDK 21
+- Maven
 
-Before running the GRIPL Backend, ensure that you have a **PostgreSQL** database instance up and running. The application requires PostgreSQL, which you can set up via Docker or install directly on your system.
-
-Next, copy the `.env.example` file to `.env` and configure all required environment variables, such as database connection details and (optionally) an OpenAI API key for process analysis. The `.env` file is used to configure the backend.
+Copy the `.env.example` file to `.env` and configure all required environment variables, such as database connection details and (optionally) an OpenAI API key for process analysis. The `.env` file is used to configure the backend.
 
 ## Running Locally with Maven
 
