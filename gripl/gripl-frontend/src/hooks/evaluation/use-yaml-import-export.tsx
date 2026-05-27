@@ -41,7 +41,7 @@ export function useYamlImportExport(props: {
         setModels,
     } = props;
 
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     function onClickImportYaml() {
         fileInputRef.current?.click();

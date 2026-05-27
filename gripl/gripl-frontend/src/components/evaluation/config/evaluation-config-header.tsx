@@ -5,7 +5,7 @@ import { Upload, Download } from "lucide-react";
 import {ChangeEvent, RefObject} from "react";
 
 interface EvaluationConfigHeaderProps {
-    fileInputRef: RefObject<HTMLInputElement | null>;
+    fileInputRef: RefObject<HTMLInputElement>;
     onFileChange: (e: ChangeEvent<HTMLInputElement>) => void;
     onClickImportYaml: () => void;
     onClickExportYaml: () => void;

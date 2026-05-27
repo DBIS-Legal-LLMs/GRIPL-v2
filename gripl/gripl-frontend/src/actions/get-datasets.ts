@@ -1,3 +1,5 @@
+"use server"
+
 import {Dataset} from "@/models/dto/Dataset";
 
 export default async function getDatasets(): Promise<Dataset[]> {
