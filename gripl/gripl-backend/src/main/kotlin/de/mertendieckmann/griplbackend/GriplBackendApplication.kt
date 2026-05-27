@@ -9,7 +9,7 @@ import org.springframework.boot.runApplication
 
 @OpenAPIDefinition(
 	info = Info(title = "GRIPL API", description = "GRIPL Backend API"),
-	servers = [Server(url = "\${app.frontend.base-url}/api", description = "Base URL of the API")]
+	servers = [Server(url = "\${app.backend.base-url:http://localhost:8000}", description = "Base URL of the API")]
 )
 @SpringBootApplication
 @ConfigurationPropertiesScan
