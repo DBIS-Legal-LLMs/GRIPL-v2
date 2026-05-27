@@ -10,17 +10,6 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@CrossOrigin(
-    origins = ["\${app.frontend.base-url}"],
-    allowCredentials = "true",
-    allowedHeaders = ["*"],
-    methods = [
-        RequestMethod.GET,
-        RequestMethod.POST,
-        RequestMethod.DELETE,
-        RequestMethod.OPTIONS
-    ]
-)
 @RequestMapping("/dataset")
 class DatasetController(
     private val datasetRepository: DatasetRepository

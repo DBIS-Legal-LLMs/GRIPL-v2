@@ -18,15 +18,6 @@ import reactor.core.scheduler.Schedulers
 
 @RestController
 @RequestMapping("/gdpr/analysis")
-@CrossOrigin(
-    origins = ["\${app.frontend.base-url}"],
-    allowCredentials = "true",
-    allowedHeaders = ["*"],
-    methods = [
-        RequestMethod.GET,
-        RequestMethod.POST,
-    ]
-)
 class AnalysisController(
     private val analyzerFactory: AnalyzerFactory,
     private val llmConfig: LlmConfig,

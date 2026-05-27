@@ -17,17 +17,6 @@ import org.springframework.web.server.ResponseStatusException
 import reactor.core.publisher.Mono
 
 @RestController
-@CrossOrigin(
-    origins = ["\${app.frontend.base-url}"],
-    allowCredentials = "true",
-    allowedHeaders = ["*"],
-    methods = [
-        RequestMethod.GET,
-        RequestMethod.POST,
-        RequestMethod.DELETE,
-        RequestMethod.OPTIONS
-    ]
-)
 @RequestMapping("/dataset/testcase")
 class EvaluationDataController(
     private val evaluationDataRepository: EvaluationDataRepository,

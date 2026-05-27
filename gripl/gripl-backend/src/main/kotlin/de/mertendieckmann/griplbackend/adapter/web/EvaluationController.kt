@@ -13,15 +13,6 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/gdpr/evaluation")
-@CrossOrigin(
-    origins = ["\${app.frontend.base-url}"],
-    allowCredentials = "true",
-    allowedHeaders = ["*"],
-    methods = [
-        RequestMethod.GET,
-        RequestMethod.POST,
-    ]
-)
 class EvaluationController(
     private val multiEvaluationRunner: MultiEvaluationRunner,
     private val env: Environment
