@@ -6,6 +6,7 @@ import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.AnalysisEndpoint
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.RagMode
+import de.mertendieckmann.griplbackend.model.dto.MulticlassAnalysisResponse
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.core.env.Environment
@@ -118,5 +119,30 @@ class AnalysisController(
         } catch (e: IllegalArgumentException) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
         }
+    @Operation(
+        summary = "Analyzes BPMN-XML for GDPR processing classes",
+        description = "Upload a BPMN XML document (file part **bpmnFile**). The service analyzes it with an LLM and returns GDPR-relevant activity elements classified into processing classes."
+    )
+    @PostMapping(
+        "/multiclass",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun analyzeBpmnForGdprMulticlass(
+        @RequestPart("bpmnFile") file: FilePart,
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null
+    ): Mono<ResponseEntity<MulticlassAnalysisResponse>> {
+
+        val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
+        val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
+
+        return bpmnXmlMono.flatMap { bpmnXml ->
+            Mono.fromCallable {
+                val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
+                val analyzer = analyzerFactory.createMulticlassAnalyzer(llm)
+                analyzer.analyzeBpmnForGdpr(bpmnXml)
+            }.subscribeOn(Schedulers.boundedElastic())
+        }.map { ResponseEntity.ok(it) }
     }
+}
 }
