@@ -28,7 +28,7 @@
 	</scm>
 	<properties>
 		<java.version>17</java.version>
-		<kotlin.version>1.9.25</kotlin.version>
+		<kotlin.version>2.2.0</kotlin.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -47,7 +47,7 @@
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
-			<version>42.7.7</version>
+			<version>42.7.11</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -91,17 +91,17 @@
 		<dependency>
 			<groupId>dev.langchain4j</groupId>
 			<artifactId>langchain4j-kotlin</artifactId>
-			<version>1.0.1-beta6</version>
+			<version>1.17.0-beta27</version>
 		</dependency>
 		<dependency>
 			<groupId>dev.langchain4j</groupId>
 			<artifactId>langchain4j-open-ai</artifactId>
-			<version>1.0.1</version>
+			<version>1.17.0</version>
 		</dependency>
 		<dependency>
 			<groupId>dev.langchain4j</groupId>
 			<artifactId>langchain4j-http-client-jdk</artifactId>
-			<version>1.0.1</version>
+			<version>1.17.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -116,7 +116,7 @@
 		<dependency>
 			<groupId>io.github.oshai</groupId>
 			<artifactId>kotlin-logging-jvm</artifactId>
-			<version>7.0.3</version>
+			<version>8.0.4</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -126,32 +126,32 @@
 		<dependency>
 			<groupId>org.camunda.bpm.springboot</groupId>
 			<artifactId>camunda-bpm-spring-boot-starter</artifactId>
-			<version>7.23.0</version>
+			<version>7.24.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.camunda.bpm.model</groupId>
 			<artifactId>camunda-bpmn-model</artifactId>
-			<version>7.23.0</version>
+			<version>7.24.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.camunda.bpm</groupId>
 			<artifactId>camunda-engine</artifactId>
-			<version>7.23.0</version>
+			<version>7.24.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.microsoft.playwright</groupId>
 			<artifactId>playwright</artifactId>
-			<version>1.45.0</version>
+			<version>1.60.0</version>
 		</dependency>
 		<dependency>
 			<groupId>info.picocli</groupId>
 			<artifactId>picocli-spring-boot-starter</artifactId>
-			<version>4.7.6</version>
+			<version>4.7.7</version>
 		</dependency>
 		<dependency>
 			<groupId>info.picocli</groupId>
 			<artifactId>picocli-shell-jline3</artifactId>
-			<version>4.7.6</version>
+			<version>4.7.7</version>
 		</dependency>
 	</dependencies>
 
