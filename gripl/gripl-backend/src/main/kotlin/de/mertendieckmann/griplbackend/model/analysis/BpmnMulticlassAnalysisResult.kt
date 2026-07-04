@@ -14,7 +14,7 @@ data class BpmnMulticlassAnalysisResult(
         @Description("The detailed reason why the Activity Element belongs to the given GDPR processing class")
         val reason: String,
         @Description("The GDPR processing class of the Activity Element")
-        val classification: GdprProcessingClass
+        val classification: List<GdprProcessingClass>
     )
 
     /**

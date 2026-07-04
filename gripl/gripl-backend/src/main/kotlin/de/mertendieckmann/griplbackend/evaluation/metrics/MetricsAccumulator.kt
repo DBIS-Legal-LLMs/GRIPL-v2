@@ -113,6 +113,10 @@ class MetricsAccumulator {
             )
         } else null
 
+        val exactMatchAccuracy = if (total > 0)
+            passed.toDouble() / total
+        else 0.0
+
         return EvaluationReportSummary(
             total = total,
             passed = passed,
@@ -123,6 +127,7 @@ class MetricsAccumulator {
             recall = overall.recall,
             f1Score = overall.f1Score,
             accuracy = overall.accuracy,
+            exactMatchAccuracy = exactMatchAccuracy,
             totalTruePositives = totalTruePositives,
             totalFalsePositives = totalFalsePositives,
             totalFalseNegatives = totalFalseNegatives,

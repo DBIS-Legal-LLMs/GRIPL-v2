@@ -99,7 +99,7 @@ data class MulticlassAnalysisResponse(
         val id: String,
         val name: String?,
         val reason: String,
-        val classification: GdprProcessingClass
+        val classification: List<GdprProcessingClass>
     )
 
     companion object {

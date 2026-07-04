@@ -43,7 +43,7 @@ object MulticlassBpmnAnalysisAiServiceFactory {
 
                     In your output, return only activities that you classify as GDPR-relevant.
 
-                    For each activity, assign exactly one of the following GDPR processing classes:
+                    For each activity, assign one or more of the following GDPR processing classes, depending on which processing operations are performed: 
 
                     - COLLECTION: Gathering or entering personal data
                     - STORAGE: Storing or maintaining personal data
@@ -54,12 +54,28 @@ object MulticlassBpmnAnalysisAiServiceFactory {
                     - ACCESS: Retrieving, viewing or making personal data available
                     Use the classification names exactly as written above: COLLECTION, STORAGE, USAGE, TRANSFERAL, MODIFICATION, DELETION, ACCESS.
                     
-                    Choose the class that best represents the primary purpose of the activity.
+                    Assign every applicable processing class.
+                    If an activity performs multiple GDPR processing operations, return all applicable classes.
+
+                    Example:
+
+                    Activity:
+                    "Collect patient information and store it in the hospital information system"
+
+                    Output:
+                    classifications:
+                    - COLLECTION
+                    - STORAGE
+
+                    Reason:
+                    The activity first collects personal data from the patient and then stores it in the hospital information system.
 
                     For each returned activity, provide:
                     - the activity ID
-                    - the assigned classification
+                    - the list of assigned classifications
                     - a clear explanation in English using the activity name and description
+
+                    The classifications field must contain one or more values from the predefined GDPR processing classes.
 
                     Do not reference element IDs in the explanation.
                     Exclude all activities that do not process personal data and all BPMN elements that are not activities/tasks.
