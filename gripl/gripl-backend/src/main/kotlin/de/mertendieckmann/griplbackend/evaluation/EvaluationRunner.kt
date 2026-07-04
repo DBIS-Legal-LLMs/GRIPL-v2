@@ -57,27 +57,64 @@ class EvaluationRunner(
         entry: EvaluationData,
         evaluationRequest: EvaluationRequest
     ): EvaluationOutcome = try {
-        val expectedActivityIds = entry.expectedValues.map { it.value }
+        val expectedValues = entry.expectedValues
         val actualResult = evaluator.evaluate(entry.bpmnXml, evaluationRequest)
-        val actualActivityIds = actualResult.first.map { it.value }
+        val actualValues = actualResult.first
 
         val bpmnModel = parseBpmn(entry.bpmnXml)
 
-        val classification = computeClassificationSets(expectedActivityIds, actualActivityIds)
-        val trueNegativesCount = computeTrueNegativesCount(
-            bpmnModel = bpmnModel,
-            truePositivesCount = classification.truePositiveIds.size,
-            falsePositivesCount = classification.falsePositiveIds.size,
-            falseNegativesCount = classification.falseNegativeIds.size
+        val isMultiLabelEvaluation =
+            evaluationRequest.evaluationEndpoint.contains("multiclass", ignoreCase = true)
+
+        val expectedComparisonValues =
+            if (isMultiLabelEvaluation) {
+                expectedValues.flatMap { expected ->
+                    expected.classification.map { classification ->
+                        "${expected.value}:$classification"
+                    }
+                }
+            } else {
+                expectedValues.map { it.value }
+            }
+
+        val actualComparisonValues =
+            if (isMultiLabelEvaluation) {
+                actualValues.flatMap { actual ->
+                    actual.classification.map { classification ->
+                        "${actual.value}:$classification"
+                    }
+                }
+            } else {
+                actualValues.map { it.value }
+            }
+
+        val classification = computeClassificationSets(
+            expectedComparisonValues,
+            actualComparisonValues
         )
+
+        val trueNegativesCount =
+            if (isMultiLabelEvaluation) {
+                0
+            } else {
+                computeTrueNegativesCount(
+                    bpmnModel = bpmnModel,
+                    truePositivesCount = classification.truePositiveIds.size,
+                    falsePositivesCount = classification.falsePositiveIds.size,
+                    falseNegativesCount = classification.falseNegativeIds.size
+                )
+            }
+
+        val expectedActivityIds = expectedValues.map { it.value }
+        val actualActivityIds = actualValues.map { it.value }
 
         val metrics = EvaluationMetrics(
             truePositives = classification.truePositiveIds.size,
             falsePositives = classification.falsePositiveIds.size,
             falseNegatives = classification.falseNegativeIds.size,
             trueNegatives = trueNegativesCount,
-            isSuccessful = actualActivityIds.toSet() == expectedActivityIds.toSet(),
-            amountOfRetries = actualResult.second
+            isSuccessful = actualComparisonValues.toSet() == expectedComparisonValues.toSet(),
+            amountOfRetries = actualResult.second ?: 0
         )
 
         val testCaseReport = TestCaseReport(
@@ -86,9 +123,9 @@ class EvaluationRunner(
             datasetId = entry.datasetId,
             imageSrc = buildPreviewUrl(
                 testCaseId = entry.id,
-                correctActivityIds = classification.truePositiveIds,
-                falsePositiveIds = classification.falsePositiveIds,
-                falseNegativeIds = classification.falseNegativeIds
+                correctActivityIds = classification.truePositiveIds.map { it.substringBefore(":") }.distinct(),
+                falsePositiveIds = classification.falsePositiveIds.map { it.substringBefore(":") }.distinct(),
+                falseNegativeIds = classification.falseNegativeIds.map { it.substringBefore(":") }.distinct()
             ),
             correctActivityIds = classification.truePositiveIds,
             falsePositiveIds = classification.falsePositiveIds,
@@ -96,8 +133,8 @@ class EvaluationRunner(
             expectedNamesWithIds = getNamesWithIds(bpmnModel, expectedActivityIds),
             actualNamesWithIds = getNamesWithIds(bpmnModel, actualActivityIds),
             isSuccessful = metrics.isSuccessful,
-            result = actualResult.first,
-            amountOfRetries = actualResult.second
+            result = actualValues,
+            amountOfRetries = actualResult.second ?: 0
         )
 
         EvaluationOutcome.Success(testCaseReport, metrics)
@@ -112,4 +149,5 @@ class EvaluationRunner(
             )
         )
     }
+    
 }

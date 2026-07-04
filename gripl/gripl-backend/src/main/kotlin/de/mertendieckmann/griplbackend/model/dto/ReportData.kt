@@ -106,6 +106,7 @@ data class EvaluationReportSummary(
     val recall: Double,
     val f1Score: Double,
     val accuracy: Double,
+    val exactMatchAccuracy: Double,
     val totalTruePositives: Int,
     val totalFalsePositives: Int,
     val totalFalseNegatives: Int,
@@ -123,6 +124,7 @@ data class EvaluationReportSummary(
             |
             |### Metrics
             |Accuracy: ${"%.3f".format(accuracy)}
+            |Exact Match Accuracy: ${"%.3f".format(exactMatchAccuracy)}
             |Precision: ${"%.3f".format(precision)}
             |Recall: ${"%.3f".format(recall)}
             |F1-Score: ${"%.3f".format(f1Score)}

@@ -2,6 +2,7 @@ package de.mertendieckmann.griplbackend.model.dto
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import de.mertendieckmann.griplbackend.model.analysis.GdprProcessingClass
 
 data class EvaluationData(
     val id: Long,
@@ -28,7 +29,8 @@ data class EvaluationData(
 
 data class ExpectedValue(
     val value: String,
-    val reason: String? = null
+    val reason: String? = null,
+    val classification: List<GdprProcessingClass> = emptyList()
 )
 
 data class EvaluationDataMeta(
