@@ -1,4 +1,4 @@
-import {GdprCategory} from "@/models/GdprCategory";
+import {GdprCategory, normalizeFrontendGdprCategories} from "@/models/GdprCategory";
 
 export interface AnalysisRequest {
     bpmnXml: String
@@ -46,7 +46,7 @@ export function getAnalysisElements(response: AnalysisResponse | null | undefine
             id: element.id,
             name: element.name || element.id,
             reason: element.reason,
-            classification: element.classification,
+            classification: normalizeFrontendGdprCategories(element.classification as unknown as string[]),
         }));
     }
 

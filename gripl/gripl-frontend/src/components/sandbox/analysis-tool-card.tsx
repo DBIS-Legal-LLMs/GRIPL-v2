@@ -16,8 +16,8 @@ import LlmModelNameDatalist from "@/components/datalist/llm-model-name-datalist"
 import LlmApiKeyPlaceholderDatalist from "@/components/datalist/llm-api-key-placeholder-datalist";
 import {GenerateRandomInput} from "@/components/ui/input-generate-random";
 import {safeFloatOrNull} from "@/lib/evaluation-config-utils";
-import {Switch} from "@/components/ui/switch";
 import {getAnalysisElements} from "@/models/dto/AnalysisDto";
+import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 
 interface AnalysisToolCardProps {
     bpmnXml: string;
@@ -34,7 +34,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
     const [temperature, setTemperature] = useState<number | null>(null)
     const [topP, setTopP] = useState<number | null>(null)
     const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
-    const [useMulticlass, setUseMulticlass] = useState<boolean>(false)
+    const {apiEndpoint, backendEndpoint} = useAnalysisEndpoint()
     const analysisElements = getAnalysisElements(analysisResult)
 
     function buildFormData(): FormData {
@@ -57,11 +57,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
         setAnalysisResult(null);
         setIsAnalyzing(true);
 
-        const endpoint = useMulticlass
-            ? `/api/gdpr/analysis/multiclass`
-            : `/api/gdpr/analysis/prompt-engineering`;
-
-        fetch(endpoint, {
+        fetch(apiEndpoint, {
             method: "POST",
             headers: { Accept: "application/json" },
             body: buildFormData()
@@ -155,11 +151,8 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             <div className="py-2">
                 <Separator/>
             </div>
-            <div className="flex items-center space-x-2">
-                <Switch id="multiclass-mode" checked={useMulticlass} onCheckedChange={setUseMulticlass}/>
-                <Label htmlFor="multiclass-mode" className="text-sm">
-                    Multiclass Classification
-                </Label>
+            <div className="text-xs text-muted-foreground break-all">
+                Selected endpoint: {backendEndpoint}
             </div>
             <Button
                 onClick={handleAnalyzeClick}
