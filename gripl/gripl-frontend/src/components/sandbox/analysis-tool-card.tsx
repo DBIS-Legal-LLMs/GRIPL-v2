@@ -21,6 +21,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 import {useToast} from "@/components/ui/toast";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 import {getAnalysisElements} from "@/models/dto/AnalysisDto";
+import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 
 interface AnalysisToolCardProps {
     bpmnXml: string;
@@ -39,7 +40,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
     const [useRag, setUseRag] = useState<boolean>(false)
     const [searchMode, setSearchMode] = useState<string>("hybrid")
     const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
-    const [useMulticlass, setUseMulticlass] = useState<boolean>(false)
+    const {apiEndpoint, backendEndpoint} = useAnalysisEndpoint()
     const analysisElements = getAnalysisElements(analysisResult)
 
     const {showError} = useToast()
@@ -64,20 +65,13 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
         setAnalysisResult(null);
         setIsAnalyzing(true);
 
-        const endpoint = useMulticlass
-            ? `/api/gdpr/analysis/multiclass`
-            : `/api/gdpr/analysis/prompt-engineering`;
-
-        fetch(endpoint, {
-        } as LlmPropsOverride
-        const jsonBlob = new Blob([JSON.stringify(llmProps)], { type: "application/json" });
-        formData.append("llmProps", jsonBlob);
+        const formData = buildFormData();
         formData.append("useRag", String(useRag));
         if (useRag) {
             formData.append("ragMode", searchMode);
         }
 
-        fetch(`/api/gdpr/analysis/prompt-engineering`, {
+        fetch(apiEndpoint, {
             method: "POST",
             headers: {
                 Accept: "application/json"
@@ -198,11 +192,8 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             <div className="py-2">
                 <Separator/>
             </div>
-            <div className="flex items-center space-x-2">
-                <Switch id="multiclass-mode" checked={useMulticlass} onCheckedChange={setUseMulticlass}/>
-                <Label htmlFor="multiclass-mode" className="text-sm">
-                    Multiclass Classification
-                </Label>
+            <div className="text-xs text-muted-foreground break-all">
+                Selected endpoint: {backendEndpoint}
             </div>
             <Button
                 onClick={handleAnalyzeClick}

@@ -11,7 +11,11 @@ import {Switch} from "@/components/ui/switch";
 import {Label} from "@/components/ui/label";
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
 import LabelingEditorLabelCard from "@/components/labeling/labeling-editor-label-card";
-import {GdprCategory} from "@/models/GdprCategory";
+import {
+    GdprCategory,
+    normalizeFrontendGdprCategories,
+    toBackendGdprProcessingClass,
+} from "@/models/GdprCategory";
 import {Spinner} from "@/components/ui/spinner";
 import {Badge} from "@/components/ui/badge";
 import {useToast} from "@/components/ui/toast";
@@ -28,7 +32,7 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
     const [criticalActivities, setCriticalActivities] = useState<ExpectedValues[]>(
         (evaluationData.expectedValues || []).map((value) => ({
             ...value,
-            classification: value.classification ?? [],
+            classification: normalizeFrontendGdprCategories((value.classification as unknown as string[]) ?? []),
         }))
     );
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -57,8 +61,12 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
         const formData = new FormData();
         formData.append("bpmnFile", xmlBlob, "diagram.bpmn");
         formData.append("name", evaluationData.name);
+        const expectedValuesPayload = criticalActivities.map((value) => ({
+            ...value,
+            classification: (value.classification ?? []).map(toBackendGdprProcessingClass),
+        }));
         const expectedValuesBlob = new Blob(
-            [JSON.stringify(criticalActivities)],
+            [JSON.stringify(expectedValuesPayload)],
             { type: 'application/json' }
         );
         formData.append('expectedValues', expectedValuesBlob, 'expectedValues.json');

@@ -1,4 +1,4 @@
-import {GdprCategory} from "@/models/GdprCategory";
+import {GdprCategory, normalizeFrontendGdprCategories} from "@/models/GdprCategory";
 
 export interface AnalysisRequest {
     bpmnXml: String
@@ -6,11 +6,8 @@ export interface AnalysisRequest {
 
 export interface BinaryAnalysisResponse {
     criticalElements: CriticalElement[];
-<<<<<<< HEAD
     ragContext?: Record<string, RagElementContext>;
-=======
     amountOfRetries?: number | null;
->>>>>>> d96d174 (frontend with backend merge)
 }
 
 export interface CriticalElement {
@@ -38,8 +35,8 @@ export interface NormalizedAnalysisElement {
     name: string;
     type?: string;
     reason: string;
-<<<<<<< HEAD
     references?: LlmReference[];
+    classification: GdprCategory[];
 }
 
 export interface LlmReference {
@@ -84,8 +81,6 @@ export interface PdfLocateResponse {
     rects: PdfHighlightRect[];
     page_width: number;
     page_height: number;
-=======
-    classification: GdprCategory[];
 }
 
 export function getAnalysisElements(response: AnalysisResponse | null | undefined): NormalizedAnalysisElement[] {
@@ -98,7 +93,7 @@ export function getAnalysisElements(response: AnalysisResponse | null | undefine
             id: element.id,
             name: element.name || element.id,
             reason: element.reason,
-            classification: element.classification,
+            classification: normalizeFrontendGdprCategories(element.classification as unknown as string[]),
         }));
     }
 
@@ -108,5 +103,4 @@ export function getAnalysisElements(response: AnalysisResponse | null | undefine
         reason: element.reason,
         classification: [],
     }));
->>>>>>> d96d174 (frontend with backend merge)
 }

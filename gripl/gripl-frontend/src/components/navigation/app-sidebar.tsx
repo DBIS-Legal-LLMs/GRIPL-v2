@@ -1,3 +1,5 @@
+"use client"
+
 import {
     Sidebar,
     SidebarContent,
@@ -10,6 +12,9 @@ import Link from "next/link";
 import {ChartBarDecreasing, Tag, Workflow} from "lucide-react";
 import React, {ReactNode} from "react";
 import Image from "next/image";
+import {Switch} from "@/components/ui/switch";
+import {Label} from "@/components/ui/label";
+import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 
 interface Page {
     href: string;
@@ -18,6 +23,7 @@ interface Page {
 }
 
 export default function AppSidebar() {
+    const {isMulticlass, setMode, backendEndpoint} = useAnalysisEndpoint();
 
     const pages = [
         {
@@ -55,6 +61,18 @@ export default function AppSidebar() {
                 })}
             </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter />
+        <SidebarFooter className="p-3 border-t">
+            <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="sidebar-endpoint-switch" className="text-xs font-medium">Multiclass Endpoint</Label>
+                    <Switch
+                        id="sidebar-endpoint-switch"
+                        checked={isMulticlass}
+                        onCheckedChange={(checked) => setMode(checked ? "multiclass" : "binary")}
+                    />
+                </div>
+                <p className="text-[11px] text-muted-foreground break-all">{backendEndpoint}</p>
+            </div>
+        </SidebarFooter>
     </Sidebar>
 }
