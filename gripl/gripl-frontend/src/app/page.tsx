@@ -6,7 +6,7 @@ import {useMemo, useState} from "react";
 import {BpmnToolCard} from "@/models/BpmnToolCard";
 import AnalysisToolCard from "@/components/sandbox/analysis-tool-card";
 import emptyDiagram from "@/data/empty-diagram.bpmn";
-import {AnalysisResponse} from "@/models/dto/AnalysisDto";
+import {AnalysisResponse, getAnalysisElements} from "@/models/dto/AnalysisDto";
 import AnalysisResultCard, {humanizeType} from "@/components/sandbox/analysis-result-card";
 import RagContextCard from "@/components/sandbox/rag-context-card";
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
@@ -26,6 +26,7 @@ export default function Home() {
   const [diagram, setDiagram] = useState<string>(emptyDiagram as string)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
+  const analysisElements = getAnalysisElements(analysisResult)
   const [pdfViewer, setPdfViewer] = useState<PdfViewerState | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(true)
 
@@ -191,4 +192,20 @@ export default function Home() {
         )}
       </main>
   )
+  return <main className="flex flex-col justify-center items-center h-full w-full">
+    <div className="w-full h-full">
+      <BpmnEditor
+          bpmnXml={diagram}
+          highlightedActivityIds={analysisElements.map((element) => element.id)}
+          highlightedActivityCategories={analysisElements.reduce((acc, element) => {
+            acc[element.id] = element.classification
+            return acc
+          }, {} as Record<string, typeof analysisElements[number]["classification"]>)}
+          onNew={handleCreateNewDiagram}
+          onDiagramChanged={setDiagram}
+          cards={editorToolCards}
+          onEvent={onEvent}
+      />
+    </div>
+  </main>
 }

@@ -1,3 +1,5 @@
+import {GdprCategory} from "@/models/GdprCategory";
+
 export interface EvaluationMetadataReport {
     type: "metadata";
     modelLabels: string[],
@@ -55,7 +57,7 @@ export interface TestCaseReport {
     expectedNamesWithIds: string[],
     actualNamesWithIds: string[];
     isSuccessful: boolean;
-    result: { value: string; reason?: string }[];
+    result: { value: string; reason?: string; classification?: GdprCategory[] }[];
     amountOfRetries: number | null;
     ragMetrics?: TestCaseRagMetrics | null;
     ragPromptContext?: string[] | null;
@@ -74,6 +76,7 @@ export interface EvaluationReportSummary {
     recall: number;
     f1Score: number;
     accuracy: number;
+    exactMatchAccuracy: number;
     totalTruePositives: number;
     totalFalsePositives: number;
     totalFalseNegatives: number;

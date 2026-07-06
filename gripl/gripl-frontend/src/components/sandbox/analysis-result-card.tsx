@@ -1,8 +1,9 @@
-import {AnalysisResponse} from "@/models/dto/AnalysisDto";
+import {AnalysisResponse, getAnalysisElements} from "@/models/dto/AnalysisDto";
 import {Brain, ChevronDown, ChevronRight} from "lucide-react";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
 import {useState} from "react";
+import {Badge} from "@/components/ui/badge";
 
 interface AnalysisResultCardProps {
     analysisResult: AnalysisResponse | null,
@@ -20,6 +21,9 @@ export function humanizeType(type?: string): string {
 
 export default function AnalysisResultCard({ analysisResult, selectedElementId }: AnalysisResultCardProps) {
     const [isOpen, setIsOpen] = useState<boolean>(true)
+    const analysisElements = getAnalysisElements(analysisResult)
+
+    const hasCategories = analysisElements.some((element) => element.classification.length > 0);
 
     return analysisResult && <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <Card className="container">
@@ -42,17 +46,25 @@ export default function AnalysisResultCard({ analysisResult, selectedElementId }
                         <thead>
                         <tr className="bg-muted">
                             <th className="text-left text-sm font-semibold p-2">Activity</th>
+                            {hasCategories && <th className="text-left text-sm font-semibold p-2">Categories</th>}
                             <th className="text-left text-sm font-semibold p-2">Reasoning</th>
                         </tr>
                         </thead>
                         <tbody>
-                        {analysisResult.criticalElements.map((element, index) => {
+                        {analysisElements.map((element, index) => {
                             const isSelected = element.id === selectedElementId
                             return <tr key={index} className={`border-t ${isSelected ? "bg-destructive/50" : ""}`}>
-                                <td className="font-medium text-sm mb-1 p-2">
-                                    {element.name || <span className="italic text-muted-foreground">{humanizeType(element.type)}</span>}
-                                </td>
-                                <td className="text-sm p-2">{element.reason || "No reasoning provided"}</td>
+                                <td className="font-medium text-sm mb-1 p-2 align-top">{element.name}</td>
+                                {hasCategories && (
+                                    <td className="p-2 align-top">
+                                        <div className="flex flex-wrap gap-1">
+                                            {element.classification.map(cat => (
+                                                <Badge key={cat} variant="destructive" className="text-xs">{cat}</Badge>
+                                            ))}
+                                        </div>
+                                    </td>
+                                )}
+                                <td className="text-sm p-2 align-top">{element.reason || "No reasoning provided"}</td>
                             </tr>
                         })}
                         </tbody>
