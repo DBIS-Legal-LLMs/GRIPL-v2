@@ -24,6 +24,9 @@ export default function EvaluationReportSummaryCardMulti({
                                     <div className="font-semibold">{label}</div>
                                     <Badge variant="outline">{pct(rate)}</Badge>
                                 </div>
+                                <div className="mb-3 text-xs text-muted-foreground">
+                                    Exact match: {pct(summary.exactMatchAccuracy)}
+                                </div>
                                 <div className="grid grid-cols-4 gap-2 text-center">
                                     <div><div className="text-xl font-bold text-chart-success">{summary.passed}</div><div className="text-xs text-muted-foreground">Passed</div></div>
                                     <div><div className="text-xl font-bold text-chart-error">{summary.failed}</div><div className="text-xs text-muted-foreground">Failed</div></div>

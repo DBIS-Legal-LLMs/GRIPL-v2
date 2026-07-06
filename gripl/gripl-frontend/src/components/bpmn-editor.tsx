@@ -11,11 +11,29 @@ import DisableModelingModule from 'bpmn-js-token-simulation/lib/features/disable
 // @ts-ignore
 import { TOGGLE_MODE_EVENT } from 'bpmn-js-token-simulation/lib/util/EventHelper';
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
+import {GdprCategory} from "@/models/GdprCategory";
+
+const GDPR_MARKER_BY_CATEGORY: Record<GdprCategory, string> = {
+  Collection: "highlight-gdpr-collection",
+  Storage: "highlight-gdpr-storage",
+  Usage: "highlight-gdpr-usage",
+  Transferal: "highlight-gdpr-transferal",
+  Modification: "highlight-gdpr-modification",
+  Deletion: "highlight-gdpr-deletion",
+  Access: "highlight-gdpr-access",
+}
+
+const GDPR_MARKER_CLASSES = [
+  "highlight-privacy",
+  "highlight-gdpr-multi",
+  ...Object.values(GDPR_MARKER_BY_CATEGORY),
+]
 
 interface BpmnEditorProps {
   title?: string
   bpmnXml: string
   highlightedActivityIds?: string[]
+  highlightedActivityCategories?: Record<string, GdprCategory[]>
   onNew?: () => void
   onDiagramChanged: (xml: string) => void
   cards?: BpmnToolCard[]
@@ -26,7 +44,7 @@ interface BpmnEditorProps {
 }
 
 export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = [], onNew, onDiagramChanged, cards = [],
-                                     editorClassName, disableEditing, onEvent, onModelerChanged }: BpmnEditorProps) {
+                                     highlightedActivityCategories = {}, editorClassName, disableEditing, onEvent, onModelerChanged }: BpmnEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const modelerRef = useRef<any>(null)
   const [isLoaded, setIsLoaded] = useState(false)
@@ -80,8 +98,8 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
 
   useEffect(() => {
     if (!modelerRef.current || !isLoaded || !highlightedActivityIds) return
-    highlightActivities(modelerRef.current, highlightedActivityIds)
-  }, [highlightedActivityIds, isLoaded])
+    highlightActivities(modelerRef.current, highlightedActivityIds, highlightedActivityCategories)
+  }, [highlightedActivityIds, highlightedActivityCategories, isLoaded])
 
   async function handleFileLoaded(content: string) {
     onDiagramChanged(content)
@@ -159,7 +177,7 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
         }
 
         if (highlightedActivityIds) {
-          highlightActivities(modeler, highlightedActivityIds)
+          highlightActivities(modeler, highlightedActivityIds, highlightedActivityCategories)
         }
       } catch (err) {
         console.error("Error while importing BPMN XML", err)
@@ -170,14 +188,14 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
     }
   }
 
-  function highlightActivities(modeler: any, activityIds: string[]) {
+  function highlightActivities(modeler: any, activityIds: string[], categoryMap: Record<string, GdprCategory[]>) {
     try {
       const canvas = modeler.get("canvas")
       const elementRegistry = modeler.get("elementRegistry")
 
       elementRegistry.getAll().forEach((element: any) => {
         if (element.id) {
-          canvas.removeMarker(element.id, "highlight-privacy")
+          GDPR_MARKER_CLASSES.forEach((marker) => canvas.removeMarker(element.id, marker))
         }
       })
 
@@ -188,7 +206,19 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
       activityIds.forEach((id) => {
         const element = elementRegistry.get(id)
         if (element) {
-          canvas.addMarker(id, "highlight-privacy")
+          const categories = categoryMap[id] || []
+
+          if (categories.length === 0) {
+            canvas.addMarker(id, "highlight-privacy")
+            return
+          }
+
+          if (categories.length === 1) {
+            canvas.addMarker(id, GDPR_MARKER_BY_CATEGORY[categories[0]])
+            return
+          }
+
+          canvas.addMarker(id, "highlight-gdpr-multi")
         }
       })
 
@@ -196,7 +226,33 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
         const styleElement = document.createElement("style")
         styleElement.textContent = `
           .highlight-privacy .djs-visual > :nth-child(1) {
-            fill: hsl(var(--destructive) / 50%) !important;
+            fill: rgba(239, 68, 68, 0.45) !important;
+          }
+          .highlight-gdpr-collection .djs-visual > :nth-child(1) {
+            fill: rgba(34, 197, 94, 0.45) !important;
+          }
+          .highlight-gdpr-storage .djs-visual > :nth-child(1) {
+            fill: rgba(59, 130, 246, 0.45) !important;
+          }
+          .highlight-gdpr-usage .djs-visual > :nth-child(1) {
+            fill: rgba(245, 158, 11, 0.45) !important;
+          }
+          .highlight-gdpr-transferal .djs-visual > :nth-child(1) {
+            fill: rgba(168, 85, 247, 0.45) !important;
+          }
+          .highlight-gdpr-modification .djs-visual > :nth-child(1) {
+            fill: rgba(14, 165, 233, 0.45) !important;
+          }
+          .highlight-gdpr-deletion .djs-visual > :nth-child(1) {
+            fill: rgba(239, 68, 68, 0.55) !important;
+          }
+          .highlight-gdpr-access .djs-visual > :nth-child(1) {
+            fill: rgba(20, 184, 166, 0.45) !important;
+          }
+          .highlight-gdpr-multi .djs-visual > :nth-child(1) {
+            fill: rgba(236, 72, 153, 0.35) !important;
+            stroke: rgba(88, 28, 135, 0.9) !important;
+            stroke-width: 3px !important;
           }
         `
         document.head.appendChild(styleElement)

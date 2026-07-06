@@ -16,6 +16,8 @@ import LlmModelNameDatalist from "@/components/datalist/llm-model-name-datalist"
 import LlmApiKeyPlaceholderDatalist from "@/components/datalist/llm-api-key-placeholder-datalist";
 import {GenerateRandomInput} from "@/components/ui/input-generate-random";
 import {safeFloatOrNull} from "@/lib/evaluation-config-utils";
+import {Switch} from "@/components/ui/switch";
+import {getAnalysisElements} from "@/models/dto/AnalysisDto";
 
 interface AnalysisToolCardProps {
     bpmnXml: string;
@@ -32,15 +34,13 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
     const [temperature, setTemperature] = useState<number | null>(null)
     const [topP, setTopP] = useState<number | null>(null)
     const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
+    const [useMulticlass, setUseMulticlass] = useState<boolean>(false)
+    const analysisElements = getAnalysisElements(analysisResult)
 
-    function handleAnalyzeClick() {
-        setAnalysisResult(null);
-        setIsAnalyzing(true);
-
+    function buildFormData(): FormData {
         const xmlBlob = new Blob([bpmnXml], { type: "application/xml" });
         const formData = new FormData();
         formData.append("bpmnFile", xmlBlob, "diagram.bpmn");
-
         const llmProps = {
             baseUrl: llmBaseUrl || null,
             modelName: modelName || null,
@@ -48,16 +48,23 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             seed: seed || null,
             temperature: temperature || null,
             topP: topP || null
-        } as LlmPropsOverride
-        const jsonBlob = new Blob([JSON.stringify(llmProps)], { type: "application/json" });
-        formData.append("llmProps", jsonBlob);
+        } as LlmPropsOverride;
+        formData.append("llmProps", new Blob([JSON.stringify(llmProps)], { type: "application/json" }));
+        return formData;
+    }
 
-        fetch(`/api/gdpr/analysis/prompt-engineering`, {
+    function handleAnalyzeClick() {
+        setAnalysisResult(null);
+        setIsAnalyzing(true);
+
+        const endpoint = useMulticlass
+            ? `/api/gdpr/analysis/multiclass`
+            : `/api/gdpr/analysis/prompt-engineering`;
+
+        fetch(endpoint, {
             method: "POST",
-            headers: {
-                Accept: "application/json"
-            },
-            body: formData
+            headers: { Accept: "application/json" },
+            body: buildFormData()
         } as RequestInit).then(response => {
             if (!response.ok) {
                 throw new Error("Fehler bei der Analyse des Diagramms");
@@ -71,12 +78,11 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             console.error("Fehler bei der Analyse:", error);
             setIsAnalyzing(false);
             alert("Fehler bei der Analyse des Diagramms: " + error.message);
-        })
+        });
     }
 
     function handleDownloadResultClick() {
         if (!analysisResult) return;
-
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(analysisResult, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
@@ -149,6 +155,12 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             <div className="py-2">
                 <Separator/>
             </div>
+            <div className="flex items-center space-x-2">
+                <Switch id="multiclass-mode" checked={useMulticlass} onCheckedChange={setUseMulticlass}/>
+                <Label htmlFor="multiclass-mode" className="text-sm">
+                    Multiclass Classification
+                </Label>
+            </div>
             <Button
                 onClick={handleAnalyzeClick}
                 variant="default"
@@ -165,7 +177,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             <Button
                 onClick={handleDownloadResultClick}
                 variant="outline"
-                disabled={!analysisResult || analysisResult.criticalElements.length === 0 || isAnalyzing}
+                disabled={!analysisResult || analysisElements.length === 0 || isAnalyzing}
             >
                 <Download className="mr-2 h-4 w-4"/>
                 Download Report (Json)
@@ -173,7 +185,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             <Button
                 onClick={() => setAnalysisResult(null)}
                 variant="outline"
-                disabled={!analysisResult || analysisResult.criticalElements.length === 0 || isAnalyzing}
+                disabled={!analysisResult || analysisElements.length === 0 || isAnalyzing}
             >
                 <RefreshCw className="mr-2 h-4 w-4"/>
                 Clear Analysis Results

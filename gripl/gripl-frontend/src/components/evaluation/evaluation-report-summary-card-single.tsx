@@ -53,11 +53,16 @@ export default function EvaluationReportSummaryCardSingle({ reportSummary }: Sum
                     <CardTitle>Performance Metrics</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                         <div className="text-center">
                             <div className="text-3xl font-bold text-chart-metric-4">{formatDecimal(reportSummary.accuracy)}</div>
                             <div className="text-sm text-muted-foreground">Accuracy</div>
                             <Progress value={reportSummary.accuracy * 100} className="h-2 mt-2" />
+                        </div>
+                        <div className="text-center">
+                            <div className="text-3xl font-bold text-chart-metric-2">{formatDecimal(reportSummary.exactMatchAccuracy)}</div>
+                            <div className="text-sm text-muted-foreground">Exact Match</div>
+                            <Progress value={reportSummary.exactMatchAccuracy * 100} className="h-2 mt-2" />
                         </div>
                         <div className="text-center">
                             <div className="text-3xl font-bold text-chart-metric-1">{formatDecimal(reportSummary.precision)}</div>
