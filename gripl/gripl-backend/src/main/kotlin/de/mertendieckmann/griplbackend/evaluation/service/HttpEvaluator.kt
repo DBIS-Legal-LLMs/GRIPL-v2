@@ -3,7 +3,6 @@ package de.mertendieckmann.griplbackend.evaluation.service
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRequest
-import de.mertendieckmann.griplbackend.model.dto.ModelRunConfig
 import de.mertendieckmann.griplbackend.model.dto.ExpectedValue
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.io.ByteArrayResource
@@ -20,9 +19,11 @@ class HttpEvaluator(
     @Value("\${server.port:8080}") private val serverPort: Int
 ): Evaluator {
 
-    private val webClient = WebClient.builder().build()
+    private val webClient = WebClient.builder()
+        .codecs { it.defaultCodecs().maxInMemorySize(32 * 1024 * 1024) }
+        .build()
 
-    override suspend fun evaluate(bpmnXml: String, evaluationRequest: EvaluationRequest): Pair<List<ExpectedValue>, Int?> {
+    override suspend fun evaluate(bpmnXml: String, evaluationRequest: EvaluationRequest): EvaluationCallResult {
         val bodyBuilder = MultipartBodyBuilder()
         bodyBuilder.part("bpmnFile", ByteArrayResource(bpmnXml.toByteArray()))
             .header("Content-Disposition", "form-data; name=\"bpmnFile\"; filename=\"process.bpmn\"")
@@ -32,6 +33,11 @@ class HttpEvaluator(
                 .header("Content-Disposition", "form-data; name=\"llmProps\"")
                 .contentType(MediaType.APPLICATION_JSON)
         }
+        // Forward RAG parameters — the analysis endpoint defaults to false/hybrid when omitted,
+        // but we send them explicitly so behaviour matches the evaluation request config.
+        bodyBuilder.part("useRag", evaluationRequest.useRag.toString())
+        bodyBuilder.part("ragMode", evaluationRequest.ragMode.toString())
+        bodyBuilder.part("activitiesOnly", evaluationRequest.activitiesOnly.toString())
 
         val absoluteEndpoint = if (evaluationRequest.evaluationEndpoint.startsWith("http://") || evaluationRequest.evaluationEndpoint.startsWith("https://")) {
             evaluationRequest.evaluationEndpoint
@@ -48,9 +54,12 @@ class HttpEvaluator(
                 .retrieve()
                 .awaitBody()
 
-            return Pair(
-                analysisResponse.criticalElements.map { ExpectedValue(value = it.id, reason = it.reason) },
-                analysisResponse.amountOfRetries
+            return EvaluationCallResult(
+                expectedValues = analysisResponse.criticalElements.map {
+                    ExpectedValue(value = it.id, reason = it.reason)
+                },
+                amountOfRetries = analysisResponse.amountOfRetries,
+                analysisResponse = analysisResponse
             )
         } catch (e: WebClientResponseException) {
             throw RuntimeException("Failed to evaluate BPMN XML at endpoint '$absoluteEndpoint': ${e.responseBodyAsString}", e)

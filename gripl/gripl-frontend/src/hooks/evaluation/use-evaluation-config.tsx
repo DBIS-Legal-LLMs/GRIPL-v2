@@ -38,6 +38,15 @@ export function useEvaluationConfig(
     const [repetitions, setRepetitions] = useState<number>(1);
     const [models, setModels] = useState<ModelRowState[]>(() => [newModelRow(1)]);
     const [selectedDatasets, setSelectedDatasets] = useState<number[]>([]);
+    const [selectedTestCaseIds, setSelectedTestCaseIds] = useState<number[]>([]);
+
+    // RAG configuration
+    const [useRag, setUseRag] = useState<boolean>(false);
+    const [ragMode, setRagMode] = useState<string>("hybrid");
+    const [evaluateRag, setEvaluateRag] = useState<boolean>(true);
+
+    // Evaluation scope: score activities only vs. all BPMN elements
+    const [activitiesOnly, setActivitiesOnly] = useState<boolean>(false);
 
     useEffect(() => {
         fetchAnalysisEndpoints().then((eps) => {
@@ -80,14 +89,19 @@ export function useEvaluationConfig(
         const multi: MultiEvaluationRequest = {
             models: dtoModels,
             datasets: selectedDatasets,
+            evaluationDataIds: selectedTestCaseIds,
             defaultEvaluationEndpoint: effectiveDefaultEndpoint,
             seed: seed || undefined,
             maxConcurrent: maxConcurrent,
             repetitions: repetitions,
+            useRag,
+            ragMode,
+            evaluateRag: useRag && evaluateRag,
+            activitiesOnly,
         };
 
         onMultiConfigChanged(multi);
-    }, [models, selectedDatasets, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, onMultiConfigChanged]);
+    }, [models, selectedDatasets, selectedTestCaseIds, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, useRag, ragMode, evaluateRag, activitiesOnly, onMultiConfigChanged]);
 
     function addModel() {
         setModels((prev) => [...prev, newModelRow(prev.length + 1)]);
@@ -127,7 +141,12 @@ export function useEvaluationConfig(
         repetitions,
         models,
         selectedDatasets,
+        selectedTestCaseIds,
         effectiveDefaultEndpoint,
+        useRag,
+        ragMode,
+        evaluateRag,
+        activitiesOnly,
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
         setDefaultCustomEndpoint,
@@ -135,7 +154,12 @@ export function useEvaluationConfig(
         setMaxConcurrent,
         setRepetitions,
         setSelectedDatasets,
+        setSelectedTestCaseIds,
         setModels,
+        setUseRag,
+        setRagMode,
+        setEvaluateRag,
+        setActivitiesOnly,
         addModel,
         removeModel,
         duplicateModel,

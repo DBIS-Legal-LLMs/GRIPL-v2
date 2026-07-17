@@ -3,6 +3,21 @@
 !*.iml
 !.idea/runConfigurations/
 
+.env
 .env.*
+!.env.example
 !.env.local.example
 !.env.prod.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.venv
+
+# LightRAG runtime data
+rag_working_dir/
+gripl/gripl-rag/.env
+

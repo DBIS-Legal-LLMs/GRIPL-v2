@@ -9,6 +9,15 @@ interface AnalysisResultCardProps {
     selectedElementId?: string | null
 }
 
+// Turns a raw BPMN type name (e.g. "exclusiveGateway") into a readable label
+// ("Exclusive Gateway"). Last-resort fallback when an element has neither a
+// real name nor an LLM-generated contextual label.
+export function humanizeType(type?: string): string {
+    if (!type) return "Unnamed element"
+    const spaced = type.replace(/([a-z])([A-Z])/g, "$1 $2")
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
 export default function AnalysisResultCard({ analysisResult, selectedElementId }: AnalysisResultCardProps) {
     const [isOpen, setIsOpen] = useState<boolean>(true)
 
@@ -40,7 +49,9 @@ export default function AnalysisResultCard({ analysisResult, selectedElementId }
                         {analysisResult.criticalElements.map((element, index) => {
                             const isSelected = element.id === selectedElementId
                             return <tr key={index} className={`border-t ${isSelected ? "bg-destructive/50" : ""}`}>
-                                <td className="font-medium text-sm mb-1 p-2">{element.name}</td>
+                                <td className="font-medium text-sm mb-1 p-2">
+                                    {element.name || <span className="italic text-muted-foreground">{humanizeType(element.type)}</span>}
+                                </td>
                                 <td className="text-sm p-2">{element.reason || "No reasoning provided"}</td>
                             </tr>
                         })}

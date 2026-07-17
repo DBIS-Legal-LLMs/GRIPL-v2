@@ -4,7 +4,9 @@ Identifying GDPR-Critical Tasks in Business Processes using Large Language Model
 
 ## Overview
 
-This repository contains the source code and research artifacts for the GRIPL framework. The system consists of a frontend, a backend, and a PostgreSQL database.
+This repository contains the source code and research artifacts for the GRIPL framework. The system consists of a frontend, a backend, a RAG service, a PostgreSQL database, and a Neo4j database.
+
+The RAG service provides a Retrieval-Augmented Generation API that queries a LightRAG knowledge graph built from GDPR-related legal documents and returns relevant legal context to the backend during analysis.
 
 In addition to the code, the repository includes:
 - A labeled dataset of BPMN files in `dataset/` for reproducing the evaluation
@@ -21,7 +23,7 @@ This project can be run in different environments by **composing multiple docker
 
 This project provides:
 
-* `docker-compose.yml` – base services (frontend, backend, Postgres)
+* `docker-compose.yml` – base services (frontend, backend, RAG service, Postgres, Neo4j)
 * `docker-compose.local.yml` – local testing and running
 * `docker-compose.prod.yml` – production style, with Traefik labels and watchtower labels, expects an existing **external** Traefik network (default: `web`)
 * `docker-compose.traefik.yml` – optional Traefik container, in case the host does **not** already run Traefik
@@ -66,8 +68,10 @@ You will then have three docker containers running:
 * frontend: [http://localhost:3000](http://localhost:3000)
 * backend (swagger): [http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)
 * Postgres: localhost:5432
+* RAG service: [http://localhost/rag](http://localhost/rag)
 
-### 3. Run in production (server already has Traefik + Watchtower)
+
+### 2. Run in production (server already has Traefik + Watchtower)
 
 ```bash
 cp .env.prod.example .env.prod
@@ -85,7 +89,7 @@ This will:
 
 ---
 
-### 4. Run Watchtower and Traefik alongside (server does not have them yet)
+### 3. Run Watchtower and Traefik alongside (server does not have them yet)
 
 If your host does **not** run Watchtower and Traefik yet, add:
 
@@ -107,6 +111,8 @@ Watchtower is configured to only update containers that have the label
 See [gripl/gripl-backend/README.md](gripl/gripl-backend/README.md) for instructions on running the backend locally.
 
 See [gripl/gripl-frontend/README.md](gripl/gripl-frontend/README.md) for instructions on running the frontend locally.
+
+The RAG service can be run locally by installing the dependencies from `gripl/gripl-rag/requirements.txt` and starting it with `uvicorn app.main:app --reload --port 8081` from the `gripl/gripl-rag` directory. It requires a running Neo4j instance, which can be started with Docker (see `docker-compose.yml`). This is the same requirements file used by the Docker image. Note that on Linux, the system libraries `libgl1` and `libglib2.0-0` are additionally required by PyMuPDF / LightRAG (the Docker image installs them automatically; on Windows they are bundled with the pip wheels).
 
 Local development requires a running PostgreSQL database. The simplest option is to start a fresh instance with Docker and set the backend’s database connection via environment variables. On startup, the backend will automatically create any missing tables.
 

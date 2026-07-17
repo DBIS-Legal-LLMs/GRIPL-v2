@@ -41,7 +41,12 @@ class MultiEvaluationRunner(
                     evaluationEndpoint = effectiveEndpoint,
                     llmProps = model.llmProps?.copy(seed = runSeed),
                     maxConcurrent = request.maxConcurrent,
-                    datasets = request.datasets
+                    datasets = request.datasets,
+                    evaluationDataIds = request.evaluationDataIds,
+                    useRag = request.useRag,
+                    ragMode = request.ragMode,
+                    evaluateRag = request.evaluateRag,
+                    activitiesOnly = request.activitiesOnly
                 )
 
                 singleRunner.run(singleRequest)
@@ -55,7 +60,11 @@ class MultiEvaluationRunner(
 
     private fun createMetadata(request: MultiEvaluationRequest, seed: Int, repetitions: Int): EvaluationMetadataReport {
         val datasets = datasetRepository.getDatasetsByIds(request.datasets.map { it.toLong() })
-        val totalTestCases = evaluationDataRepository.countEvaluationDataForDatasets(request.datasets.map { it.toLong() })
+        val totalTestCases = if (request.evaluationDataIds.isNotEmpty()) {
+            request.evaluationDataIds.size
+        } else {
+            evaluationDataRepository.countEvaluationDataForDatasets(request.datasets.map { it.toLong() })
+        }
 
         return EvaluationMetadataReport(
             modelLabels = request.models.map { it.label },
@@ -65,7 +74,8 @@ class MultiEvaluationRunner(
             totalTestCases = totalTestCases,
             seed = seed,
             defaultEvaluationEndpoint = request.defaultEvaluationEndpoint,
-            totalRepetitions = repetitions
+            totalRepetitions = repetitions,
+            activitiesOnly = request.activitiesOnly
         )
     }
 

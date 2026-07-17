@@ -5,6 +5,7 @@ import de.mertendieckmann.griplbackend.application.analyzer.AnalyzerFactory
 import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.AnalysisEndpoint
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
+import de.mertendieckmann.griplbackend.model.dto.RagMode
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.core.env.Environment
@@ -13,6 +14,7 @@ import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.http.codec.multipart.FilePart
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.server.ResponseStatusException
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 
@@ -46,8 +48,15 @@ class AnalysisController(
     )
     fun analyzeBpmnForGdprPromptEngineering(
         @RequestPart("bpmnFile") file: FilePart,
-        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("activitiesOnly", required = false) activitiesOnlyPart: org.springframework.http.codec.multipart.FormFieldPart?
     ): Mono<ResponseEntity<AnalysisResponse>> {
+
+        val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
+        val ragMode = parseRagMode(ragModePart)
+        val activitiesOnly = activitiesOnlyPart?.value()?.toBooleanStrictOrNull() ?: false
 
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
         val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
@@ -56,8 +65,12 @@ class AnalysisController(
             Mono.fromCallable {
                 val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
                 val analyzer = analyzerFactory.createPromptEngineeringAnalyzer(llm)
-                analyzer.analyzeBpmnForGdpr(bpmnXml)
-            }.subscribeOn(Schedulers.boundedElastic())
+                analyzer.analyzeBpmnForGdpr(
+                    bpmnXml = bpmnXml,
+                    useRag = useRag,
+                    ragMode = ragMode,
+                    activitiesOnly = activitiesOnly
+                )            }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
 
@@ -73,9 +86,15 @@ class AnalysisController(
     )
     fun analyzeBpmnForGdprBaseline(
         @RequestPart("bpmnFile") file: FilePart,
-        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("activitiesOnly", required = false) activitiesOnlyPart: org.springframework.http.codec.multipart.FormFieldPart?
     ): Mono<ResponseEntity<AnalysisResponse>> {
 
+        val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
+        val ragMode = parseRagMode(ragModePart)
+        val activitiesOnly = activitiesOnlyPart?.value()?.toBooleanStrictOrNull() ?: false
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
         val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
 
@@ -83,8 +102,21 @@ class AnalysisController(
             Mono.fromCallable {
                 val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
                 val analyzer = analyzerFactory.createBaselineAnalyzer(llm)
-                analyzer.analyzeBpmnForGdpr(bpmnXml)
-            }.subscribeOn(Schedulers.boundedElastic())
+                analyzer.analyzeBpmnForGdpr(
+                    bpmnXml = bpmnXml,
+                    useRag = useRag,
+                    ragMode = ragMode,
+                    activitiesOnly = activitiesOnly
+                )            }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
+    }
+
+    private fun parseRagMode(ragModePart: org.springframework.http.codec.multipart.FormFieldPart?): RagMode {
+        val raw = ragModePart?.value() ?: return RagMode.HYBRID
+        return try {
+            RagMode.fromString(raw)
+        } catch (e: IllegalArgumentException) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
+        }
     }
 }

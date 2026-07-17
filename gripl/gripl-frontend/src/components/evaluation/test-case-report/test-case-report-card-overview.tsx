@@ -16,7 +16,7 @@ export default function TestCaseReportCardOverview({ totalExpected, totalActual,
                 <h3 className="font-medium text-sm">Expected</h3>
             </div>
             <p className="text-2xl font-bold">{totalExpected}</p>
-            <p className="text-xs text-muted-foreground">Activities</p>
+            <p className="text-xs text-muted-foreground">BPMN Elements</p>
         </Card>
 
         <Card className="p-4">
@@ -25,7 +25,7 @@ export default function TestCaseReportCardOverview({ totalExpected, totalActual,
                 <h3 className="font-medium text-sm">Detected</h3>
             </div>
             <p className="text-2xl font-bold">{totalActual}</p>
-            <p className="text-xs text-muted-foreground">Activities</p>
+            <p className="text-xs text-muted-foreground">BPMN Elements</p>
         </Card>
 
         <Card className="p-4">

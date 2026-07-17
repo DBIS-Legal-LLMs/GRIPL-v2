@@ -3,11 +3,10 @@ FROM maven:3.8.6-eclipse-temurin-17 AS builder
 WORKDIR /app
 
 COPY pom.xml .
+RUN mvn dependency:go-offline dependency:resolve-plugins -q
+
 COPY src ./src
-
-RUN mvn clean package -DskipTests
-
-RUN mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install-deps"
+RUN mvn package -DskipTests
 
 FROM mcr.microsoft.com/playwright:latest AS runtime
 USER root

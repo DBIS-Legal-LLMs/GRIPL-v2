@@ -18,14 +18,9 @@ class EvaluationController(
     private val env: Environment
 ) {
 
-    @Operation(
-        summary = "Evaluates the classification algorithm against the dataset",
-        description = "Runs the evaluation of the classification algorithm against all process models inside the dataset and returns a markdown report with the results."
-    )
+    @Operation(summary = "Evaluates the classification algorithm against the dataset (markdown)")
     @PostMapping("/markdown", produces = [MediaType.TEXT_MARKDOWN_VALUE])
-    suspend fun evaluate(
-        @RequestBody request: MultiEvaluationRequest
-    ): String {
+    suspend fun evaluate(@RequestBody request: MultiEvaluationRequest): String {
         val sb = StringBuilder()
         var currentLabel: String? = null
         val resolvedRequest = ControllerUtils.resolveEnvironmentVariables(request, env)
@@ -51,14 +46,9 @@ class EvaluationController(
         return sb.toString().trimEnd()
     }
 
-    @Operation(
-        summary = "Evaluates the classification algorithm against the dataset",
-        description = "Runs the evaluation of the classification algorithm against all process models inside the dataset and returns a JSON report with the results in a stream."
-    )
+    @Operation(summary = "Evaluates the classification algorithm against the dataset (NDJSON stream)")
     @PostMapping("/stream", produces = [MediaType.APPLICATION_NDJSON_VALUE])
-    suspend fun evaluateStream(
-        @RequestBody request: MultiEvaluationRequest
-    ): Flow<ModelReportEnvelope> {
+    suspend fun evaluateStream(@RequestBody request: MultiEvaluationRequest): Flow<ModelReportEnvelope> {
         val resolvedRequest = ControllerUtils.resolveEnvironmentVariables(request, env)
             ?: throw IllegalArgumentException("Invalid request after resolving environment variables.")
         return multiEvaluationRunner.runAll(resolvedRequest)

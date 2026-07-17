@@ -5,6 +5,8 @@ import { dump as yamlDump, load as yamlLoad } from "js-yaml";
 import { MultiEvaluationRequest, ModelRunConfig } from "@/models/dto/MultiEvaluationRequest";
 import {ModelRowState} from "@/models/evaluation/Config";
 import {cryptoRandomId, findPreset, normalize, pruneNulls} from "@/lib/evaluation-config-utils";
+import {useToast} from "@/components/ui/toast";
+import {toErrorMessage} from "@/lib/http-error";
 
 export function useYamlImportExport(props: {
     availableEvaluationEndpoints: AnalysisEndpoint[];
@@ -14,6 +16,10 @@ export function useYamlImportExport(props: {
     seed: number | null;
     maxConcurrent: number;
     repetitions: number;
+    useRag: boolean;
+    ragMode: string;
+    evaluateRag: boolean;
+    activitiesOnly: boolean;
     setDefaultEndpointChoice: (v: "preset" | "custom") => void;
     setDefaultPresetEndpoint: (v: string) => void;
     setDefaultCustomEndpoint: (v: string) => void;
@@ -22,6 +28,10 @@ export function useYamlImportExport(props: {
     setRepetitions: (v: number) => void;
     setSelectedDatasets: (v: number[]) => void;
     setModels: (v: ModelRowState[]) => void;
+    setUseRag: (v: boolean) => void;
+    setRagMode: (v: string) => void;
+    setEvaluateRag: (v: boolean) => void;
+    setActivitiesOnly: (v: boolean) => void;
 }) {
     const {
         availableEvaluationEndpoints,
@@ -31,6 +41,10 @@ export function useYamlImportExport(props: {
         seed,
         maxConcurrent,
         repetitions,
+        useRag,
+        ragMode,
+        evaluateRag,
+        activitiesOnly,
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
         setDefaultCustomEndpoint,
@@ -39,9 +53,14 @@ export function useYamlImportExport(props: {
         setRepetitions,
         setSelectedDatasets,
         setModels,
+        setUseRag,
+        setRagMode,
+        setEvaluateRag,
+        setActivitiesOnly,
     } = props;
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const {showError} = useToast();
 
     function onClickImportYaml() {
         fileInputRef.current?.click();
@@ -56,7 +75,7 @@ export function useYamlImportExport(props: {
             applyYamlConfig(parsed);
         } catch (err) {
             console.error("YAML parse error:", err);
-            alert("Failed to parse YAML. Please check the file.");
+            showError("Failed to parse YAML", toErrorMessage(err));
         } finally {
             e.target.value = "";
         }
@@ -94,6 +113,11 @@ export function useYamlImportExport(props: {
         if (typeof reps === "number" && Number.isFinite(reps) && reps > 0) {
             setRepetitions(reps);
         }
+
+        if (typeof cfg?.useRag === "boolean") setUseRag(cfg.useRag);
+        if (typeof cfg?.ragMode === "string" && cfg.ragMode) setRagMode(cfg.ragMode);
+        if (typeof cfg?.evaluateRag === "boolean") setEvaluateRag(cfg.evaluateRag);
+        if (typeof cfg?.activitiesOnly === "boolean") setActivitiesOnly(cfg.activitiesOnly);
 
         if (modelItems.length > 0) {
             const next: ModelRowState[] = modelItems.map((model: any, idx: number) => {
@@ -174,6 +198,10 @@ export function useYamlImportExport(props: {
             repetitions: repetitions || 1,
             models: dtoModels,
             datasets: selectedDatasets,
+            useRag,
+            ragMode,
+            evaluateRag: useRag && evaluateRag,
+            activitiesOnly,
         };
     }
 

@@ -26,6 +26,8 @@ import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluat
 import MetricChart from "@/components/evaluation/charts/aggregated/metric-chart";
 import {ColorProvider, useColors} from "@/components/evaluation/charts/common/color-context";
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
+import {useToast} from "@/components/ui/toast";
+import {toErrorMessage} from "@/lib/http-error";
 
 type ModelReportEnvelope = {
     modelLabel: string;
@@ -55,27 +57,9 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const [isMetricsSummaryOpen, setIsMetricsSummaryOpen] = useState<boolean>(false);
 
     const { colors, setColors } = useColors()
+    const { showToast, showError } = useToast()
 
-    const handleEvaluationStart = async () => {
-        if (!evaluationRequest) return;
-
-        setMetadata(null);
-        setTestCasesByRun(new Map());
-        setSummaryByRun(new Map());
-        setCurrentStepInfos([]);
-        setErrorsByRun(new Map());
-        setIsLoading(true);
-        setIsFinished(false);
-        setSelectedRun(1);
-
-        console.log("Sending request", evaluationRequest)
-
-        const res = await fetch(`/api/gdpr/evaluation/stream`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(evaluationRequest)
-        });
-
+    const processNdjsonStream = async (res: Response) => {
         if (!res.ok || !res.body) {
             console.error("Request failed:", res.status, res.statusText);
             setIsLoading(false);
@@ -100,8 +84,6 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 try {
                     const env = JSON.parse(line) as ModelReportEnvelope;
                     const { modelLabel, report, runNumber } = env;
-
-                    console.log(`Received report for model: ${modelLabel}, run: ${runNumber}`, report);
 
                     if (report.type === "metadata") {
                         setMetadata(report);
@@ -144,6 +126,29 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
         setIsFinished(true);
     };
 
+    const resetState = () => {
+        setMetadata(null);
+        setTestCasesByRun(new Map());
+        setSummaryByRun(new Map());
+        setCurrentStepInfos([]);
+        setErrorsByRun(new Map());
+        setIsLoading(true);
+        setIsFinished(false);
+        setSelectedRun(1);
+    };
+
+    const handleEvaluationStart = async () => {
+        if (!evaluationRequest) return;
+        resetState();
+        console.log("Sending request", evaluationRequest);
+        const res = await fetch(`/api/gdpr/evaluation/stream`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(evaluationRequest)
+        });
+        await processNdjsonStream(res);
+    };
+
     useEffect(() => {
         setCurrentStepInfos((infos) =>
             infos.filter((info) => {
@@ -166,6 +171,29 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const summary = summaryByRun.get(selectedRun) || new Map();
     const errors = errorsByRun.get(selectedRun) || [];
 
+
+    const involvedDatasets = useMemo(() => {
+        const ids = new Set<number>();
+        for (const tc of testCases) if (tc.datasetId != null) ids.add(tc.datasetId);
+        for (const e of errors) if (e.datasetId != null) ids.add(e.datasetId);
+
+        const nameById = new Map<number, string>();
+        datasets.forEach((d) => nameById.set(d.id, d.name));
+        metadata?.datasets.forEach((d) => nameById.set(d.id, d.name));
+
+        const order = metadata?.datasets.map((d) => d.id) ?? [];
+        return [...ids]
+            .sort((a, b) => {
+                const ia = order.indexOf(a);
+                const ib = order.indexOf(b);
+                if (ia !== -1 && ib !== -1) return ia - ib;
+                if (ia !== -1) return -1;
+                if (ib !== -1) return 1;
+                return a - b;
+            })
+            .map((id) => ({ id, name: nameById.get(id) ?? `Dataset ${id}` }));
+    }, [testCases, errors, metadata, datasets]);
+
     const aggregateStats = useMemo<AggregatedEvaluationResults | null>(() => {
         if (summaryByRun.size === 0 || !metadata?.modelLabels) return null;
 
@@ -184,6 +212,18 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
             const falsePositives: number[] = [];
             const falseNegatives: number[] = [];
             const trueNegatives: number[] = [];
+            const contextUtilizations: number[] = [];
+            const faithfulnesses: number[] = [];
+            const perTypeValues = new Map<string, {
+                displayName: string;
+                precisions: number[];
+                recalls: number[];
+                f1Scores: number[];
+                tps: number[];
+                fps: number[];
+                fns: number[];
+                tns: number[];
+            }>();
 
             for (const [runNum, runSummaries] of summaryByRun.entries()) {
                 const modelSummary = runSummaries.get(modelLabel);
@@ -202,6 +242,28 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     falsePositives.push(modelSummary.totalFalsePositives);
                     falseNegatives.push(modelSummary.totalFalseNegatives);
                     trueNegatives.push(modelSummary.totalTrueNegatives);
+                    if (modelSummary.ragMetrics?.contextUtilizationMean !== null && modelSummary.ragMetrics?.contextUtilizationMean !== undefined) {
+                        contextUtilizations.push(modelSummary.ragMetrics.contextUtilizationMean);
+                    }
+                    if (modelSummary.ragMetrics?.faithfulnessMean !== null && modelSummary.ragMetrics?.faithfulnessMean !== undefined) {
+                        faithfulnesses.push(modelSummary.ragMetrics.faithfulnessMean);
+                    }
+                    if (modelSummary.perElementType) {
+                        for (const [key, typeSummary] of Object.entries(modelSummary.perElementType)) {
+                            let bucket = perTypeValues.get(key);
+                            if (!bucket) {
+                                bucket = { displayName: typeSummary.displayName, precisions: [], recalls: [], f1Scores: [], tps: [], fps: [], fns: [], tns: [] };
+                                perTypeValues.set(key, bucket);
+                            }
+                            bucket.precisions.push(typeSummary.precision);
+                            bucket.recalls.push(typeSummary.recall);
+                            bucket.f1Scores.push(typeSummary.f1Score);
+                            bucket.tps.push(typeSummary.truePositives);
+                            bucket.fps.push(typeSummary.falsePositives);
+                            bucket.fns.push(typeSummary.falseNegatives);
+                            bucket.tns.push(typeSummary.trueNegatives);
+                        }
+                    }
                 }
             }
 
@@ -226,6 +288,12 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 const avgAmountOfRetries = amountOfRetries.length > 0 ? amountOfRetries.reduce((a, b) => a + b, 0) / amountOfRetries.length : undefined;
                 const stdAmountOfRetries = amountOfRetries.length > 0 ? Math.sqrt(amountOfRetries.reduce((sum, val) => sum + Math.pow(val - (avgAmountOfRetries || 0), 2), 0) / amountOfRetries.length) : undefined;
 
+                const avgContextUtilization = contextUtilizations.length > 0 ? contextUtilizations.reduce((a, b) => a + b, 0) / contextUtilizations.length : undefined;
+                const stdContextUtilization = contextUtilizations.length > 0 ? Math.sqrt(contextUtilizations.reduce((sum, val) => sum + Math.pow(val - (avgContextUtilization || 0), 2), 0) / contextUtilizations.length) : undefined;
+                const avgFaithfulness = faithfulnesses.length > 0 ? faithfulnesses.reduce((a, b) => a + b, 0) / faithfulnesses.length : undefined;
+                const stdFaithfulness = faithfulnesses.length > 0 ? Math.sqrt(faithfulnesses.reduce((sum, val) => sum + Math.pow(val - (avgFaithfulness || 0), 2), 0) / faithfulnesses.length) : undefined;
+                const ragRunsCounted = Math.max(contextUtilizations.length, faithfulnesses.length);
+
                 const avgTruePositives = truePositives.reduce((a, b) => a + b, 0) / truePositives.length;
                 const avgFalsePositives = falsePositives.reduce((a, b) => a + b, 0) / falsePositives.length;
                 const avgFalseNegatives = falseNegatives.reduce((a, b) => a + b, 0) / falseNegatives.length;
@@ -234,6 +302,28 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 const stdFalsePositives = Math.sqrt(falsePositives.reduce((sum, val) => sum + Math.pow(val - avgFalsePositives, 2), 0) / falsePositives.length);
                 const stdFalseNegatives = Math.sqrt(falseNegatives.reduce((sum, val) => sum + Math.pow(val - avgFalseNegatives, 2), 0) / falseNegatives.length);
                 const stdTrueNegatives = Math.sqrt(trueNegatives.reduce((sum, val) => sum + Math.pow(val - avgTrueNegatives, 2), 0) / trueNegatives.length);
+
+                const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+                const std = (xs: number[]) => {
+                    const m = mean(xs);
+                    return Math.sqrt(xs.reduce((sum, val) => sum + Math.pow(val - m, 2), 0) / xs.length);
+                };
+                const perElementType = perTypeValues.size > 0
+                    ? Object.fromEntries([...perTypeValues.entries()].map(([key, v]) => [key, {
+                        displayName: v.displayName,
+                        avgPrecision: mean(v.precisions),
+                        stdPrecision: std(v.precisions),
+                        avgRecall: mean(v.recalls),
+                        stdRecall: std(v.recalls),
+                        avgF1Score: mean(v.f1Scores),
+                        stdF1Score: std(v.f1Scores),
+                        avgTruePositives: mean(v.tps),
+                        avgFalsePositives: mean(v.fps),
+                        avgFalseNegatives: mean(v.fns),
+                        avgTrueNegatives: mean(v.tns),
+                        runsCounted: v.precisions.length
+                    }]))
+                    : undefined;
 
                 stats[modelLabel] = {
                     avgPrecision,
@@ -252,6 +342,8 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     stdErrors,
                     avgAmountOfRetries,
                     stdAmountOfRetries,
+                    avgContextUtilization,
+                    stdContextUtilization,
                     avgTruePositives,
                     stdTruePositives,
                     avgFalsePositives,
@@ -259,7 +351,11 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     avgFalseNegatives,
                     stdFalseNegatives,
                     avgTrueNegatives,
-                    stdTrueNegatives
+                    stdTrueNegatives,
+                    avgFaithfulness,
+                    stdFaithfulness,
+                    ragRunsCounted,
+                    perElementType
                 }
             }
         }
@@ -270,7 +366,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const handleDownloadMarkdownReport = () => {
         const hasSummaries = summaryByRun.size > 0;
         if (testCasesByRun.size === 0 && !hasSummaries) {
-            alert("No results yet.");
+            showToast({title: "No results yet", description: "Run an evaluation before downloading a report.", variant: "info"});
             return;
         }
         const sections: string[] = [];
@@ -297,6 +393,26 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 sections.push(`- Errors: ${stats.avgErrors.toFixed(3)} ± ${stats.stdErrors.toFixed(3)} / ${metadata?.totalTestCases}`);
                 if (stats.avgAmountOfRetries !== undefined && stats.stdAmountOfRetries !== undefined) {
                     sections.push(`- Amount of Retries: ${stats.avgAmountOfRetries.toFixed(3)} ± ${stats.stdAmountOfRetries.toFixed(3)}`);
+                }
+                if (stats.ragRunsCounted > 0) {
+                    sections.push(`\n### RAG Metrics (averaged across ${stats.ragRunsCounted} run(s))`);
+                    if (stats.avgContextUtilization !== undefined && stats.stdContextUtilization !== undefined) {
+                        sections.push(`- Context Utilization: ${stats.avgContextUtilization.toFixed(3)} ± ${stats.stdContextUtilization.toFixed(3)}`);
+                    }
+                    if (stats.avgFaithfulness !== undefined && stats.stdFaithfulness !== undefined) {
+                        sections.push(`- Faithfulness: ${stats.avgFaithfulness.toFixed(3)} ± ${stats.stdFaithfulness.toFixed(3)}`);
+                    }
+                }
+                if (stats.perElementType && Object.keys(stats.perElementType).length > 0) {
+                    const rows = Object.values(stats.perElementType).map((t) =>
+                        `| ${t.displayName} | ${t.avgPrecision.toFixed(3)} ± ${t.stdPrecision.toFixed(3)} | ${t.avgRecall.toFixed(3)} ± ${t.stdRecall.toFixed(3)} | ${t.avgF1Score.toFixed(3)} ± ${t.stdF1Score.toFixed(3)} | ${t.avgTruePositives.toFixed(1)} | ${t.avgFalsePositives.toFixed(1)} | ${t.avgFalseNegatives.toFixed(1)} | ${t.avgTrueNegatives.toFixed(1)} |`
+                    );
+                    sections.push([
+                        `### Metrics by Element Type (averaged across runs)`,
+                        `| Type | Precision | Recall | F1-Score | TP | FP | FN | TN |`,
+                        `|------|-----------|--------|----------|----|----|----|----|`,
+                        ...rows
+                    ].join("\n"));
                 }
             }
         }
@@ -332,7 +448,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const handleDownloadJsonReport = () => {
         const hasSummaries = summaryByRun.size > 0;
         if (testCasesByRun.size === 0 && !hasSummaries) {
-            alert("No results yet.");
+            showToast({title: "No results yet", description: "Run an evaluation before downloading a report.", variant: "info"});
             return;
         }
 
@@ -413,7 +529,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 }
             } catch (err) {
                 console.error("Failed to load report:", err);
-                alert("Failed to load report: " + (err as Error).message);
+                showError("Failed to load report", toErrorMessage(err));
             }
         };
         reader.readAsText(file);
@@ -570,6 +686,24 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                 />
                             </div>
                             <MetricsTable aggregatedEvaluationResults={aggregateStats} />
+                            {Object.values(aggregateStats).some(s => s.ragRunsCounted > 0) && (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    <MetricChart
+                                        title="Context Utilization"
+                                        description="Context Utilization (mean ± SD)"
+                                        metricKey="avgContextUtilization"
+                                        stdKey="stdContextUtilization"
+                                        aggregatedEvaluationResults={aggregateStats}
+                                    />
+                                    <MetricChart
+                                        title="Faithfulness"
+                                        description="Faithfulness (mean ± SD)"
+                                        metricKey="avgFaithfulness"
+                                        stdKey="stdFaithfulness"
+                                        aggregatedEvaluationResults={aggregateStats}
+                                    />
+                                </div>
+                            )}
                         </>)}
                     </div>
                 </> : <Card className="p-4 mb-4">
@@ -637,10 +771,10 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                                     )}
 
                                                     <h2 className="text-2xl font-semibold mb-2">Test Case Results for {label}</h2>
-                                                    <Tabs className="w-full" value={selectedDataset || (metadata?.datasets?.[0] ? `dataset-${metadata.datasets[0].id}` : undefined)}
+                                                    <Tabs className="w-full" value={selectedDataset || (involvedDatasets[0] ? `dataset-${involvedDatasets[0].id}` : undefined)}
                                                           onValueChange={setSelectedDataset}>
                                                         <TabsList className="w-full h-12 sticky top-24 z-30 mb-4">
-                                                            {metadata?.datasets.map?.((dataset) => (
+                                                            {involvedDatasets.map((dataset) => (
                                                                 <TabsTrigger value={`dataset-${dataset.id}`}
                                                                              key={`dataset-${dataset.id}-trigger`}>
                                                                     {dataset.name}
@@ -648,7 +782,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                                             ))}
                                                         </TabsList>
 
-                                                        {metadata?.datasets.map?.((dataset) => (
+                                                        {involvedDatasets.map((dataset) => (
                                                             <TabsContent value={`dataset-${dataset.id}`}
                                                                          key={`dataset-${dataset.id}-content`}>
                                                                 <div className="flex flex-col space-y-4 pb-6">

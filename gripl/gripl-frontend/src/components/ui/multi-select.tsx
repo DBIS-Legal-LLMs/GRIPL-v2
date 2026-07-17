@@ -393,7 +393,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
             onValueChange(defaultValue);
         }, [defaultValue, onValueChange]);
 
-        const buttonRef = React.useRef<HTMLButtonElement>(null);
+        const buttonRef = React.useRef<HTMLButtonElement | null>(null);
 
         React.useImperativeHandle(
             ref,

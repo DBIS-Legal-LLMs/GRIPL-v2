@@ -42,7 +42,7 @@ export default function TestCaseReportCardErrorAnalysis({ report }: TestCaseRepo
                         False Positives ({falsePositiveCount})
                     </h4>
                     <p className="text-xs text-orange-600 dark:text-orange-400 mb-3">
-                        Activities detected but not expected
+                        BPMN elements detected but not expected
                     </p>
                     <div className="space-y-1">
                         {falsePositiveNames.map((name, index) => (
@@ -62,7 +62,7 @@ export default function TestCaseReportCardErrorAnalysis({ report }: TestCaseRepo
                         False Negatives ({falseNegativeCount})
                     </h4>
                     <p className="text-xs text-red-600 dark:text-red-400 mb-3">
-                        Expected activities not detected
+                        Expected BPMN elements not detected
                     </p>
                     <div className="space-y-1">
                         {falseNegativeNames.map((name, index) => (

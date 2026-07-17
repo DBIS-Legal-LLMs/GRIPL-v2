@@ -1,8 +1,10 @@
 package de.mertendieckmann.griplbackend.application
 
 import de.mertendieckmann.griplbackend.model.BpmnElement
+import de.mertendieckmann.griplbackend.model.BpmnFlowLabel
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.camunda.bpm.model.bpmn.Bpmn
+import org.camunda.bpm.model.bpmn.BpmnModelInstance
 import org.camunda.bpm.model.bpmn.impl.instance.ProcessImpl
 import org.camunda.bpm.model.bpmn.instance.*
 import org.camunda.bpm.model.xml.ModelParseException
@@ -13,10 +15,67 @@ import org.springframework.web.server.ResponseStatusException
 class BpmnExtractor {
     private val log = KotlinLogging.logger { }
 
-    fun extractBpmnElements(bpmnXml: String): Set<BpmnElement> {
+    /**
+     * The human-readable label of a sequence flow: its name, its condition expression, or both.
+     * Returns null for unlabeled flows so they can be skipped entirely.
+     */
+    private fun sequenceFlowLabel(flow: SequenceFlow): String? {
+        val name = flow.name?.takeIf { it.isNotBlank() }
+        val condition = flow.conditionExpression?.textContent?.takeIf { it.isNotBlank() }
+        return when {
+            name != null && condition != null && !name.equals(condition, ignoreCase = true) -> "$name [condition: $condition]"
+            name != null -> name
+            else -> condition
+        }
+    }
 
+    private fun outgoingFlowLabels(element: FlowNode): List<BpmnFlowLabel> =
+        element.outgoing.mapNotNull { flow ->
+            sequenceFlowLabel(flow)?.let { BpmnFlowLabel(it, flow.target.id) }
+        }
+
+    private fun incomingFlowLabels(element: FlowNode): List<BpmnFlowLabel> =
+        element.incoming.mapNotNull { flow ->
+            sequenceFlowLabel(flow)?.let { BpmnFlowLabel(it, flow.source.id) }
+        }
+
+    private fun outgoingMessageFlowLabels(bpmnModel: BpmnModelInstance, elementId: String): List<BpmnFlowLabel> =
+        bpmnModel.getModelElementsByType(MessageFlow::class.java)
+            .filter { it.source.id == elementId }
+            .mapNotNull { flow -> flow.name?.takeIf { it.isNotBlank() }?.let { BpmnFlowLabel(it, flow.target.id) } }
+
+    private fun incomingMessageFlowLabels(bpmnModel: BpmnModelInstance, elementId: String): List<BpmnFlowLabel> =
+        bpmnModel.getModelElementsByType(MessageFlow::class.java)
+            .filter { it.target.id == elementId }
+            .mapNotNull { flow -> flow.name?.takeIf { it.isNotBlank() }?.let { BpmnFlowLabel(it, flow.source.id) } }
+
+    /**
+     * The name of the pool (participant) whose process contains this element.
+     *
+     * Elements nested inside subprocesses have a SubProcessImpl parent, not a
+     * ProcessImpl, so casting parentElement directly would throw. Walk up the
+     * XML tree to the nearest enclosing process instead; nested elements belong
+     * to the same pool as their top-level process.
+     */
+    private fun resolvePoolName(bpmnModel: BpmnModelInstance, element: BaseElement): String? {
+        var ancestor = element.parentElement
+        while (ancestor != null && ancestor !is ProcessImpl) {
+            ancestor = ancestor.parentElement
+        }
+        val processId = (ancestor as? ProcessImpl)?.id ?: return null
+        return bpmnModel.getModelElementsByType(Participant::class.java)
+            .find { it.getAttributeValue("processRef") == processId }
+            ?.name
+    }
+
+    fun extractBpmnElements(bpmnXml: String): Set<BpmnElement> {
         val bpmnModel = Bpmn.readModelFromStream(bpmnXml.byteInputStream())
         Bpmn.validateModel(bpmnModel)
+        return extractBpmnElements(bpmnModel)
+    }
+
+    /** Overload for callers that already hold a parsed model — avoids re-parsing the XML. */
+    fun extractBpmnElements(bpmnModel: BpmnModelInstance): Set<BpmnElement> {
 
         val unsupportedElements = mutableSetOf<String>()
 
@@ -30,7 +89,8 @@ class BpmnExtractor {
                         id = element.id,
                         name = element.name,
                         documentation = element.documentations.joinToString { it.rawTextContent },
-                        poolName = bpmnModel.getModelElementsByType(Participant::class.java).find { it.getAttributeValue("processRef") == (element.parentElement as ProcessImpl).id }?.name,
+                        isActivity = true,
+                        poolName = resolvePoolName(bpmnModel, element),
                         laneName = element.parentElement
                             .getChildElementsByType(LaneSet::class.java)
                             .flatMap { it.getChildElementsByType(Lane::class.java) }
@@ -42,8 +102,12 @@ class BpmnExtractor {
                         outgoingFlowElementIds = element.outgoing.mapNotNull {
                             bpmnModel.getModelElementById<SequenceFlow>(it.id).getAttributeValue("targetRef")
                         },
+                        outgoingFlowLabels = outgoingFlowLabels(element),
+                        incomingFlowLabels = incomingFlowLabels(element),
                         outgoingMessageFlowsToElementIds = bpmnModel.getModelElementsByType(MessageFlow::class.java).filter { it.source.id == element.id }.map { it.target.id },
                         incomingMessageFlowsFromElementIds = bpmnModel.getModelElementsByType(MessageFlow::class.java).filter { it.target.id == element.id }.map { it.source.id },
+                        outgoingMessageFlowLabels = outgoingMessageFlowLabels(bpmnModel, element.id),
+                        incomingMessageFlowLabels = incomingMessageFlowLabels(bpmnModel, element.id),
                         incomingDataFromElementIds = element.dataInputAssociations.flatMap { it.sources.mapNotNull { source -> source.id } },
                         outgoingDataToElementIds = element.dataOutputAssociations.map { it.target.id },
                         associatedElementIds = bpmnModel.getModelElementsByType(Association::class.java)
@@ -60,7 +124,7 @@ class BpmnExtractor {
                         id = element.id,
                         name = element.name,
                         documentation = element.documentations.joinToString { it.rawTextContent },
-                        poolName = bpmnModel.getModelElementsByType(Participant::class.java).find { it.getAttributeValue("processRef") == (element.parentElement as ProcessImpl).id }?.name,
+                        poolName = resolvePoolName(bpmnModel, element),
                         laneName = element.parentElement
                             .getChildElementsByType(LaneSet::class.java)
                             .flatMap { it.getChildElementsByType(Lane::class.java) }
@@ -76,8 +140,12 @@ class BpmnExtractor {
                                 it.id
                             ).getAttributeValue("targetRef")
                         },
+                        outgoingFlowLabels = outgoingFlowLabels(element),
+                        incomingFlowLabels = incomingFlowLabels(element),
                         outgoingMessageFlowsToElementIds = bpmnModel.getModelElementsByType(MessageFlow::class.java).filter { it.source.id == element.id }.map { it.target.id },
                         incomingMessageFlowsFromElementIds = bpmnModel.getModelElementsByType(MessageFlow::class.java).filter { it.target.id == element.id }.map { it.source.id },
+                        outgoingMessageFlowLabels = outgoingMessageFlowLabels(bpmnModel, element.id),
+                        incomingMessageFlowLabels = incomingMessageFlowLabels(bpmnModel, element.id),
                         associatedElementIds = bpmnModel.getModelElementsByType(Association::class.java)
                             .filter { it.getAttributeValue("sourceRef") == element.id }
                             .mapNotNull { it.getAttributeValue("targetRef") }

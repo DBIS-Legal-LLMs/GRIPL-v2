@@ -12,6 +12,8 @@ import {Label} from "@/components/ui/label";
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
 import LabelingEditorLabelCard from "@/components/labeling/labeling-editor-label-card";
 import {Spinner} from "@/components/ui/spinner";
+import {useToast} from "@/components/ui/toast";
+import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 
 interface LabelingEditorProps {
     className?: string;
@@ -25,6 +27,8 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [selectedElement, setSelectedElement] = useState<any | null>(null);
     const [isSaveLoading, setIsSaveLoading] = useState(false);
+
+    const {showToast, showError} = useToast();
 
     function onSave() {
 
@@ -46,18 +50,19 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                 Accept: "application/json",
             },
             body: formData,
-        }).then(response => {
+        }).then(async response => {
             if (!response.ok) {
-                console.error("Error while saving test case:", response.statusText);
-                throw new Error("Fehler beim Speichern des Testfalls");
+                const details = await extractErrorDetails(response);
+                console.error("Error while saving test case:", details);
+                throw new Error(details);
             }
             setHasUnsavedChanges(false)
             setIsSaveLoading(false);
-            alert("Test case saved sccessfully!");
+            showToast({title: "Test case saved successfully", variant: "success"});
         }).catch(error => {
             console.error("Error while saving test case:", error);
             setIsSaveLoading(false);
-            alert("Error while saving test case: " + error.message);
+            showError("Failed to save the test case", toErrorMessage(error));
         })
     }
 

@@ -14,8 +14,8 @@ const Chart = dynamic(() => import("react-apexcharts"), { ssr: false })
 interface MetricChartProps {
     title: string
     description: string
-    metricKey: "avgPrecision" | "avgRecall" | "avgF1Score" | "avgAccuracy" | "avgAmountOfRetries"
-    stdKey: "stdPrecision" | "stdRecall" | "stdF1Score" | "stdAccuracy" | "stdAmountOfRetries"
+    metricKey: "avgPrecision" | "avgRecall" | "avgF1Score" | "avgAccuracy" | "avgAmountOfRetries" | "avgContextUtilization" | "avgFaithfulness"
+    stdKey: "stdPrecision" | "stdRecall" | "stdF1Score" | "stdAccuracy" | "stdAmountOfRetries" | "stdContextUtilization" | "stdFaithfulness"
     aggregatedEvaluationResults: AggregatedEvaluationResults
     xAxisMaxOffset?: number
 }

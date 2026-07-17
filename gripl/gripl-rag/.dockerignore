@@ -1,0 +1,26 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment files (secrets are injected at runtime via docker-compose env_file)
+.env
+
+# Generated RAG data (mounted or regenerated at runtime)
+rag_working_dir/
+
+# Test / evaluation artefacts
+tests/
+data/
+
+# IDE / OS
+.idea/
+.vscode/
+*.DS_Store

@@ -35,6 +35,22 @@ services:
       - app
       - traefik
 
+  gripl-rag:
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.gripl-rag.rule=Host(`${GRIPL_HOST}`) && PathPrefix(`/rag/`) || Host(`www.${GRIPL_HOST}`) && PathPrefix(`/rag/`)
+      - traefik.http.routers.gripl-rag.entrypoints=websecure
+      - traefik.http.routers.gripl-rag.tls=true
+      - traefik.http.routers.gripl-rag.tls.certresolver=lets-encrypt
+      - traefik.http.middlewares.gripl-rag-strip-prefix.stripprefix.prefixes=/rag
+      - traefik.http.routers.gripl-rag.middlewares=gripl-rag-strip-prefix
+      - traefik.http.services.gripl-rag.loadbalancer.server.port=8081
+      - traefik.docker.network=${TRAEFIK_NETWORK:-web}
+      - com.centurylinklabs.watchtower.enable=true
+    networks:
+      - app
+      - traefik
+
   gripl-postgres:
     labels:
       - com.centurylinklabs.watchtower.enable=true

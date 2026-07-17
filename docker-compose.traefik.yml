@@ -27,3 +27,4 @@ services:
 networks:
   traefik:
     name: ${TRAEFIK_NETWORK:-web}
+    external: true

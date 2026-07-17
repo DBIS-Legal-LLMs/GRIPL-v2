@@ -2,6 +2,8 @@ package de.mertendieckmann.griplbackend.model.dto
 
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
+import de.mertendieckmann.griplbackend.model.evaluation.ElementTypeCounts
+import de.mertendieckmann.griplbackend.model.evaluation.RagMetrics
 import java.sql.Timestamp
 
 @JsonTypeInfo(
@@ -30,7 +32,8 @@ data class EvaluationMetadataReport(
     val totalTestCases: Int,
     val defaultEvaluationEndpoint: String,
     val seed: Int? = null,
-    val totalRepetitions: Int = 1
+    val totalRepetitions: Int = 1,
+    val activitiesOnly: Boolean = false
 ): EvaluationReport() {
     override fun toMarkdown(): String {
         return """
@@ -40,6 +43,7 @@ data class EvaluationMetadataReport(
             |- **Top Ps:** ${modelTopPs.joinToString(", ") { it?.toString() ?: "default" }}
             |- **Datasets:** ${datasets.joinToString(", ")}
             |- **Total Test Cases:** $totalTestCases
+            |- **Evaluation Scope:** ${if (activitiesOnly) "Activities only" else "All BPMN elements"}
             |${if (totalRepetitions > 1) "- **Repetitions:** $totalRepetitions" else ""}
             |${if (seed != null) "- **Seed:** $seed" else ""}
             |- **Timestamp:** $timestamp
@@ -65,10 +69,24 @@ data class TestCaseReport(
     val actualNamesWithIds: List<String>,
     val isSuccessful: Boolean,
     val result: List<ExpectedValue>,
-    val amountOfRetries: Int? = null
+    val amountOfRetries: Int? = null,
+    val ragMetrics: RagMetrics? = null,
+    val ragPromptContext: List<String>? = null,
+    /** Confusion counts of this test case broken down by element category. */
+    val perElementType: Map<String, ElementTypeCounts> = emptyMap()
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
+        val ragBlock = ragMetrics?.let {
+            """
+            |
+            |### RAG Metrics (Ragas)
+            |- **Faithfulness:** ${it.faithfulness?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |- **Context Utilization:** ${it.contextUtilization?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |- **Samples:** ${it.sampleCount} (failed: ${it.failedCount})
+            """.trimMargin()
+        } ?: ""
+
         return """
             |## Test Case $testCaseId${if (testCaseName != null) " - $testCaseName" else ""}
             |<img src="$imageSrc" alt="Test Case BPMN XML" />
@@ -85,6 +103,7 @@ data class TestCaseReport(
             |- **False Negatives:** ${if (falseNegativeIds.isEmpty()) "None" else falseNegativeIds.joinToString(", ") { id -> expectedNamesWithIds.find { it.contains(id) } ?: id }}
             |
             |- **Amount of Retries:** ${amountOfRetries ?: "N/A"}
+            |$ragBlock
             |
             |<details>
             |<summary><h3>Reasoning of the LLM</h3></summary>
@@ -95,6 +114,27 @@ data class TestCaseReport(
         """.trimMargin()
     }
 }
+
+data class RagSummaryMetrics(
+    val faithfulnessMean: Double? = null,
+    val contextUtilizationMean: Double? = null,
+    val evaluatedTestCases: Int = 0,
+    val totalSamples: Int = 0,
+    val failedSamples: Int = 0
+)
+
+/** Aggregated confusion counts and derived metrics for one element category. */
+data class ElementTypeSummary(
+    val displayName: String,
+    val truePositives: Int,
+    val falsePositives: Int,
+    val falseNegatives: Int,
+    val trueNegatives: Int,
+    val precision: Double,
+    val recall: Double,
+    val f1Score: Double,
+    val accuracy: Double
+)
 
 data class EvaluationReportSummary(
     val total: Int,
@@ -109,10 +149,33 @@ data class EvaluationReportSummary(
     val totalTruePositives: Int,
     val totalFalsePositives: Int,
     val totalFalseNegatives: Int,
-    val totalTrueNegatives: Int
+    val totalTrueNegatives: Int,
+    val ragMetrics: RagSummaryMetrics? = null,
+    /** Metrics broken down by element category, keyed by category key (activity, event, ...). */
+    val perElementType: Map<String, ElementTypeSummary> = emptyMap()
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
+        val perTypeBlock = if (perElementType.isEmpty()) "" else buildString {
+            appendLine()
+            appendLine("### Metrics by Element Type")
+            appendLine("| Type | TP | FP | FN | TN | Precision | Recall | F1 |")
+            appendLine("|------|----|----|----|----|-----------|--------|----|")
+            perElementType.values.forEach { s ->
+                appendLine("| ${s.displayName} | ${s.truePositives} | ${s.falsePositives} | ${s.falseNegatives} | ${s.trueNegatives} | ${"%.3f".format(s.precision)} | ${"%.3f".format(s.recall)} | ${"%.3f".format(s.f1Score)} |")
+            }
+        }
+
+        val ragBlock = ragMetrics?.let {
+            """
+            |
+            |### RAG Metrics (Ragas) — averaged across $evaluatedTestCasesText
+            |Faithfulness: ${it.faithfulnessMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |Context Utilization: ${it.contextUtilizationMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |Total Samples Scored: ${it.totalSamples} (failed: ${it.failedSamples})
+            """.trimMargin()
+        } ?: ""
+
         return """
             |## Summary
             |Total: $total
@@ -132,8 +195,13 @@ data class EvaluationReportSummary(
             |False Positives: $totalFalsePositives
             |False Negatives: $totalFalseNegatives
             |True Negatives: $totalTrueNegatives
+            |$perTypeBlock
+            |$ragBlock
         """.trimMargin()
     }
+
+    private val evaluatedTestCasesText: String
+        get() = ragMetrics?.evaluatedTestCases?.let { "$it test case(s)" } ?: "0 test cases"
 }
 
 data class EvaluationReportStepInfo(

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import RagMetricsCard from "./rag-metrics-card";
 
 interface SummaryReportCardSingleProps {
     reportSummary: EvaluationReportSummary;
@@ -77,6 +78,48 @@ export default function EvaluationReportSummaryCardSingle({ reportSummary }: Sum
                     </div>
                 </CardContent>
             </Card>
+
+            {reportSummary.perElementType && Object.keys(reportSummary.perElementType).length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Metrics by Element Type</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead className="text-right">TP</TableHead>
+                                    <TableHead className="text-right">FP</TableHead>
+                                    <TableHead className="text-right">FN</TableHead>
+                                    <TableHead className="text-right">TN</TableHead>
+                                    <TableHead className="text-right">Precision</TableHead>
+                                    <TableHead className="text-right">Recall</TableHead>
+                                    <TableHead className="text-right">F1-Score</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {Object.entries(reportSummary.perElementType).map(([key, typeSummary]) => (
+                                    <TableRow key={key}>
+                                        <TableCell className="font-medium">{typeSummary.displayName}</TableCell>
+                                        <TableCell className="text-right">{typeSummary.truePositives}</TableCell>
+                                        <TableCell className="text-right">{typeSummary.falsePositives}</TableCell>
+                                        <TableCell className="text-right">{typeSummary.falseNegatives}</TableCell>
+                                        <TableCell className="text-right">{typeSummary.trueNegatives}</TableCell>
+                                        <TableCell className="text-right">{formatDecimal(typeSummary.precision)}</TableCell>
+                                        <TableCell className="text-right">{formatDecimal(typeSummary.recall)}</TableCell>
+                                        <TableCell className="text-right">{formatDecimal(typeSummary.f1Score)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
+
+            {reportSummary.ragMetrics && (
+                <RagMetricsCard summary={reportSummary.ragMetrics} />
+            )}
         </div>
     );
 }

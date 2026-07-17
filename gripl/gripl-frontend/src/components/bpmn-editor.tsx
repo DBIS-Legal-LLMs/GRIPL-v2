@@ -27,7 +27,7 @@ interface BpmnEditorProps {
 
 export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = [], onNew, onDiagramChanged, cards = [],
                                      editorClassName, disableEditing, onEvent, onModelerChanged }: BpmnEditorProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const modelerRef = useRef<any>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
@@ -195,8 +195,14 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
       if (!styleElementRef.current) {
         const styleElement = document.createElement("style")
         styleElement.textContent = `
-          .highlight-privacy .djs-visual > :nth-child(1) {
-            fill: hsl(var(--destructive) / 50%) !important;
+          /* Fill every shape primitive (rect, circle, polygon, path) with the SAME
+             OPAQUE tint. Using an opaque colour (a 50/50 mix of destructive and the
+             canvas background, so it still looks like a light red) means overlapping
+             fills — e.g. a message event's circle and envelope — don't compound into
+             a darker patch. We only set fill, never stroke or opacity, so the
+             element outline and the label text keep their normal colour. */
+          .highlight-privacy .djs-visual > :not(text):not(tspan) {
+            fill: color-mix(in srgb, hsl(var(--destructive)) 50%, hsl(var(--background))) !important;
           }
         `
         document.head.appendChild(styleElement)
@@ -363,7 +369,7 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
           ).map(([position, positionCards]) => (
             <div
                 key={`bpmn-editor-position-${position}`}
-                className={`absolute z-10 gap-4
+                className={`absolute z-50 gap-4
                   ${position === "bottom-left" ? "left-4 bottom-4 flex-flex-col items-start" : ""}
                   ${position === "bottom-right" ? "right-4 bottom-14 flex flex-col items-end" : ""}
                   ${position === "top-right" ? "right-4 top-4 flex flex-col items-end" : ""}

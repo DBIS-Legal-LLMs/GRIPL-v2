@@ -10,6 +10,7 @@ import {SidebarInset, SidebarProvider, SidebarTrigger} from "@/components/ui/sid
 import AppSidebar from "@/components/navigation/app-sidebar";
 import AppBreadCrumbs from "@/components/navigation/app-breadcrumbs";
 import {ThemeToggle} from "@/components/ui/theme-toggle";
+import {ToastProvider} from "@/components/ui/toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,6 +43,7 @@ export default function RootLayout({
         defaultTheme="system"
         enableSystem={true}
       >
+        <ToastProvider>
         <SidebarProvider className="h-full w-full">
           <AppSidebar />
           <SidebarInset className="h-full w-full">
@@ -55,6 +57,7 @@ export default function RootLayout({
             {children}
           </SidebarInset>
         </SidebarProvider>
+        </ToastProvider>
       </ThemeProvider>
     </body>
   </html>

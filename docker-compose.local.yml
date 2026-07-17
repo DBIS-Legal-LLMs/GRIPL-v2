@@ -22,6 +22,7 @@ services:
     restart: unless-stopped
     depends_on:
       - gripl-postgres
+      - gripl-neo4j
     env_file:
       - .env.local
     environment:
@@ -30,12 +31,51 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/gripldb
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
+      - RAG_API_URL=http://gripl-rag:8081
     volumes:
       - playwright-browsers:/root/.cache/ms-playwright
     networks:
       - app
     ports:
       - "8000:8080"
+
+  gripl-rag:
+    build:
+      context: ./gripl/gripl-rag
+      dockerfile: Dockerfile
+    image: gripl-rag:latest
+    container_name: gripl-rag
+    restart: unless-stopped
+    depends_on:
+      - gripl-neo4j
+    env_file:
+      - .env.local
+    environment:
+      - NEO4J_URI=neo4j://gripl-neo4j:7687
+      - NEO4J_USERNAME=neo4j
+      - NEO4J_PASSWORD=gripl-rag-2026
+    volumes:
+      - ./gripl/gripl-rag/rag_working_dir:/app/rag_working_dir
+      - ./gripl/gripl-rag/data:/app/data
+      - huggingface_cache:/root/.cache/huggingface
+    networks:
+      - app
+    ports:
+      - "8081:8081"
+
+  gripl-neo4j:
+    image: neo4j:5-community
+    container_name: gripl-neo4j
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=neo4j/gripl-rag-2026
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - app
+    ports:
+      - "7474:7474"
+      - "7687:7687"
 
   gripl-postgres:
     image: postgres:15
@@ -55,6 +95,8 @@ services:
 volumes:
   playwright-browsers:
   gripl-postgres-data:
+  huggingface_cache:
+  neo4j_data:
 
 networks:
   app:

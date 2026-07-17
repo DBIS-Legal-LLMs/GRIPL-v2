@@ -9,7 +9,38 @@ export interface EvaluationMetadataReport {
     defaultEvaluationEndpoint: string;
     seed: number;
     totalRepetitions?: number;
+    activitiesOnly?: boolean;
     markdown: string;
+}
+
+export interface TestCaseRagMetrics {
+    faithfulness: number | null;
+    contextUtilization: number | null;
+    sampleCount: number;
+    failedCount: number;
+}
+
+export interface RagSummaryMetrics {
+    faithfulnessMean: number | null;
+    contextUtilizationMean: number | null;
+    evaluatedTestCases: number;
+    totalSamples: number;
+    failedSamples: number;
+}
+
+export interface ElementTypeCounts {
+    truePositives: number;
+    falsePositives: number;
+    falseNegatives: number;
+    trueNegatives: number;
+}
+
+export interface ElementTypeSummary extends ElementTypeCounts {
+    displayName: string;
+    precision: number;
+    recall: number;
+    f1Score: number;
+    accuracy: number;
 }
 
 export interface TestCaseReport {
@@ -26,6 +57,9 @@ export interface TestCaseReport {
     isSuccessful: boolean;
     result: { value: string; reason?: string }[];
     amountOfRetries: number | null;
+    ragMetrics?: TestCaseRagMetrics | null;
+    ragPromptContext?: string[] | null;
+    perElementType?: Record<string, ElementTypeCounts>;
     markdown: string;
 }
 
@@ -44,6 +78,8 @@ export interface EvaluationReportSummary {
     totalFalsePositives: number;
     totalFalseNegatives: number;
     totalTrueNegatives: number;
+    ragMetrics?: RagSummaryMetrics | null;
+    perElementType?: Record<string, ElementTypeSummary>;
     markdown: string;
 }
 

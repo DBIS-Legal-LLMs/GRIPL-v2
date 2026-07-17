@@ -16,6 +16,8 @@ import {useRouter} from "next/navigation";
 import {Plus} from "lucide-react";
 import emptyDiagram from "@/data/empty-diagram.bpmn";
 import {Dataset} from "@/models/dto/Dataset";
+import {useToast} from "@/components/ui/toast";
+import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 
 interface CreateTestCaseButtonProps {
     dataset: Dataset;
@@ -25,11 +27,12 @@ export default function CreateTestCaseButton({ dataset }: CreateTestCaseButtonPr
 
     const router = useRouter()
     const [showCreateTestCaseDialog, setShowCreateTestCaseDialog] = React.useState(false)
+    const {showToast, showError} = useToast()
 
     function handleTestCaseCreation() {
         const testCaseName = (document.getElementById("test-case-name") as HTMLInputElement).value;
         if (!testCaseName) {
-            alert("Please enter a name for the test case.");
+            showToast({title: "Please enter a name for the test case.", variant: "info"});
             return;
         }
 
@@ -47,9 +50,9 @@ export default function CreateTestCaseButton({ dataset }: CreateTestCaseButtonPr
         fetch("/api/dataset/testcase", {
             method: "POST",
             body: formData,
-        } as RequestInit).then(response => {
+        } as RequestInit).then(async response => {
             if (!response.ok) {
-                throw new Error("Failed to create test case");
+                throw new Error(await extractErrorDetails(response));
             }
             return response.json();
         }).then(id => {
@@ -59,7 +62,7 @@ export default function CreateTestCaseButton({ dataset }: CreateTestCaseButtonPr
             setShowCreateTestCaseDialog(false);
         }).catch(error => {
             console.error("There was an error creating the test case:", error);
-            alert("Failed to create test case. Please try again.");
+            showError("Failed to create test case", toErrorMessage(error));
         })
     }
 

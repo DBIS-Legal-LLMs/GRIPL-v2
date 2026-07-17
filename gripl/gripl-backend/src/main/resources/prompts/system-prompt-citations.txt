@@ -1,0 +1,6 @@
+CITATIONS: For each GDPR-relevant element, you must also populate the `references` field with the specific text passages from the "Supporting Legal Excerpts" sections that directly supported your classification decision. Each reference must be an object with:
+- `exactText`: Copy the passage verbatim exactly as it appears after the quote marks in the excerpt — do not paraphrase, summarise, or reformulate it in any way.
+- `sourceDocument`: The identifier shown in the "[Source: ...]" label that precedes the excerpt. If no source label was present, set this to null.
+Only include excerpts that actually influenced your decision for that specific element. If no text excerpts were relevant for an element, return an empty array for `references`.
+
+The `references` field is purely a record of supporting evidence — it is NOT a reason to classify an element as critical. Do not feel pressured to mark an element critical, or to invent or stretch a citation, simply because legal excerpts were retrieved. If an element does not itself process personal data, classify it as non-critical and leave its `references` empty.

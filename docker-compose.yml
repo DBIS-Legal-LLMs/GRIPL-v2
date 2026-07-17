@@ -28,8 +28,43 @@ services:
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
       - PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
       - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
+      - RAG_API_URL=${RAG_API_URL:-http://gripl-rag:8081}
     volumes:
       - playwright-browsers:/root/.cache/ms-playwright
+    networks:
+      - app
+
+  gripl-rag:
+    build:
+      context: ./gripl/gripl-rag
+      dockerfile: Dockerfile
+    image: ${RAG_IMAGE:-mertend/gripl-rag:latest}
+    container_name: ${RAG_CONTAINER_NAME:-gripl-rag}
+    restart: unless-stopped
+    env_file:
+      - ./.env.local
+    environment:
+      # Always the Docker service name — a NEO4J_URI from .env.local (meant for
+      # running the RAG service outside Docker) must not leak into the container.
+      - NEO4J_URI=neo4j://gripl-neo4j:7687
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-gripl-rag-2026}
+    depends_on:
+      - gripl-neo4j
+    volumes:
+      - gripl-rag-working-dir:/app/rag_working_dir
+      - ./gripl/gripl-rag/data:/app/data:ro
+    networks:
+      - app
+
+  gripl-neo4j:
+    image: neo4j:5-community
+    container_name: gripl-neo4j
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-gripl-rag-2026}
+    volumes:
+      - neo4j_data:/data
     networks:
       - app
 
@@ -45,6 +80,9 @@ services:
 volumes:
   playwright-browsers:
   gripl-postgres-data:
+  gripl-rag-working-dir:
+  neo4j_data:
+    name: gripl-neo4j-data
 
 networks:
   app:

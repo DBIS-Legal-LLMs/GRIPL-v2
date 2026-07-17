@@ -16,16 +16,19 @@ import {useRouter} from "next/navigation";
 import {Plus} from "lucide-react";
 import emptyDiagram from "@/data/empty-diagram.bpmn";
 import createDataset from "@/actions/create-dataset";
+import {useToast} from "@/components/ui/toast";
+import {toErrorMessage} from "@/lib/http-error";
 
 export default function CreateDatasetButton() {
 
     const router = useRouter()
     const [showCreateDatasetDialog, setShowCreateDatasetDialog] = React.useState(false)
+    const {showToast, showError} = useToast()
 
     function handleTestCaseCreation() {
         const datasetName = (document.getElementById("dataset-name") as HTMLInputElement).value
         if (!datasetName) {
-            alert("Please enter a name for the test case.")
+            showToast({title: "Please enter a name for the dataset.", variant: "info"})
             return
         }
         const datasetDescription = (document.getElementById("dataset-description") as HTMLInputElement).value
@@ -34,7 +37,7 @@ export default function CreateDatasetButton() {
             setShowCreateDatasetDialog(false)
         }).catch(error => {
             console.error("There was an error creating the dataset:", error)
-            alert("There was an error creating the dataset. Please try again.")
+            showError("Failed to create the dataset", toErrorMessage(error))
         })
     }
 

@@ -4,13 +4,15 @@ import type React from "react"
 import {useRef} from "react"
 import {Button} from "@/components/ui/button"
 import {Upload} from "lucide-react"
+import {useToast} from "@/components/ui/toast"
 
 interface FileUploadProps {
   onFileLoaded: (content: string) => void
 }
 
 export default function BpmnUploadButton({ onFileLoaded }: FileUploadProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const {showToast, showError} = useToast()
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -22,7 +24,11 @@ export default function BpmnUploadButton({ onFileLoaded }: FileUploadProps) {
 
   const processFile = (file: File) => {
     if (!file.name.endsWith(".bpmn") && !file.name.endsWith(".xml")) {
-      alert("Please select a valid BPMN (.bpmn or .xml) file.")
+      showToast({
+        title: "Unsupported file type",
+        description: `'${file.name}' is not a BPMN file. Please select a .bpmn or .xml file.`,
+        variant: "info",
+      })
       return
     }
 
@@ -33,10 +39,12 @@ export default function BpmnUploadButton({ onFileLoaded }: FileUploadProps) {
         onFileLoaded(content)
       } else {
         console.error("Error while reading file: content is empty")
+        showError("Could not read the file", `'${file.name}' appears to be empty.`)
       }
     }
-    reader.onerror = (e) => {
-      console.error("Error while reading file:", e)
+    reader.onerror = () => {
+      console.error("Error while reading file:", reader.error)
+      showError("Could not read the file", reader.error?.message ?? `Failed to read '${file.name}'.`)
     }
     reader.readAsText(file)
   }
@@ -51,7 +59,7 @@ export default function BpmnUploadButton({ onFileLoaded }: FileUploadProps) {
         variant="outline"
         size="sm"
         onClick={handleButtonClick}
-        title="Exportieren"
+        title="Import"
     >
       <Upload className="h-4 w-4 mr-1"/>
         Import

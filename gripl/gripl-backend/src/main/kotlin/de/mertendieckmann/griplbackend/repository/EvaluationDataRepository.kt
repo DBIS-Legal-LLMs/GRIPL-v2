@@ -37,6 +37,12 @@ class EvaluationDataRepository(
         return jdbc.query("SELECT * FROM evaluation_data WHERE dataset_id IN ($inSql)", mapper)
     }
 
+    fun getEvaluationDataByIds(ids: List<Int>): List<EvaluationData> {
+        if (ids.isEmpty()) return emptyList()
+        val inSql = ids.joinToString(",")
+        return jdbc.query("SELECT * FROM evaluation_data WHERE id IN ($inSql)", mapper)
+    }
+
     fun getEvaluationDataById(id: Long): EvaluationData? {
         return jdbc.query("SELECT * FROM evaluation_data WHERE id = ?", mapper, id).firstOrNull()
     }

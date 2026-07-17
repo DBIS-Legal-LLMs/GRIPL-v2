@@ -5,6 +5,8 @@ import {ConfirmationDialog} from "@/components/ui/confirmation-dialog";
 import React, {useState} from "react";
 import {Trash2} from "lucide-react";
 import {useRouter} from "next/navigation";
+import {useToast} from "@/components/ui/toast";
+import {toErrorMessage} from "@/lib/http-error";
 
 export interface DeleteTestCaseButtonProps {
     testCaseId: number
@@ -15,6 +17,7 @@ export default function DeleteTestCaseButton({ testCaseId, testCaseName }: Delet
 
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState<boolean>(false)
     const router = useRouter();
+    const {showError} = useToast();
 
     const handleDeleteClick = (e: React.MouseEvent) => {
         e.stopPropagation()
@@ -35,7 +38,7 @@ export default function DeleteTestCaseButton({ testCaseId, testCaseName }: Delet
                 router.refresh();
             } catch (error) {
                 console.error("There was an error deleting the test case:", error);
-                alert("Failed to delete the test case. Please try again later.");
+                showError("Failed to delete the test case", toErrorMessage(error));
             }
         }
         setIsConfirmDialogOpen(false)

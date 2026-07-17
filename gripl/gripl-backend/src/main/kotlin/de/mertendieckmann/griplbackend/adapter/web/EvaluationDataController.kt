@@ -26,11 +26,12 @@ class EvaluationDataController(
 
     @Operation(
         summary = "Get all Testcases Metadata",
-        description = "Returns a list of the metadata of all available processes inside the evaluation dataset."
+        description = "Returns a list of the metadata of all available processes inside the evaluation dataset. " +
+            "Optionally filtered to a single dataset via the datasetId query parameter."
     )
     @GetMapping("", produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun getAllBpmnDatasetMeta(): List<EvaluationDataMeta> {
-        val datasets = evaluationDataRepository.getAllEvaluationData()
+    fun getAllBpmnDatasetMeta(@RequestParam(required = false) datasetId: Int? = null): List<EvaluationDataMeta> {
+        val datasets = evaluationDataRepository.getEvaluationDataByDatasetIdsOrAll(listOfNotNull(datasetId))
         return datasets.map { EvaluationDataMeta(it.id, it.name, it.datasetId) }
     }
 

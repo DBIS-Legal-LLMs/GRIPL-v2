@@ -2,10 +2,15 @@
 export interface MultiEvaluationRequest {
     models: ModelRunConfig[];
     datasets: number[];
+    evaluationDataIds?: number[];
     defaultEvaluationEndpoint: string;
     seed?: number;
     maxConcurrent: number | null;
     repetitions?: number;
+    useRag: boolean;
+    ragMode: string;
+    evaluateRag: boolean;
+    activitiesOnly: boolean;
 }
 
 export interface ModelRunConfig {

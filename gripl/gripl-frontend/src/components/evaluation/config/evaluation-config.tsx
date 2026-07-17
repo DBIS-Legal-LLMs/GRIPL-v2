@@ -29,6 +29,10 @@ export default function EvaluationConfig({ className, children, datasets, onMult
         seed: config.seed,
         maxConcurrent: config.maxConcurrent,
         repetitions: config.repetitions,
+        useRag: config.useRag,
+        ragMode: config.ragMode,
+        evaluateRag: config.evaluateRag,
+        activitiesOnly: config.activitiesOnly,
         setDefaultEndpointChoice: (v) => config.setDefaultEndpointChoice(v),
         setDefaultPresetEndpoint: config.setDefaultPresetEndpoint,
         setDefaultCustomEndpoint: config.setDefaultCustomEndpoint,
@@ -37,6 +41,10 @@ export default function EvaluationConfig({ className, children, datasets, onMult
         setRepetitions: config.setRepetitions,
         setSelectedDatasets: config.setSelectedDatasets,
         setModels: config.setModels,
+        setUseRag: config.setUseRag,
+        setRagMode: config.setRagMode,
+        setEvaluateRag: config.setEvaluateRag,
+        setActivitiesOnly: config.setActivitiesOnly,
     });
 
     return (
@@ -68,18 +76,28 @@ export default function EvaluationConfig({ className, children, datasets, onMult
                         seed={config.seed}
                         maxConcurrent={config.maxConcurrent}
                         repetitions={config.repetitions}
+                        useRag={config.useRag}
+                        ragMode={config.ragMode}
+                        evaluateRag={config.evaluateRag}
+                        activitiesOnly={config.activitiesOnly}
                         setDefaultEndpointChoice={config.setDefaultEndpointChoice}
                         setDefaultPresetEndpoint={config.setDefaultPresetEndpoint}
                         setDefaultCustomEndpoint={config.setDefaultCustomEndpoint}
                         setSeed={config.setSeed}
                         onMaxConcurrentChange={(v) => config.setMaxConcurrent(v)}
                         onRepetitionsChange={(v) => config.setRepetitions(v)}
+                        setUseRag={config.setUseRag}
+                        setRagMode={config.setRagMode}
+                        setEvaluateRag={config.setEvaluateRag}
+                        setActivitiesOnly={config.setActivitiesOnly}
                     />
 
                     <EvaluationConfigDatasetSettings
                         datasets={datasets}
                         selectedDatasets={config.selectedDatasets}
-                        onChange={config.setSelectedDatasets}
+                        selectedTestCaseIds={config.selectedTestCaseIds}
+                        onDatasetsChange={config.setSelectedDatasets}
+                        onTestCasesChange={config.setSelectedTestCaseIds}
                     />
                 </div>
 
