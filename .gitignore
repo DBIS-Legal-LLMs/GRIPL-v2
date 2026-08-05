@@ -21,3 +21,5 @@ __pycache__/
 rag_working_dir/
 gripl/gripl-rag/.env
 
+extra/*
+.github/*

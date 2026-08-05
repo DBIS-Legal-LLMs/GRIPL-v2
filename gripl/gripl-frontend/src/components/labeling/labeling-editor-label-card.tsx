@@ -6,15 +6,18 @@ import {ExpectedValues} from "@/models/dto/EvaluationData";
 import {GDPR_CATEGORIES, GdprCategory} from "@/models/GdprCategory";
 import {cn} from "@/lib/utils";
 
+const BINARY_FALLBACK_CATEGORY: GdprCategory = "Collection";
+
 export interface LabelingEditorLabelCardProps {
     className?: string;
     elementName: string;
     elementId: string;
     criticalActivities: ExpectedValues[];
+    allowMulticlass: boolean;
     onLabelingChange: (elementId: string, classification: GdprCategory[], reason?: string) => void;
 }
 
-export default function LabelingEditorLabelCard({ className, elementName, elementId, criticalActivities, onLabelingChange }: LabelingEditorLabelCardProps) {
+export default function LabelingEditorLabelCard({ className, elementName, elementId, criticalActivities, allowMulticlass, onLabelingChange }: LabelingEditorLabelCardProps) {
 
     const categoryChipClass: Record<GdprCategory, string> = {
         Collection: "bg-emerald-600 border-emerald-600 text-white",
@@ -37,9 +40,20 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
     }, [elementId, criticalActivities]);
 
     function toggleCategory(cat: GdprCategory) {
-        const next = selectedCategories.includes(cat)
-            ? selectedCategories.filter(c => c !== cat)
-            : [...selectedCategories, cat];
+        let next: GdprCategory[];
+        if (allowMulticlass) {
+            next = selectedCategories.includes(cat)
+                ? selectedCategories.filter(c => c !== cat)
+                : [...selectedCategories, cat];
+        } else {
+            next = selectedCategories.includes(cat) ? [] : [cat];
+        }
+        setSelectedCategories(next);
+        onLabelingChange(elementId, next, reason);
+    }
+
+    function toggleBinaryCritical() {
+        const next = selectedCategories.length > 0 ? [] : [selectedCategories[0] ?? BINARY_FALLBACK_CATEGORY];
         setSelectedCategories(next);
         onLabelingChange(elementId, next, reason);
     }
@@ -59,30 +73,54 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
             </p>
         </CardHeader>
         <CardContent className="flex flex-col space-y-3">
-            <div>
-                <Label className="text-xs mb-2 block">GDPR Processing Classes</Label>
-                <div className="flex flex-wrap gap-1">
-                    {GDPR_CATEGORIES.map(cat => {
-                        const active = selectedCategories.includes(cat.value);
-                        return (
-                            <button
-                                key={cat.value}
-                                type="button"
-                                title={cat.description}
-                                onClick={() => toggleCategory(cat.value)}
-                                className={cn(
-                                    "px-2 py-0.5 rounded-full border text-xs font-medium transition-colors",
-                                    active
-                                        ? categoryChipClass[cat.value]
-                                        : "bg-background border-border text-muted-foreground hover:border-primary hover:text-primary"
-                                )}
-                            >
-                                {cat.label}
-                            </button>
-                        );
-                    })}
+            <>{allowMulticlass ? (
+                <div>
+                    <Label className="text-xs mb-2 block">GDPR Processing Classes</Label>
+                    <p className="text-[11px] text-muted-foreground mb-2">
+                        Multiclass mode: multiple classes allowed.
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                        {GDPR_CATEGORIES.map(cat => {
+                            const active = selectedCategories.includes(cat.value);
+                            return (
+                                <button
+                                    key={cat.value}
+                                    type="button"
+                                    title={cat.description}
+                                    onClick={() => toggleCategory(cat.value)}
+                                    className={cn(
+                                        "px-2 py-0.5 rounded-full border text-xs font-medium transition-colors",
+                                        active
+                                            ? categoryChipClass[cat.value]
+                                            : "bg-background border-border text-muted-foreground hover:border-primary hover:text-primary"
+                                    )}
+                                >
+                                    {cat.label}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <div>
+                    <Label className="text-xs mb-2 block">Critical Label</Label>
+                    <p className="text-[11px] text-muted-foreground mb-2">
+                        Binary mode: mark this activity as GDPR critical or not critical.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={toggleBinaryCritical}
+                        className={cn(
+                            "px-2 py-0.5 rounded-full border text-xs font-medium transition-colors",
+                            selectedCategories.length > 0
+                                ? "bg-destructive border-destructive text-destructive-foreground"
+                                : "bg-background border-border text-muted-foreground hover:border-primary hover:text-primary"
+                        )}
+                    >
+                        {selectedCategories.length > 0 ? "Critical" : "Not Critical"}
+                    </button>
+                </div>
+            )}</>
             <div className="flex flex-col space-y-1">
                 <Label htmlFor="reason" className="text-xs">Notes (optional)</Label>
                 <Textarea
