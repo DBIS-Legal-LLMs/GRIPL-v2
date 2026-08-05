@@ -25,7 +25,8 @@ export function newModelRow(index: number): ModelRowState {
 
 export function useEvaluationConfig(
     datasets: Dataset[],
-    onMultiConfigChanged: (config: MultiEvaluationRequest) => void
+    onMultiConfigChanged: (config: MultiEvaluationRequest) => void,
+    preferredDefaultEndpoint?: string
 ) {
     const [availableEvaluationEndpoints, setAvailableEvaluationEndpoints] = useState<AnalysisEndpoint[]>([]);
 
@@ -47,6 +48,26 @@ export function useEvaluationConfig(
             }
         });
     }, []);
+
+    useEffect(() => {
+        const normalizedPreferredEndpoint = preferredDefaultEndpoint?.trim();
+        if (!normalizedPreferredEndpoint) {
+            return;
+        }
+
+        const matchingPreset = availableEvaluationEndpoints.find(
+            (endpoint) => endpoint.endpoint === normalizedPreferredEndpoint
+        );
+
+        if (matchingPreset) {
+            setDefaultEndpointChoice("preset");
+            setDefaultPresetEndpoint(matchingPreset.endpoint);
+            return;
+        }
+
+        setDefaultEndpointChoice("custom");
+        setDefaultCustomEndpoint(normalizedPreferredEndpoint);
+    }, [preferredDefaultEndpoint, availableEvaluationEndpoints]);
 
     const effectiveDefaultEndpoint = useMemo(() => {
         if (defaultEndpointChoice === "custom") return defaultCustomEndpoint.trim();

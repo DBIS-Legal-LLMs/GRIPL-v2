@@ -6,3 +6,6 @@
 .env.*
 !.env.local.example
 !.env.prod.example
+
+extra/*
+github/*

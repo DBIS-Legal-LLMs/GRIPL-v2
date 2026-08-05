@@ -6,7 +6,7 @@ import {BpmnToolCard} from "@/models/BpmnToolCard";
 import {Card, CardContent, CardHeader} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {ChevronLeft, ChevronRight, Save, Trash2} from "lucide-react";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {Switch} from "@/components/ui/switch";
 import {Label} from "@/components/ui/label";
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
@@ -18,6 +18,7 @@ import {
 } from "@/models/GdprCategory";
 import {Spinner} from "@/components/ui/spinner";
 import {Badge} from "@/components/ui/badge";
+import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 
 interface LabelingEditorProps {
     className?: string;
@@ -38,6 +39,34 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
     const [isSaveLoading, setIsSaveLoading] = useState(false);
     const [elementNames, setElementNames] = useState<Record<string, string>>({});
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const {isMulticlass, backendEndpoint} = useAnalysisEndpoint();
+
+    useEffect(() => {
+        if (isMulticlass) {
+            return;
+        }
+
+        setCriticalActivities((prev) => {
+            let changed = false;
+            const normalized = prev.map((value) => {
+                if ((value.classification?.length ?? 0) <= 1) {
+                    return value;
+                }
+                changed = true;
+                return {
+                    ...value,
+                    classification: value.classification.slice(0, 1),
+                };
+            });
+
+            if (changed) {
+                setHasUnsavedChanges(true);
+                return normalized;
+            }
+
+            return prev;
+        });
+    }, [isMulticlass]);
 
     const categoryBadgeClass: Record<GdprCategory, string> = {
         Collection: "bg-emerald-600 text-white border-transparent",
@@ -168,6 +197,11 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                         <Switch id="label-mode" checked={isLabelMode} onCheckedChange={setIsLabelMode}/>
                         <Label htmlFor="label-mode">Label Mode</Label>
                     </div>
+                    <div className="text-xs text-muted-foreground break-all">
+                        Endpoint mode: {isMulticlass ? "multiclass" : "binary"}
+                        <br />
+                        Endpoint: {backendEndpoint}
+                    </div>
                 </CardContent>
             </Card>
         },
@@ -178,6 +212,7 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                 elementName={selectedElementName}
                 elementId={selectedElement.id}
                 criticalActivities={criticalActivities}
+                allowMulticlass={isMulticlass}
                 onLabelingChange={handleElementLabelingChange}
             /> : <></>
         }
@@ -227,7 +262,7 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                             {criticalActivities.map((critical) => {
                                 const isSelected = selectedElement?.id === critical.value;
                                 const displayName = elementNames[critical.value] || critical.value;
-                                const isMultiCategory = (critical.classification ?? []).length > 1;
+                                const isMultiCategory = isMulticlass && (critical.classification ?? []).length > 1;
                                 return (
                                     <div
                                         key={critical.value}
@@ -255,16 +290,24 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                                             </Button>
                                         </div>
                                         <div className="mt-2 flex flex-wrap gap-1">
-                                            {isMultiCategory && (
-                                                <Badge variant="outline" className="text-[10px] bg-fuchsia-600 text-white border-fuchsia-600">
-                                                    Multiple
+                                            <>{isMulticlass ? (
+                                                <>
+                                                    {isMultiCategory && (
+                                                        <Badge variant="outline" className="text-[10px] bg-fuchsia-600 text-white border-fuchsia-600">
+                                                            Multiple
+                                                        </Badge>
+                                                    )}
+                                                    {(critical.classification ?? []).map((category) => (
+                                                        <Badge key={`${critical.value}-${category}`} variant="outline" className={`text-[10px] ${categoryBadgeClass[category]}`}>
+                                                            {category}
+                                                        </Badge>
+                                                    ))}
+                                                </>
+                                            ) : (
+                                                <Badge variant="outline" className="text-[10px] bg-destructive text-destructive-foreground border-destructive">
+                                                    Critical
                                                 </Badge>
-                                            )}
-                                            {(critical.classification ?? []).map((category) => (
-                                                <Badge key={`${critical.value}-${category}`} variant="outline" className={`text-[10px] ${categoryBadgeClass[category]}`}>
-                                                    {category}
-                                                </Badge>
-                                            ))}
+                                            )}</>
                                         </div>
                                         {critical.reason && (
                                             <p className="mt-2 text-[11px] text-muted-foreground break-words">

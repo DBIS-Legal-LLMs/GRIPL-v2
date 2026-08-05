@@ -4,6 +4,17 @@ import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
 import {useState} from "react";
 import {Badge} from "@/components/ui/badge";
+import {GdprCategory} from "@/models/GdprCategory";
+
+const categoryBadgeClass: Record<GdprCategory, string> = {
+    Collection: "bg-emerald-600 text-white border-transparent",
+    Storage: "bg-blue-600 text-white border-transparent",
+    Usage: "bg-amber-500 text-black border-transparent",
+    Transferal: "bg-violet-600 text-white border-transparent",
+    Modification: "bg-sky-600 text-white border-transparent",
+    Deletion: "bg-red-600 text-white border-transparent",
+    Access: "bg-teal-600 text-white border-transparent",
+};
 
 interface AnalysisResultCardProps {
     analysisResult: AnalysisResponse | null,
@@ -50,7 +61,9 @@ export default function AnalysisResultCard({ analysisResult, selectedElementId }
                                     <td className="p-2 align-top">
                                         <div className="flex flex-wrap gap-1">
                                             {element.classification.map(cat => (
-                                                <Badge key={cat} variant="destructive" className="text-xs">{cat}</Badge>
+                                                <Badge key={cat} variant="outline" className={`text-xs ${categoryBadgeClass[cat]}`}>
+                                                    {cat}
+                                                </Badge>
                                             ))}
                                         </div>
                                     </td>
