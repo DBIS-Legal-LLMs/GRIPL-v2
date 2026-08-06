@@ -10,7 +10,6 @@ import EvaluationConfigDefaultSettings from "@/components/evaluation/config/eval
 import EvaluationConfigDatasetSettings from "@/components/evaluation/config/evaluation-config-dataset-settings";
 import EvaluationConfigModelsSettings from "@/components/evaluation/config/evaluation-config-models-settings";
 import {nextLabel} from "@/lib/evaluation-config-utils";
-import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 
 interface EvaluationConfigCardMultiProps {
     className?: string;
@@ -20,8 +19,7 @@ interface EvaluationConfigCardMultiProps {
 }
 
 export default function EvaluationConfig({ className, children, datasets, onMultiConfigChanged }: EvaluationConfigCardMultiProps) {
-    const {backendEndpoint} = useAnalysisEndpoint();
-    const config = useEvaluationConfig(datasets, onMultiConfigChanged, backendEndpoint);
+    const config = useEvaluationConfig(datasets, onMultiConfigChanged);
 
     const { fileInputRef, onClickImportYaml, onFileChange, onClickExportYaml } = useYamlImportExport({
         availableEvaluationEndpoints: config.availableEvaluationEndpoints,
