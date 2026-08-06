@@ -61,7 +61,7 @@ export default function AppSidebar() {
                 })}
             </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="p-3 border-t">
+        <SidebarFooter className="px-3 pt-2 pb-10 border-t">
             <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                     <Label htmlFor="sidebar-endpoint-switch" className="text-xs font-medium">Multiclass Endpoint</Label>

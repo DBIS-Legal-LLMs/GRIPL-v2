@@ -7,6 +7,8 @@ import { ModelRunConfig, MultiEvaluationRequest } from "@/models/dto/MultiEvalua
 import {EndpointChoice, ModelRowState} from "@/models/evaluation/Config";
 import {cryptoRandomId, normalize} from "@/lib/evaluation-config-utils";
 
+const DEFAULT_EVALUATION_ENDPOINT = "/gdpr/analysis/prompt-engineering";
+
 export function newModelRow(index: number): ModelRowState {
     return {
         id: cryptoRandomId(),
@@ -25,8 +27,7 @@ export function newModelRow(index: number): ModelRowState {
 
 export function useEvaluationConfig(
     datasets: Dataset[],
-    onMultiConfigChanged: (config: MultiEvaluationRequest) => void,
-    preferredDefaultEndpoint?: string
+    onMultiConfigChanged: (config: MultiEvaluationRequest) => void
 ) {
     const [availableEvaluationEndpoints, setAvailableEvaluationEndpoints] = useState<AnalysisEndpoint[]>([]);
 
@@ -43,31 +44,12 @@ export function useEvaluationConfig(
     useEffect(() => {
         fetchAnalysisEndpoints().then((eps) => {
             setAvailableEvaluationEndpoints(eps);
-            if (eps.length > 0 && !defaultPresetEndpoint) {
-                setDefaultPresetEndpoint(eps[0].endpoint);
+            if (eps.length > 0) {
+                const preferredEndpoint = eps.find((ep) => ep.endpoint === DEFAULT_EVALUATION_ENDPOINT);
+                setDefaultPresetEndpoint((current) => current || preferredEndpoint?.endpoint || eps[0].endpoint);
             }
         });
     }, []);
-
-    useEffect(() => {
-        const normalizedPreferredEndpoint = preferredDefaultEndpoint?.trim();
-        if (!normalizedPreferredEndpoint) {
-            return;
-        }
-
-        const matchingPreset = availableEvaluationEndpoints.find(
-            (endpoint) => endpoint.endpoint === normalizedPreferredEndpoint
-        );
-
-        if (matchingPreset) {
-            setDefaultEndpointChoice("preset");
-            setDefaultPresetEndpoint(matchingPreset.endpoint);
-            return;
-        }
-
-        setDefaultEndpointChoice("custom");
-        setDefaultCustomEndpoint(normalizedPreferredEndpoint);
-    }, [preferredDefaultEndpoint, availableEvaluationEndpoints]);
 
     const effectiveDefaultEndpoint = useMemo(() => {
         if (defaultEndpointChoice === "custom") return defaultCustomEndpoint.trim();
