@@ -14,6 +14,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import org.springframework.stereotype.Component
 import java.util.concurrent.atomic.AtomicInteger
+import de.mertendieckmann.griplbackend.model.analysis.GdprProcessingClass
+import de.mertendieckmann.griplbackend.model.evaluation.ClassMetrics
 
 @Component
 class EvaluationRunner(
@@ -62,18 +64,18 @@ class EvaluationRunner(
     }
 
     private suspend fun evaluateSingleEntry(
-    entry: EvaluationData,
-    evaluationRequest: EvaluationRequest
-): EvaluationOutcome = try {
-    evaluateEntryOrFailFast(entry, evaluationRequest)
-} catch (e: Exception) {
-    EvaluationOutcome.Error(
-        EvaluationReportError(
-            testCaseId = entry.id,
-            datasetId = entry.datasetId,
-            testCaseName = entry.name ?: "Test Case ${entry.id}",
-            errorMessage = e.message ?: "Unbekannter Fehler aufgetreten"
-        )
+        entry: EvaluationData,
+        evaluationRequest: EvaluationRequest
+    ): EvaluationOutcome = try {
+        evaluateEntryOrFailFast(entry, evaluationRequest)
+    } catch (e: Exception) {
+        EvaluationOutcome.Error(
+            EvaluationReportError(
+                testCaseId = entry.id,
+                datasetId = entry.datasetId,
+                testCaseName = entry.name ?: "Test Case ${entry.id}",
+                errorMessage = e.message ?: "Unbekannter Fehler aufgetreten"
+            )
     )
 }
 
@@ -178,7 +180,7 @@ private suspend fun evaluateEntryOrFailFast(
         computeClassificationSets(
             expectedComparisonValues,
             actualComparisonValues
-    )
+        )
     val classificationIds: ClassificationSets<String> = ClassificationSets(
         truePositiveIds = classification.truePositiveIds
             .map { if (isMultiLabelEvaluation) it.substringBefore(":") else it }
@@ -244,6 +246,62 @@ private suspend fun evaluateEntryOrFailFast(
             )
         }
 
+    val perClassMetrics =
+        if (isMultiLabelEvaluation) {
+            GdprProcessingClass.entries.associateWith { gdprClass ->
+                val expectedIdsForClass =
+                    expectedValues
+                        .filter {
+                            scopeIds == null || it.value in scopeIds
+                        }
+                        .filter {
+                            gdprClass in it.classification
+                        }
+                        .map { it.value }
+
+                val actualIdsForClass =
+                    actualValues
+                        .filter {
+                            scopeIds == null || it.value in scopeIds
+                        }
+                        .filter {
+                            gdprClass in it.classification
+                        }
+                        .map { it.value }
+
+                val classClassification =
+                    computeClassificationSets(
+                        expectedIdsForClass,
+                        actualIdsForClass
+                    )
+
+                val classTrueNegatives =
+                    computeTrueNegativesCount(
+                        bpmnModel = bpmnModel,
+                        truePositivesCount =
+                            classClassification.truePositiveIds.size,
+                        falsePositivesCount =
+                            classClassification.falsePositiveIds.size,
+                        falseNegativesCount =
+                            classClassification.falseNegativeIds.size,
+                        activitiesOnly =
+                            evaluationRequest.activitiesOnly
+                    )
+
+                ClassMetrics(
+                    truePositives =
+                        classClassification.truePositiveIds.size,
+                    falsePositives =
+                        classClassification.falsePositiveIds.size,
+                    falseNegatives =
+                        classClassification.falseNegativeIds.size,
+                    trueNegatives = classTrueNegatives
+                )
+            }
+        } else {
+            emptyMap()
+        }
+
     val amountOfRetries =
         actualResult.analysisResponse.amountOfRetries ?: 0
 
@@ -257,7 +315,8 @@ private suspend fun evaluateEntryOrFailFast(
                 expectedComparisonValues.toSet(),
         amountOfRetries = amountOfRetries,
         ragMetrics = ragMetrics,
-        perElementType = perElementType
+        perElementType = perElementType, 
+        perClassMetrics = perClassMetrics
     )
 
     val testCaseReport = TestCaseReport(

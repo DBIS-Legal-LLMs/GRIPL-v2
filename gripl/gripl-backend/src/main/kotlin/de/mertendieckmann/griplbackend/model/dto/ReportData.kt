@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo
 import de.mertendieckmann.griplbackend.model.evaluation.ElementTypeCounts
 import de.mertendieckmann.griplbackend.model.evaluation.RagMetrics
 import java.sql.Timestamp
+import de.mertendieckmann.griplbackend.model.analysis.GdprProcessingClass
 
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
@@ -115,6 +116,7 @@ data class TestCaseReport(
     }
 }
 
+
 data class RagSummaryMetrics(
     val faithfulnessMean: Double? = null,
     val contextUtilizationMean: Double? = null,
@@ -126,6 +128,17 @@ data class RagSummaryMetrics(
 /** Aggregated confusion counts and derived metrics for one element category. */
 data class ElementTypeSummary(
     val displayName: String,
+    val truePositives: Int,
+    val falsePositives: Int,
+    val falseNegatives: Int,
+    val trueNegatives: Int,
+    val precision: Double,
+    val recall: Double,
+    val f1Score: Double,
+    val accuracy: Double
+)
+
+data class PerClassEvaluationMetrics(
     val truePositives: Int,
     val falsePositives: Int,
     val falseNegatives: Int,
@@ -153,7 +166,8 @@ data class EvaluationReportSummary(
     val totalTrueNegatives: Int,
     val ragMetrics: RagSummaryMetrics? = null,
     /** Metrics broken down by element category, keyed by category key (activity, event, ...). */
-    val perElementType: Map<String, ElementTypeSummary> = emptyMap()
+    val perElementType: Map<String, ElementTypeSummary> = emptyMap(),
+    val perClassMetrics: Map<GdprProcessingClass, PerClassEvaluationMetrics> = emptyMap()
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
