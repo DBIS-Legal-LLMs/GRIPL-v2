@@ -3,6 +3,7 @@ package de.mertendieckmann.griplbackend.model.dto
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import java.sql.Timestamp
+import de.mertendieckmann.griplbackend.model.analysis.GdprProcessingClass
 
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
@@ -96,6 +97,17 @@ data class TestCaseReport(
     }
 }
 
+data class PerClassEvaluationMetrics(
+    val truePositives: Int,
+    val falsePositives: Int,
+    val falseNegatives: Int,
+    val trueNegatives: Int,
+    val precision: Double,
+    val recall: Double,
+    val f1Score: Double,
+    val accuracy: Double
+)
+
 data class EvaluationReportSummary(
     val total: Int,
     val passed: Int,
@@ -110,7 +122,8 @@ data class EvaluationReportSummary(
     val totalTruePositives: Int,
     val totalFalsePositives: Int,
     val totalFalseNegatives: Int,
-    val totalTrueNegatives: Int
+    val totalTrueNegatives: Int,
+    val perClassMetrics: Map<GdprProcessingClass, PerClassEvaluationMetrics> = emptyMap()
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {

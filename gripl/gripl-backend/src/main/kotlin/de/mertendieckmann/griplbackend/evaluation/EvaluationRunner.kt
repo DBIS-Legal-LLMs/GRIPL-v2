@@ -11,6 +11,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import org.springframework.stereotype.Component
 import java.util.concurrent.atomic.AtomicInteger
+import de.mertendieckmann.griplbackend.model.analysis.GdprProcessingClass
+import de.mertendieckmann.griplbackend.model.evaluation.ClassMetrics
 
 @Component
 class EvaluationRunner(
@@ -104,6 +106,40 @@ class EvaluationRunner(
                     falseNegativesCount = classification.falseNegativeIds.size
                 )
             }
+        val perClassMetrics =
+            if (isMultiLabelEvaluation) {
+                GdprProcessingClass.entries.associateWith { gdprClass ->
+
+                    val expectedIdsForClass = expectedValues
+                        .filter { gdprClass in it.classification }
+                        .map { it.value }
+
+                    val actualIdsForClass = actualValues
+                        .filter { gdprClass in it.classification }
+                        .map { it.value }
+
+                    val classClassification = computeClassificationSets(
+                        expectedIdsForClass,
+                        actualIdsForClass
+                    )
+
+                    val classTrueNegatives = computeTrueNegativesCount(
+                        bpmnModel = bpmnModel,
+                        truePositivesCount = classClassification.truePositiveIds.size,
+                        falsePositivesCount = classClassification.falsePositiveIds.size,
+                        falseNegativesCount = classClassification.falseNegativeIds.size
+                    )
+
+                    ClassMetrics(
+                        truePositives = classClassification.truePositiveIds.size,
+                        falsePositives = classClassification.falsePositiveIds.size,
+                        falseNegatives = classClassification.falseNegativeIds.size,
+                        trueNegatives = classTrueNegatives
+                    )
+                }
+            } else {
+                emptyMap()
+            }
 
         val expectedActivityIds = expectedValues.map { it.value }
         val actualActivityIds = actualValues.map { it.value }
@@ -114,7 +150,8 @@ class EvaluationRunner(
             falseNegatives = classification.falseNegativeIds.size,
             trueNegatives = trueNegativesCount,
             isSuccessful = actualComparisonValues.toSet() == expectedComparisonValues.toSet(),
-            amountOfRetries = actualResult.second ?: 0
+            amountOfRetries = actualResult.second ?: 0,
+            perClassMetrics = perClassMetrics
         )
 
         val testCaseReport = TestCaseReport(
