@@ -123,3 +123,29 @@ summary::after {
 details[open] summary:after {
   content: " ▼";
 }
+
+.apexcharts-tooltip,
+.apexcharts-xaxistooltip {
+  background: hsl(var(--popover)) !important;
+  color: hsl(var(--popover-foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16) !important;
+}
+
+.apexcharts-tooltip-title {
+  background: hsl(var(--muted)) !important;
+  color: hsl(var(--popover-foreground)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+}
+
+.apexcharts-tooltip-text,
+.apexcharts-tooltip-text-y-label,
+.apexcharts-tooltip-text-y-value,
+.apexcharts-tooltip-text-z-label,
+.apexcharts-tooltip-text-z-value,
+.apexcharts-tooltip-text-goals-label,
+.apexcharts-tooltip-text-goals-value,
+.apexcharts-tooltip-series-group {
+  color: hsl(var(--popover-foreground)) !important;
+  fill: hsl(var(--popover-foreground)) !important;
+}

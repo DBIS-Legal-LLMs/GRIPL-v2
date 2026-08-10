@@ -18,6 +18,9 @@ export function AmountOfRetriesPerModel({ reportSummaries }: AmountOfRetriesPerM
     const [isClient, setIsClient] = useState(false)
 
     const chartId = "amount-of-retries-chart"
+    const foregroundColor = "hsl(var(--foreground))"
+    const mutedForegroundColor = "hsl(var(--muted-foreground))"
+    const borderColor = "hsl(var(--border))"
     const series = [
         {
             name: "Amount of Retries",
@@ -44,23 +47,33 @@ export function AmountOfRetriesPerModel({ reportSummaries }: AmountOfRetriesPerM
         },
         dataLabels: {
             enabled: true,
+            style: {
+                colors: [foregroundColor],
+            },
         },
         xaxis: {
             categories: reportSummaries.map((r) => r.label),
             labels: {
                 rotate: -42,
                 rotateAlways: true,
-                style: { fontSize: "10px" },
+                style: { fontSize: "10px", colors: mutedForegroundColor },
             },
+            axisBorder: { show: true, color: borderColor },
         },
         yaxis: {
             title: {
                 text: "Number of Retries",
-                style: { fontSize: "10px", fontWeight: 400 },
+                style: { fontSize: "10px", fontWeight: 400, color: mutedForegroundColor },
             },
-            labels: { style: { fontSize: "10px" } },
+            labels: { style: { fontSize: "10px", colors: mutedForegroundColor } },
+            axisBorder: { show: true, color: borderColor },
         },
         colors: ["#fb923c"],
+        legend: {
+            labels: {
+                colors: foregroundColor,
+            },
+        },
         tooltip: {
             y: {
                 formatter: (val) => `${val} retries`,

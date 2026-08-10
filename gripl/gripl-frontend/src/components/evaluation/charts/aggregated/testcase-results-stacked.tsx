@@ -21,6 +21,9 @@ export default function TestcaseResultsStacked({ aggregatedEvaluationResults, re
         failed: "#ef4444",
         error: "#fb923c",
     })
+    const foregroundColor = "hsl(var(--foreground))"
+    const mutedForegroundColor = "hsl(var(--muted-foreground))"
+    const borderColor = "hsl(var(--border))"
 
     useEffect(() => {
         setIsClient(true)
@@ -67,6 +70,7 @@ export default function TestcaseResultsStacked({ aggregatedEvaluationResults, re
                         style: {
                             fontSize: "10px",
                             fontWeight: 600,
+                            color: foregroundColor,
                         },
                     },
                 },
@@ -75,27 +79,30 @@ export default function TestcaseResultsStacked({ aggregatedEvaluationResults, re
         colors: [customColors.passed, customColors.failed, customColors.error],
         dataLabels: {
             enabled: true,
+            style: {
+                colors: [foregroundColor],
+            },
         },
         xaxis: {
             categories,
             labels: {
                 rotate: -42,
                 rotateAlways: true,
-                style: { fontSize: "10px" },
+                style: { fontSize: "10px", colors: mutedForegroundColor },
             },
-            axisBorder: { show: true, color: "#000000" },
+            axisBorder: { show: true, color: borderColor },
             axisTicks: { show: true },
         },
         yaxis: {
             title: {
                 text: "Mean number of test cases",
-                style: { fontSize: "10px", fontWeight: 400 },
+                style: { fontSize: "10px", fontWeight: 400, color: mutedForegroundColor },
             },
-            labels: { style: { fontSize: "10px" } },
-            axisBorder: { show: true, color: "#000000" },
+            labels: { style: { fontSize: "10px", colors: mutedForegroundColor } },
+            axisBorder: { show: true, color: borderColor },
         },
         grid: {
-            borderColor: "#e0e0e0",
+            borderColor,
             strokeDashArray: 4,
             xaxis: { lines: { show: false } },
             yaxis: { lines: { show: true } },
@@ -103,6 +110,9 @@ export default function TestcaseResultsStacked({ aggregatedEvaluationResults, re
         legend: {
             position: "right",
             offsetY: 40,
+            labels: {
+                colors: foregroundColor,
+            },
             markers: {
                 shape: "square",
             },

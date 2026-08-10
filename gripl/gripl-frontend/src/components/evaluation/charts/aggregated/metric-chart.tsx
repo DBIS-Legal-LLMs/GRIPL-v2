@@ -14,8 +14,8 @@ const Chart = dynamic(() => import("react-apexcharts"), { ssr: false })
 interface MetricChartProps {
     title: string
     description: string
-    metricKey: "avgPrecision" | "avgRecall" | "avgF1Score" | "avgAccuracy" | "avgAmountOfRetries" | "avgContextUtilization" | "avgFaithfulness"
-    stdKey: "stdPrecision" | "stdRecall" | "stdF1Score" | "stdAccuracy" | "stdAmountOfRetries" | "stdContextUtilization" | "stdFaithfulness"
+    metricKey: "avgPrecision" | "avgRecall" | "avgF1Score" | "avgAccuracy" | "avgExactMatchAccuracy" | "avgAmountOfRetries" | "avgContextUtilization" | "avgFaithfulness"
+    stdKey: "stdPrecision" | "stdRecall" | "stdF1Score" | "stdAccuracy" | "stdExactMatchAccuracy" | "stdAmountOfRetries" | "stdContextUtilization" | "stdFaithfulness"
     aggregatedEvaluationResults: AggregatedEvaluationResults
     xAxisMaxOffset?: number
 }
@@ -44,6 +44,9 @@ export default function MetricChart({ title, description, metricKey, stdKey, agg
     }))
 
     const chartId = `metric-chart-${metricKey}`
+    const foregroundColor = "hsl(var(--foreground))"
+    const mutedForegroundColor = "hsl(var(--muted-foreground))"
+    const borderColor = "hsl(var(--border))"
 
     const maxValue = Math.max(...data.map((d) => d.mean + d.sd))
     const xAxisMax = maxValue + (xAxisMaxOffset || 0.2)
@@ -83,7 +86,7 @@ export default function MetricChart({ title, description, metricKey, stdKey, agg
             },
             offsetY: 0,
             offsetX: 40,
-            style: { fontSize: "11px", colors: ["#000000"] },
+            style: { fontSize: "11px", colors: [foregroundColor] },
             background: { enabled: false },
         },
         xaxis: {
@@ -92,21 +95,21 @@ export default function MetricChart({ title, description, metricKey, stdKey, agg
             min: 0,
             title: {
                 text: `${title} (mean ± SD)`,
-                style: { fontSize: "10px", fontWeight: 400 },
+                style: { fontSize: "10px", fontWeight: 400, color: mutedForegroundColor },
             },
-            labels: { style: { fontSize: "10px" } },
-            axisBorder: { show: true, color: "#000000" },
+            labels: { style: { fontSize: "10px", colors: mutedForegroundColor } },
+            axisBorder: { show: true, color: borderColor },
             axisTicks: { show: true },
         },
         yaxis: {
             labels: {
-                style: { fontSize: "10px" },
+                style: { fontSize: "10px", colors: mutedForegroundColor },
                 maxWidth: 300
             },
-            axisBorder: { show: true, color: "#000000" },
+            axisBorder: { show: true, color: borderColor },
         },
         grid: {
-            borderColor: "#e0e0e0",
+            borderColor,
             strokeDashArray: 4,
             xaxis: { lines: { show: true } },
             yaxis: { lines: { show: false } },
