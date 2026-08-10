@@ -6,9 +6,15 @@ import { Badge } from "@/components/ui/badge";
 
 interface SummaryReportCardSingleProps {
     reportSummary: EvaluationReportSummary;
+    isMulticlass?: boolean;
+    showExactMatchMetric?: boolean;
 }
 
-export default function EvaluationReportSummaryCardSingle({ reportSummary }: SummaryReportCardSingleProps) {
+export default function EvaluationReportSummaryCardSingle({
+    reportSummary,
+    isMulticlass = false,
+    showExactMatchMetric = true
+}: SummaryReportCardSingleProps) {
     const formatPercentage = (value: number) => `${(value * 100).toFixed(1)}%`;
     const formatDecimal = (value: number) => value.toFixed(3);
     const successRate = reportSummary.total > 0 ? reportSummary.passed / reportSummary.total : 0;
@@ -53,17 +59,21 @@ export default function EvaluationReportSummaryCardSingle({ reportSummary }: Sum
                     <CardTitle>Performance Metrics</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                        <div className="text-center">
-                            <div className="text-3xl font-bold text-chart-metric-4">{formatDecimal(reportSummary.accuracy)}</div>
-                            <div className="text-sm text-muted-foreground">Accuracy</div>
-                            <Progress value={reportSummary.accuracy * 100} className="h-2 mt-2" />
-                        </div>
-                        <div className="text-center">
-                            <div className="text-3xl font-bold text-chart-metric-2">{formatDecimal(reportSummary.exactMatchAccuracy)}</div>
-                            <div className="text-sm text-muted-foreground">Exact Match</div>
-                            <Progress value={reportSummary.exactMatchAccuracy * 100} className="h-2 mt-2" />
-                        </div>
+                    <div className={`grid grid-cols-2 ${showExactMatchMetric ? "md:grid-cols-4 lg:grid-cols-5" : "md:grid-cols-3"} gap-6`}>
+                        {!isMulticlass && (
+                            <div className="text-center">
+                                <div className="text-3xl font-bold text-chart-metric-4">{formatDecimal(reportSummary.accuracy)}</div>
+                                <div className="text-sm text-muted-foreground">Accuracy</div>
+                                <Progress value={reportSummary.accuracy * 100} className="h-2 mt-2" />
+                            </div>
+                        )}
+                        {showExactMatchMetric && (
+                            <div className="text-center">
+                                <div className="text-3xl font-bold text-chart-metric-2">{formatDecimal(reportSummary.exactMatchAccuracy)}</div>
+                                <div className="text-sm text-muted-foreground">Exact Match Accuracy</div>
+                                <Progress value={reportSummary.exactMatchAccuracy * 100} className="h-2 mt-2" />
+                            </div>
+                        )}
                         <div className="text-center">
                             <div className="text-3xl font-bold text-chart-metric-1">{formatDecimal(reportSummary.precision)}</div>
                             <div className="text-sm text-muted-foreground">Precision</div>

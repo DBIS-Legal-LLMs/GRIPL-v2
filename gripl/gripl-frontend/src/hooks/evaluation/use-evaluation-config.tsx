@@ -4,10 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import fetchAnalysisEndpoints from "@/actions/analysis-endpoints";
 import { Dataset } from "@/models/dto/Dataset";
 import { ModelRunConfig, MultiEvaluationRequest } from "@/models/dto/MultiEvaluationRequest";
-import {EndpointChoice, ModelRowState} from "@/models/evaluation/Config";
+import {AnalysisEndpoint, EndpointChoice, ModelRowState} from "@/models/evaluation/Config";
 import {cryptoRandomId, normalize} from "@/lib/evaluation-config-utils";
-
-const DEFAULT_EVALUATION_ENDPOINT = "/gdpr/analysis/prompt-engineering";
+import { useAnalysisEndpoint } from "@/components/providers/analysis-endpoint-provider";
 
 export function newModelRow(index: number): ModelRowState {
     return {
@@ -29,6 +28,11 @@ export function useEvaluationConfig(
     datasets: Dataset[],
     onMultiConfigChanged: (config: MultiEvaluationRequest) => void
 ) {
+    const { isMulticlass } = useAnalysisEndpoint();
+    const preferredDefaultEndpoint = isMulticlass
+        ? "/gdpr/analysis/multiclass"
+        : "/gdpr/analysis/prompt-engineering";
+
     const [availableEvaluationEndpoints, setAvailableEvaluationEndpoints] = useState<AnalysisEndpoint[]>([]);
 
     const [defaultEndpointChoice, setDefaultEndpointChoice] = useState<EndpointChoice>("preset");
@@ -45,11 +49,11 @@ export function useEvaluationConfig(
         fetchAnalysisEndpoints().then((eps) => {
             setAvailableEvaluationEndpoints(eps);
             if (eps.length > 0) {
-                const preferredEndpoint = eps.find((ep) => ep.endpoint === DEFAULT_EVALUATION_ENDPOINT);
+                const preferredEndpoint = eps.find((ep) => ep.endpoint === preferredDefaultEndpoint);
                 setDefaultPresetEndpoint((current) => current || preferredEndpoint?.endpoint || eps[0].endpoint);
             }
         });
-    }, []);
+    }, [preferredDefaultEndpoint]);
 
     const effectiveDefaultEndpoint = useMemo(() => {
         if (defaultEndpointChoice === "custom") return defaultCustomEndpoint.trim();

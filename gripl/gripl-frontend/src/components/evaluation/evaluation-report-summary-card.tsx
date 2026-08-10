@@ -5,11 +5,21 @@ import EvaluationReportSummaryCardMulti from "@/components/evaluation/evaluation
 
 type SingleProps = { reportSummary: EvaluationReportSummary; reportSummaries?: undefined };
 type MultiProps  = { reportSummary?: undefined; reportSummaries: Array<{ label: string; summary: EvaluationReportSummary }>, metadata: EvaluationMetadataReport | null };
-type Props = SingleProps | MultiProps;
+type CommonProps = {
+    isMulticlass?: boolean;
+    showExactMatchMetric?: boolean;
+};
+type Props = (SingleProps | MultiProps) & CommonProps;
 
 export default function EvaluationReportSummaryCard(props: Props) {
     if ("reportSummaries" in props && props.reportSummaries) {
         return <EvaluationReportSummaryCardMulti items={props.reportSummaries} metadata={props.metadata} />;
     }
-    return <EvaluationReportSummaryCardSingle reportSummary={(props as SingleProps).reportSummary} />;
+    return (
+        <EvaluationReportSummaryCardSingle
+            reportSummary={(props as SingleProps).reportSummary}
+            isMulticlass={props.isMulticlass}
+            showExactMatchMetric={props.showExactMatchMetric}
+        />
+    );
 }

@@ -1,5 +1,24 @@
 import {GdprCategory} from "@/models/GdprCategory";
 
+export interface PerClassMetricValues {
+    totalTruePositives?: number;
+    totalFalsePositives?: number;
+    totalFalseNegatives?: number;
+    totalTrueNegatives?: number;
+    truePositives?: number;
+    falsePositives?: number;
+    falseNegatives?: number;
+    trueNegatives?: number;
+    tp?: number;
+    fp?: number;
+    fn?: number;
+    tn?: number;
+    precision?: number;
+    recall?: number;
+    f1Score?: number;
+    f1?: number;
+}
+
 export interface EvaluationMetadataReport {
     type: "metadata";
     modelLabels: string[],
@@ -47,6 +66,7 @@ export interface EvaluationReportSummary {
     totalFalsePositives: number;
     totalFalseNegatives: number;
     totalTrueNegatives: number;
+    perClassMetrics?: Partial<Record<string, PerClassMetricValues>>;
     markdown: string;
 }
 

@@ -44,7 +44,7 @@ export default function TestCaseReportCardComparison({ report }: TestCaseReportC
         <div>
             <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                 <Target className="h-4 w-4" />
-                Expected Activities
+                Expected Activity-Classifications
             </h3>
             <Card className="p-3">
                 <div className="space-y-1">
@@ -72,7 +72,7 @@ export default function TestCaseReportCardComparison({ report }: TestCaseReportC
         <div>
             <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                 <ListChecks className="h-4 w-4" />
-                Detected Activities
+                Predicted Activity-Classifications
             </h3>
             <Card className="p-3">
                 <div className="space-y-1">

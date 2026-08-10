@@ -13,11 +13,11 @@ export default function TestCaseReportCardReasoning({ report }: TestCaseReportCa
             AI Model Reasoning
         </h3>
         <div className="rounded-lg border">
-            <table className="w-full">
+            <table className="w-full text-foreground">
                 <thead>
                     <tr className="bg-muted">
-                        <th className="text-left text-sm font-semibold p-2">Activity</th>
-                        <th className="text-left text-sm font-semibold p-2">Reasoning</th>
+                        <th className="text-left text-sm font-semibold p-2 text-foreground">Activity / Classification</th>
+                        <th className="text-left text-sm font-semibold p-2 text-foreground">Reasoning</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -28,9 +28,9 @@ export default function TestCaseReportCardReasoning({ report }: TestCaseReportCa
 
                         const isFalsePositive = report.falsePositiveIds?.includes(result.value) || false
 
-                        return <tr key={index} className={`border-t ${isFalsePositive && "bg-destructive/30"}`}>
-                            <td className="font-medium text-sm mb-1 p-2">{matchedName}</td>
-                            <td className="text-sm p-2">{result.reason || "No reasoning provided"}</td>
+                        return <tr key={index} className={`border-t border-border ${isFalsePositive && "bg-destructive/30"}`}>
+                            <td className="font-medium text-sm mb-1 p-2 text-foreground">{matchedName}</td>
+                            <td className="text-sm p-2 text-foreground">{result.reason || "No reasoning provided"}</td>
                         </tr>
                     })}
                 </tbody>

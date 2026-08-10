@@ -20,12 +20,27 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Card, CardContent, CardDescription, CardHeader} from "@/components/ui/card";
 import EvaluationConfig from "@/components/evaluation/config/evaluation-config";
 import {Dataset} from "@/models/dto/Dataset";
-import {FileText, Play} from "lucide-react";
+import {ChevronDown, FileText, Play} from "lucide-react";
 import TestcaseResultsStacked from "@/components/evaluation/charts/aggregated/testcase-results-stacked";
 import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluationResult";
 import MetricChart from "@/components/evaluation/charts/aggregated/metric-chart";
 import {ColorProvider, useColors} from "@/components/evaluation/charts/common/color-context";
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
+import {
+    applyClassSelectionToSummary,
+    ALL_CLASSES_FILTER,
+    classOptions,
+    hasPerClassMetrics,
+    isAllClassesSelected
+} from "@/lib/evaluation-class-metrics";
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 type ModelReportEnvelope = {
     modelLabel: string;
@@ -51,6 +66,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const [selectedRun, setSelectedRun] = useState<number>(1);
     const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
     const [selectedDataset, setSelectedDataset] = useState<string | undefined>(undefined);
+    const [selectedClasses, setSelectedClasses] = useState<string[]>([ALL_CLASSES_FILTER]);
 
     const [isMetricsSummaryOpen, setIsMetricsSummaryOpen] = useState<boolean>(false);
 
@@ -162,8 +178,40 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
         );
     }, [testCasesByRun, errorsByRun]);
 
+    const isMulticlassEvaluation = useMemo(() => {
+        if (metadata?.defaultEvaluationEndpoint?.includes("multiclass")) {
+            return true;
+        }
+
+        for (const runSummaries of summaryByRun.values()) {
+            for (const summary of runSummaries.values()) {
+                if (hasPerClassMetrics(summary)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }, [metadata, summaryByRun]);
+
+    const showExactMatchMetric = isMulticlassEvaluation && isAllClassesSelected(selectedClasses);
+    const showClassSpecificMetrics = isMulticlassEvaluation && !isAllClassesSelected(selectedClasses);
+
     const testCases = testCasesByRun.get(selectedRun) || [];
-    const summary = summaryByRun.get(selectedRun) || new Map();
+    const summary = useMemo(() => {
+        const rawSummary = summaryByRun.get(selectedRun) || new Map();
+
+        if (!isMulticlassEvaluation) {
+            return rawSummary;
+        }
+
+        return new Map(
+            Array.from(rawSummary.entries()).map(([label, modelSummary]) => [
+                label,
+                applyClassSelectionToSummary(modelSummary, selectedClasses)
+            ])
+        );
+    }, [summaryByRun, selectedRun, isMulticlassEvaluation, selectedClasses]);
     const errors = errorsByRun.get(selectedRun) || [];
 
     const aggregateStats = useMemo<AggregatedEvaluationResults | null>(() => {
@@ -176,6 +224,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
             const recalls: number[] = [];
             const f1Scores: number[] = [];
             const accuracies: number[] = [];
+            const exactMatchAccuracies: number[] = [];
             const passedCounts: number[] = [];
             const failedCounts: number[] = [];
             const errorCounts: number[] = [];
@@ -184,14 +233,20 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
             const falsePositives: number[] = [];
             const falseNegatives: number[] = [];
             const trueNegatives: number[] = [];
+            const expectedClassifications: number[] = [];
+            const predictedClassifications: number[] = [];
 
             for (const [runNum, runSummaries] of summaryByRun.entries()) {
-                const modelSummary = runSummaries.get(modelLabel);
+                const rawSummary = runSummaries.get(modelLabel);
+                const modelSummary = rawSummary && isMulticlassEvaluation
+                    ? applyClassSelectionToSummary(rawSummary, selectedClasses)
+                    : rawSummary;
                 if (modelSummary) {
                     precisions.push(modelSummary.precision);
                     recalls.push(modelSummary.recall);
                     f1Scores.push(modelSummary.f1Score);
                     accuracies.push(modelSummary.accuracy);
+                    exactMatchAccuracies.push(modelSummary.exactMatchAccuracy);
                     passedCounts.push(modelSummary.passed);
                     failedCounts.push(modelSummary.failed);
                     errorCounts.push(modelSummary.error);
@@ -203,6 +258,21 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     falseNegatives.push(modelSummary.totalFalseNegatives);
                     trueNegatives.push(modelSummary.totalTrueNegatives);
                 }
+
+                const runTestCases = (testCasesByRun.get(runNum) || []).filter((testCase) => testCase.modelLabel === modelLabel);
+                if (runTestCases.length > 0) {
+                    const expectedCount = runTestCases.reduce(
+                        (sum, testCase) => sum + testCase.correctActivityIds.length + testCase.falseNegativeIds.length,
+                        0
+                    );
+                    const predictedCount = runTestCases.reduce(
+                        (sum, testCase) => sum + testCase.correctActivityIds.length + testCase.falsePositiveIds.length,
+                        0
+                    );
+
+                    expectedClassifications.push(expectedCount);
+                    predictedClassifications.push(predictedCount);
+                }
             }
 
             if (precisions.length > 0) {
@@ -210,11 +280,13 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 const avgRecall = recalls.reduce((a, b) => a + b, 0) / recalls.length;
                 const avgF1Score = f1Scores.reduce((a, b) => a + b, 0) / f1Scores.length;
                 const avgAccuracy = accuracies.reduce((a, b) => a + b, 0) / accuracies.length;
+                const avgExactMatchAccuracy = exactMatchAccuracies.reduce((a, b) => a + b, 0) / exactMatchAccuracies.length;
 
                 const stdPrecision = Math.sqrt(precisions.reduce((sum, val) => sum + Math.pow(val - avgPrecision, 2), 0) / precisions.length);
                 const stdRecall = Math.sqrt(recalls.reduce((sum, val) => sum + Math.pow(val - avgRecall, 2), 0) / recalls.length);
                 const stdF1Score = Math.sqrt(f1Scores.reduce((sum, val) => sum + Math.pow(val - avgF1Score, 2), 0) / f1Scores.length);
                 const stdAccuracy = Math.sqrt(accuracies.reduce((sum, val) => sum + Math.pow(val - avgAccuracy, 2), 0) / accuracies.length);
+                const stdExactMatchAccuracy = Math.sqrt(exactMatchAccuracies.reduce((sum, val) => sum + Math.pow(val - avgExactMatchAccuracy, 2), 0) / exactMatchAccuracies.length);
 
                 const avgPassed = passedCounts.reduce((a, b) => a + b, 0) / passedCounts.length;
                 const stdPassed = Math.sqrt(passedCounts.reduce((sum, val) => sum + Math.pow(val - avgPassed, 2), 0) / passedCounts.length);
@@ -234,6 +306,18 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 const stdFalsePositives = Math.sqrt(falsePositives.reduce((sum, val) => sum + Math.pow(val - avgFalsePositives, 2), 0) / falsePositives.length);
                 const stdFalseNegatives = Math.sqrt(falseNegatives.reduce((sum, val) => sum + Math.pow(val - avgFalseNegatives, 2), 0) / falseNegatives.length);
                 const stdTrueNegatives = Math.sqrt(trueNegatives.reduce((sum, val) => sum + Math.pow(val - avgTrueNegatives, 2), 0) / trueNegatives.length);
+                const avgExpectedClassifications = expectedClassifications.length > 0
+                    ? expectedClassifications.reduce((a, b) => a + b, 0) / expectedClassifications.length
+                    : 0;
+                const avgPredictedClassifications = predictedClassifications.length > 0
+                    ? predictedClassifications.reduce((a, b) => a + b, 0) / predictedClassifications.length
+                    : 0;
+                const stdExpectedClassifications = expectedClassifications.length > 0
+                    ? Math.sqrt(expectedClassifications.reduce((sum, val) => sum + Math.pow(val - avgExpectedClassifications, 2), 0) / expectedClassifications.length)
+                    : 0;
+                const stdPredictedClassifications = predictedClassifications.length > 0
+                    ? Math.sqrt(predictedClassifications.reduce((sum, val) => sum + Math.pow(val - avgPredictedClassifications, 2), 0) / predictedClassifications.length)
+                    : 0;
 
                 stats[modelLabel] = {
                     avgPrecision,
@@ -244,6 +328,8 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     stdF1Score,
                     avgAccuracy,
                     stdAccuracy,
+                    avgExactMatchAccuracy,
+                    stdExactMatchAccuracy,
                     avgPassed,
                     stdPassed,
                     avgFailed,
@@ -259,13 +345,30 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     avgFalseNegatives,
                     stdFalseNegatives,
                     avgTrueNegatives,
-                    stdTrueNegatives
+                    stdTrueNegatives,
+                    avgExpectedClassifications,
+                    stdExpectedClassifications,
+                    avgPredictedClassifications,
+                    stdPredictedClassifications
                 }
             }
         }
 
         return stats;
-    }, [summaryByRun, metadata]);
+    }, [summaryByRun, metadata, isMulticlassEvaluation, selectedClasses, testCasesByRun]);
+
+    const toggleClassSelection = (className: string, checked: boolean) => {
+        setSelectedClasses((previous) => {
+            const withoutAll = previous.filter((value) => value !== ALL_CLASSES_FILTER);
+
+            if (checked) {
+                return Array.from(new Set([...withoutAll, className]));
+            }
+
+            const next = withoutAll.filter((value) => value !== className);
+            return next.length > 0 ? next : [ALL_CLASSES_FILTER];
+        });
+    };
 
     const handleDownloadMarkdownReport = () => {
         const hasSummaries = summaryByRun.size > 0;
@@ -287,11 +390,17 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 sections.push(`- Precision: ${stats.avgPrecision.toFixed(3)} ± ${stats.stdPrecision.toFixed(3)}`);
                 sections.push(`- Recall: ${stats.avgRecall.toFixed(3)} ± ${stats.stdRecall.toFixed(3)}`);
                 sections.push(`- F1-Score: ${stats.avgF1Score.toFixed(3)} ± ${stats.stdF1Score.toFixed(3)}`);
-                sections.push(`- Accuracy: ${stats.avgAccuracy.toFixed(3)} ± ${stats.stdAccuracy.toFixed(3)}`);
+                if (isMulticlassEvaluation && isAllClassesSelected(selectedClasses)) {
+                    sections.push(`- Exact Match Accuracy: ${stats.avgExactMatchAccuracy.toFixed(3)} ± ${stats.stdExactMatchAccuracy.toFixed(3)}`);
+                } else if (!isMulticlassEvaluation) {
+                    sections.push(`- Accuracy: ${stats.avgAccuracy.toFixed(3)} ± ${stats.stdAccuracy.toFixed(3)}`);
+                }
                 sections.push(`- True Positives: ${stats.avgTruePositives.toFixed(3)} ± ${stats.stdTruePositives.toFixed(3)}`);
                 sections.push(`- False Positives: ${stats.avgFalsePositives.toFixed(3)} ± ${stats.stdFalsePositives.toFixed(3)}`);
                 sections.push(`- False Negatives: ${stats.avgFalseNegatives.toFixed(3)} ± ${stats.stdFalseNegatives.toFixed(3)}`);
                 sections.push(`- True Negatives: ${stats.avgTrueNegatives.toFixed(3)} ± ${stats.stdTrueNegatives.toFixed(3)}`);
+                sections.push(`- Expected Classifications: ${stats.avgExpectedClassifications.toFixed(3)} ± ${stats.stdExpectedClassifications.toFixed(3)}`);
+                sections.push(`- Predicted Classifications: ${stats.avgPredictedClassifications.toFixed(3)} ± ${stats.stdPredictedClassifications.toFixed(3)}`);
                 sections.push(`- Passed: ${stats.avgPassed.toFixed(3)} ± ${stats.stdPassed.toFixed(3)} / ${metadata?.totalTestCases}`);
                 sections.push(`- Failed: ${stats.avgFailed.toFixed(3)} ± ${stats.stdFailed.toFixed(3)} / ${metadata?.totalTestCases}`);
                 sections.push(`- Errors: ${stats.avgErrors.toFixed(3)} ± ${stats.stdErrors.toFixed(3)} / ${metadata?.totalTestCases}`);
@@ -482,6 +591,44 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
 
             <section className="px-6 container mx-auto">
                 <h2 className="text-2xl font-semibold mb-2">Complete Result Overview</h2>
+                {isMulticlassEvaluation && (
+                    <div className="mb-4 flex flex-wrap items-center gap-3">
+                        <span className="text-sm font-medium">Classification Filter:</span>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="gap-2">
+                                    {isAllClassesSelected(selectedClasses)
+                                        ? "All"
+                                        : `${selectedClasses.length} selected`}
+                                    <ChevronDown className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                                <DropdownMenuLabel>Per-class Metrics</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuCheckboxItem
+                                    checked={isAllClassesSelected(selectedClasses)}
+                                    onCheckedChange={(checked) => {
+                                        if (checked === true) {
+                                            setSelectedClasses([ALL_CLASSES_FILTER]);
+                                        }
+                                    }}
+                                >
+                                    All
+                                </DropdownMenuCheckboxItem>
+                                {classOptions().map((className) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={className}
+                                        checked={!isAllClassesSelected(selectedClasses) && selectedClasses.includes(className)}
+                                        onCheckedChange={(checked) => toggleClassSelection(className, checked === true)}
+                                    >
+                                        {className}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                )}
                 {summariesByModel.length > 0 || metadata ? <>
                     <Card className="mb-6">
                         <CardHeader>
@@ -550,13 +697,15 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                     stdKey="stdF1Score"
                                     aggregatedEvaluationResults={aggregateStats}
                                 />
-                                <MetricChart
-                                    title="Accuracy"
-                                    description="Accuracy (mean ± SD)"
-                                    metricKey="avgAccuracy"
-                                    stdKey="stdAccuracy"
-                                    aggregatedEvaluationResults={aggregateStats}
-                                />
+                                {(!isMulticlassEvaluation || showExactMatchMetric) && (
+                                    <MetricChart
+                                        title={isMulticlassEvaluation ? "Exact Match Accuracy" : "Accuracy"}
+                                        description={isMulticlassEvaluation ? "Exact Match Accuracy (mean ± SD)" : "Accuracy (mean ± SD)"}
+                                        metricKey={isMulticlassEvaluation ? "avgExactMatchAccuracy" : "avgAccuracy"}
+                                        stdKey={isMulticlassEvaluation ? "stdExactMatchAccuracy" : "stdAccuracy"}
+                                        aggregatedEvaluationResults={aggregateStats}
+                                    />
+                                )}
                             </div>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 <TestcaseResultsStacked aggregatedEvaluationResults={aggregateStats} repetisions={metadata.totalRepetitions} />
@@ -569,7 +718,12 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                     xAxisMaxOffset={2}
                                 />
                             </div>
-                            <MetricsTable aggregatedEvaluationResults={aggregateStats} />
+                            <MetricsTable
+                                aggregatedEvaluationResults={aggregateStats}
+                                showAccuracy={!isMulticlassEvaluation}
+                                showExactMatchAccuracy={isMulticlassEvaluation && showExactMatchMetric}
+                                classSpecificView={showClassSpecificMetrics}
+                            />
                         </>)}
                     </div>
                 </> : <Card className="p-4 mb-4">
@@ -599,9 +753,11 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                     {summaryByRun.get(runNum) && (
                                         <div className="space-y-6 mb-6">
                                             <MetricsCharts
+                                                isMulticlass={isMulticlassEvaluation}
+                                                showExactMatchMetric={showExactMatchMetric}
                                                 reportSummaries={Array.from((summaryByRun.get(runNum) || new Map()).entries()).map(([label, s]) => ({
                                                     label,
-                                                    summary: s
+                                                    summary: isMulticlassEvaluation ? applyClassSelectionToSummary(s, selectedClasses) : s
                                                 }))}/>
                                         </div>
                                     )}
@@ -631,8 +787,16 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
 
                                                     {modelSummary && (
                                                         <div className="space-y-6 mb-6">
-                                                            <EvaluationReportSummaryCard reportSummary={modelSummary}/>
-                                                            <MetricsCharts reportSummary={modelSummary}/>
+                                                            <EvaluationReportSummaryCard
+                                                                reportSummary={modelSummary}
+                                                                isMulticlass={isMulticlassEvaluation}
+                                                                showExactMatchMetric={showExactMatchMetric}
+                                                            />
+                                                            <MetricsCharts
+                                                                reportSummary={modelSummary}
+                                                                isMulticlass={isMulticlassEvaluation}
+                                                                showExactMatchMetric={showExactMatchMetric}
+                                                            />
                                                         </div>
                                                     )}
 

@@ -8,10 +8,24 @@ import {EvaluationReportSummary} from "@/models/dto/ReportData";
 import UniversalTooltip from "@/components/evaluation/charts/common/universal-tooltip";
 import ChartContainer from "@/components/evaluation/charts/chart-container";
 
-export default function PerformanceMetricsOverviewRadarSingle({ summary }: { summary: EvaluationReportSummary }) {
+export default function PerformanceMetricsOverviewRadarSingle({
+    summary,
+    isMulticlass = false,
+    showExactMatchMetric = true,
+}: {
+    summary: EvaluationReportSummary;
+    isMulticlass?: boolean;
+    showExactMatchMetric?: boolean;
+}) {
     const colors = mergeEvalColors(getEvaluationColors);
     const data = [
-        { metric: "Accuracy", value: summary.accuracy * 100, fullMark: 100 },
+        ...(showExactMatchMetric
+            ? [{
+                metric: isMulticlass ? "Exact Match Accuracy" : "Accuracy",
+                value: (isMulticlass ? summary.exactMatchAccuracy : summary.accuracy) * 100,
+                fullMark: 100,
+            }]
+            : []),
         { metric: "Precision", value: summary.precision * 100, fullMark: 100 },
         { metric: "Recall",    value: summary.recall * 100,    fullMark: 100 },
         { metric: "F1-Score",  value: summary.f1Score * 100,   fullMark: 100 },

@@ -8,10 +8,24 @@ import {EvaluationReportSummary} from "@/models/dto/ReportData";
 import UniversalTooltip from "@/components/evaluation/charts/common/universal-tooltip";
 import ChartContainer from "@/components/evaluation/charts/chart-container";
 
-export default function PerformanceMetricsBarsSingle({ summary }: { summary: EvaluationReportSummary }) {
+export default function PerformanceMetricsBarsSingle({
+    summary,
+    isMulticlass = false,
+    showExactMatchMetric = true,
+}: {
+    summary: EvaluationReportSummary;
+    isMulticlass?: boolean;
+    showExactMatchMetric?: boolean;
+}) {
     const colors = mergeEvalColors(getEvaluationColors);
     const data = [
-        { name: "Accuracy",  value: summary.accuracy,  color: colors.accuracy },
+        ...(showExactMatchMetric
+            ? [{
+                name: isMulticlass ? "Exact Match Accuracy" : "Accuracy",
+                value: isMulticlass ? summary.exactMatchAccuracy : summary.accuracy,
+                color: colors.accuracy,
+            }]
+            : []),
         { name: "Precision", value: summary.precision, color: colors.precision },
         { name: "Recall",    value: summary.recall,    color: colors.recall },
         { name: "F1-Score",  value: summary.f1Score,   color: colors.f1Score },

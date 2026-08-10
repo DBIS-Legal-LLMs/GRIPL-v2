@@ -15,6 +15,9 @@ interface ConfusionMatrixPerModelProps {
 export function ConfusionMatrixBarsMulti({ reportSummaries }: ConfusionMatrixPerModelProps) {
     const [isClient, setIsClient] = useState(false)
     const chartId = "confusion-matrix-chart"
+    const foregroundColor = "hsl(var(--foreground))"
+    const mutedForegroundColor = "hsl(var(--muted-foreground))"
+    const borderColor = "hsl(var(--border))"
 
     const series = [
         {
@@ -65,22 +68,27 @@ export function ConfusionMatrixBarsMulti({ reportSummaries }: ConfusionMatrixPer
             labels: {
                 rotate: -42,
                 rotateAlways: true,
-                style: { fontSize: "10px" }
+                style: { fontSize: "10px", colors: mutedForegroundColor }
             },
+            axisBorder: { show: true, color: borderColor },
         },
         yaxis: {
             title: {
                 text: "Count",
-                style: { fontSize: "10px", fontWeight: 400 },
+                style: { fontSize: "10px", fontWeight: 400, color: mutedForegroundColor },
             },
             labels: {
-                style: { fontSize: "10px" },
-            }
+                style: { fontSize: "10px", colors: mutedForegroundColor },
+            },
+            axisBorder: { show: true, color: borderColor },
         },
         colors: ["#00E396", "#FEB019", "#FF4560", "#775DD0"],
         legend: {
             position: "bottom",
             horizontalAlign: "center",
+            labels: {
+                colors: foregroundColor,
+            },
         },
         tooltip: {
             y: {

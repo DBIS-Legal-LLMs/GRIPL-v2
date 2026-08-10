@@ -16,6 +16,9 @@ interface ResultsPerModelStackedProps {
 export function ResultsPerModelStacked({ reportSummaries }: ResultsPerModelStackedProps) {
     const [isClient, setIsClient] = useState(false)
     const chartId = "results-per-model-stacked-chart"
+    const foregroundColor = "hsl(var(--foreground))"
+    const mutedForegroundColor = "hsl(var(--muted-foreground))"
+    const borderColor = "hsl(var(--border))"
 
     useEffect(() => {
         setIsClient(true)
@@ -53,6 +56,7 @@ export function ResultsPerModelStacked({ reportSummaries }: ResultsPerModelStack
                         style: {
                             fontSize: "10px",
                             fontWeight: 900,
+                            color: foregroundColor,
                         },
                     },
                 },
@@ -60,28 +64,36 @@ export function ResultsPerModelStacked({ reportSummaries }: ResultsPerModelStack
         },
         dataLabels: {
             enabled: true,
+            style: {
+                colors: [foregroundColor],
+            },
         },
         xaxis: {
             categories: reportSummaries.map((r) => r.label),
             labels: {
                 rotate: -42,
                 rotateAlways: true,
-                style: { fontSize: "10px" }
+                style: { fontSize: "10px", colors: mutedForegroundColor }
             },
+            axisBorder: { show: true, color: borderColor },
         },
         yaxis: {
             title: {
                 text: "Number of Test Cases",
-                style: { fontSize: "10px", fontWeight: 400 },
+                style: { fontSize: "10px", fontWeight: 400, color: mutedForegroundColor },
             },
             labels: {
-                style: {fontSize: "10px"},
-            }
+                style: {fontSize: "10px", colors: mutedForegroundColor},
+            },
+            axisBorder: { show: true, color: borderColor },
         },
         colors: ["#22c55e", "#ef4444", "#f97316"],
         legend: {
             position: "bottom",
             horizontalAlign: "center",
+            labels: {
+                colors: foregroundColor,
+            },
         },
         tooltip: {
             y: {

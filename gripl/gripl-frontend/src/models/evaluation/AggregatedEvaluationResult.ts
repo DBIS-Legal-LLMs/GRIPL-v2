@@ -7,6 +7,8 @@ export interface AggregatedEvaluationResult {
     stdF1Score: number
     avgAccuracy: number
     stdAccuracy: number
+    avgExactMatchAccuracy: number
+    stdExactMatchAccuracy: number
     avgPassed: number
     stdPassed: number
     avgFailed: number
@@ -21,6 +23,10 @@ export interface AggregatedEvaluationResult {
     stdFalseNegatives: number
     avgTrueNegatives: number
     stdTrueNegatives: number
+    avgExpectedClassifications: number
+    stdExpectedClassifications: number
+    avgPredictedClassifications: number
+    stdPredictedClassifications: number
     avgAmountOfRetries: number | undefined
     stdAmountOfRetries: number | undefined
 }

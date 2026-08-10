@@ -4,42 +4,36 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/compo
 import ApexCharts from "react-apexcharts"
 import ChartMenu from "@/components/evaluation/charts/common/chart-menu";
 import {useEffect, useState} from "react";
-
-export interface EvaluationReportSummary {
-    type: "summary"
-    total: number
-    passed: number
-    failed: number
-    error: number
-    amountOfRetries: number | null
-    precision: number
-    recall: number
-    f1Score: number
-    accuracy: number
-    totalTruePositives: number
-    totalFalsePositives: number
-    totalFalseNegatives: number
-    totalTrueNegatives: number
-    markdown: string
-}
+import {EvaluationReportSummary} from "@/models/dto/ReportData";
 
 interface PerformanceMetricsSideBySideProps {
     reportSummaries: Array<{ label: string; summary: EvaluationReportSummary }>
+    isMulticlass?: boolean
+    showExactMatchMetric?: boolean
 }
 
-export function PerformanceMetricsBarsMulti({ reportSummaries }: PerformanceMetricsSideBySideProps) {
+export function PerformanceMetricsBarsMulti({
+    reportSummaries,
+    isMulticlass = false,
+    showExactMatchMetric = true
+}: PerformanceMetricsSideBySideProps) {
     const [isClient, setIsClient] = useState(false)
     const chartId = "performance-metrics-chart"
+    const foregroundColor = "hsl(var(--foreground))"
+    const mutedForegroundColor = "hsl(var(--muted-foreground))"
+    const borderColor = "hsl(var(--border))"
 
     useEffect(() => {
         setIsClient(true)
     }, [])
 
-    const series = [
-        {
-            name: "Accuracy",
-            data: reportSummaries.map((report) => report.summary.accuracy * 100),
-        },
+    const series: ApexAxisChartSeries = [
+        ...(showExactMatchMetric
+            ? [{
+                name: isMulticlass ? "Exact Match Accuracy" : "Accuracy",
+                data: reportSummaries.map((report) => (isMulticlass ? report.summary.exactMatchAccuracy : report.summary.accuracy) * 100),
+            }]
+            : []),
         {
             name: "Precision",
             data: reportSummaries.map((report) => report.summary.precision * 100),
@@ -83,25 +77,32 @@ export function PerformanceMetricsBarsMulti({ reportSummaries }: PerformanceMetr
             labels: {
                 rotate: -42,
                 rotateAlways: true,
-                style: { fontSize: "10px" }
+                style: { fontSize: "10px", colors: mutedForegroundColor }
             },
+            axisBorder: { show: true, color: borderColor },
         },
         yaxis: {
             title: {
                 text: "Percentage (%)",
-                style: { fontSize: "10px", fontWeight: 400 },
+                style: { fontSize: "10px", fontWeight: 400, color: mutedForegroundColor },
             },
             min: 0,
             max: 100,
             labels: {
-                style: { fontSize: "10px" },
+                style: { fontSize: "10px", colors: mutedForegroundColor },
                 formatter: (val) => `${val.toFixed(0)}%`,
             },
+            axisBorder: { show: true, color: borderColor },
         },
-        colors: ["#008FFB", "#00E396", "#FEB019", "#FF4560"],
+        colors: showExactMatchMetric
+            ? ["#008FFB", "#00E396", "#FEB019", "#FF4560"]
+            : ["#00E396", "#FEB019", "#FF4560"],
         legend: {
             position: "bottom",
             horizontalAlign: "center",
+            labels: {
+                colors: foregroundColor,
+            },
         },
         tooltip: {
             y: {
