@@ -47,7 +47,7 @@ export default function TestCaseReportCardReasoning({ report }: TestCaseReportCa
 
                         return <tr key={index} className={`border-t border-border ${isFalsePositive && "bg-destructive/30"}`}>
                             <td className="p-2 align-top text-foreground">
-                                <div className="mb-1 text-sm font-medium">{matchedName}</div>
+                                <div className="mb-1 text-sm font-medium">{matchedName.replace(/\s*\([^)]+\)\s*$/, "")}</div>
                                 {result.classification && result.classification.length > 0 && (
                                     <div className="flex flex-wrap gap-1">
                                         {result.classification.map((classification) => (
