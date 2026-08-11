@@ -1,5 +1,17 @@
 import {Brain} from "lucide-react";
 import {TestCaseReport} from "@/models/dto/ReportData";
+import {Badge} from "@/components/ui/badge";
+import {GdprCategory} from "@/models/GdprCategory";
+
+const categoryBadgeClass: Record<GdprCategory, string> = {
+    Collection: "bg-emerald-600 text-white border-transparent",
+    Storage: "bg-blue-600 text-white border-transparent",
+    Usage: "bg-amber-500 text-black border-transparent",
+    Transferal: "bg-violet-600 text-white border-transparent",
+    Modification: "bg-sky-600 text-white border-transparent",
+    Deletion: "bg-red-600 text-white border-transparent",
+    Access: "bg-teal-600 text-white border-transparent",
+};
 
 interface TestCaseReportCardReasoningProps {
     report: TestCaseReport
@@ -29,7 +41,18 @@ export default function TestCaseReportCardReasoning({ report }: TestCaseReportCa
                         const isFalsePositive = report.falsePositiveIds?.includes(result.value) || false
 
                         return <tr key={index} className={`border-t border-border ${isFalsePositive && "bg-destructive/30"}`}>
-                            <td className="font-medium text-sm mb-1 p-2 text-foreground">{matchedName}</td>
+                            <td className="p-2 align-top text-foreground">
+                                <div className="mb-1 text-sm font-medium">{matchedName}</div>
+                                {result.classification && result.classification.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                        {result.classification.map((classification) => (
+                                            <Badge key={classification} variant="outline" className={`text-xs ${categoryBadgeClass[classification]}`}>
+                                                {classification}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                )}
+                            </td>
                             <td className="text-sm p-2 text-foreground">{result.reason || "No reasoning provided"}</td>
                         </tr>
                     })}

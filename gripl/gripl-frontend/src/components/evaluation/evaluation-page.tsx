@@ -32,7 +32,6 @@ import {
     applyClassSelectionToSummary,
     ALL_CLASSES_FILTER,
     classOptions,
-    hasPerClassMetrics,
     isAllClassesSelected
 } from "@/lib/evaluation-class-metrics";
 import {
@@ -184,20 +183,10 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     }, [testCasesByRun, errorsByRun]);
 
     const isMulticlassEvaluation = useMemo(() => {
-        if (metadata?.defaultEvaluationEndpoint?.includes("multiclass")) {
-            return true;
-        }
-
-        for (const runSummaries of summaryByRun.values()) {
-            for (const summary of runSummaries.values()) {
-                if (hasPerClassMetrics(summary)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }, [metadata, summaryByRun]);
+        const endpoint = evaluationRequest?.defaultEvaluationEndpoint
+            ?? metadata?.defaultEvaluationEndpoint;
+        return endpoint?.includes("multiclass") === true;
+    }, [evaluationRequest, metadata]);
 
     const showExactMatchMetric = isMulticlassEvaluation && isAllClassesSelected(selectedClasses);
     const showClassSpecificMetrics = isMulticlassEvaluation && !isAllClassesSelected(selectedClasses);
