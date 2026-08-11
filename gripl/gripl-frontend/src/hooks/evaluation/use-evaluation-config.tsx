@@ -48,12 +48,33 @@ export function useEvaluationConfig(
     useEffect(() => {
         fetchAnalysisEndpoints().then((eps) => {
             setAvailableEvaluationEndpoints(eps);
-            if (eps.length > 0) {
-                const preferredEndpoint = eps.find((ep) => ep.endpoint === preferredDefaultEndpoint);
-                setDefaultPresetEndpoint(preferredEndpoint?.endpoint || eps[0].endpoint);
+            if (eps.length === 0) {
+                return;
+            }
+
+            const preferredEndpoint = eps.find((ep) => ep.endpoint === preferredDefaultEndpoint);
+            const nextEndpoint = preferredEndpoint?.endpoint || eps[0].endpoint;
+
+            if (defaultEndpointChoice === "preset") {
+                setDefaultPresetEndpoint(nextEndpoint);
             }
         });
-    }, [preferredDefaultEndpoint]);
+    }, [preferredDefaultEndpoint, defaultEndpointChoice]);
+
+    useEffect(() => {
+        if (defaultEndpointChoice !== "preset") {
+            return;
+        }
+
+        if (availableEvaluationEndpoints.length === 0) {
+            return;
+        }
+
+        const preferredEndpoint = availableEvaluationEndpoints.find((ep) => ep.endpoint === preferredDefaultEndpoint);
+        const nextEndpoint = preferredEndpoint?.endpoint || availableEvaluationEndpoints[0].endpoint;
+
+        setDefaultPresetEndpoint(nextEndpoint);
+    }, [availableEvaluationEndpoints, preferredDefaultEndpoint, defaultEndpointChoice]);
 
     const effectiveDefaultEndpoint = useMemo(() => {
         if (defaultEndpointChoice === "custom") return defaultCustomEndpoint.trim();
