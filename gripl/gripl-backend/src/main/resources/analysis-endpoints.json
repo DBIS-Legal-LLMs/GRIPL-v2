@@ -6,5 +6,9 @@
   {
     "name": "Baseline Analysis",
     "endpoint": "/gdpr/analysis/baseline"
+  },
+  {
+    "name": "Multiclass Analysis",
+    "endpoint": "/gdpr/analysis/multiclass"
   }
 ]
