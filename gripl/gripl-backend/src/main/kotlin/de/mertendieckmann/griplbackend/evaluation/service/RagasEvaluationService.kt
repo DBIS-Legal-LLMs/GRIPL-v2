@@ -82,14 +82,36 @@ class RagasEvaluationService(
     private fun buildQuery(element: BpmnElement?, ctx: RagElementContext?): String {
         // Phrase as a question so Ragas' ResponseRelevancy (which generates synthetic
         // questions from the response and embeds them) has a comparable user_input.
-        val name = element?.name ?: ctx?.activityName ?: "this BPMN activity"
+        //
+        // The noun is derived from the element itself rather than the evaluation scope:
+        // in activities-only mode every scored element is an activity, so the wording is
+        // unchanged, while in all-elements mode a gateway is not called an "activity".
+        val noun = elementNoun(element)
+        val name = element?.name?.takeIf { it.isNotBlank() }
+            ?: element?.derivedNameFromFlows()
+            ?: ctx?.activityName
+            ?: "this BPMN $noun"
         val attrs = listOfNotNull(
             element?.documentation?.takeIf { it.isNotBlank() }?.let { "documentation: $it" },
             element?.poolName?.takeIf { it.isNotBlank() }?.let { "pool: $it" },
             element?.laneName?.takeIf { it.isNotBlank() }?.let { "lane: $it" }
         )
         val suffix = if (attrs.isEmpty()) "" else " (${attrs.joinToString(", ")})"
-        return "Is the BPMN activity '$name'$suffix GDPR-critical, and if so, why?"
+        return "Is the BPMN $noun '$name'$suffix GDPR-critical, and if so, why?"
+    }
+
+    /**
+     * Human-readable noun for the element: "activity" for anything the extractor marked
+     * as one, otherwise the BPMN type spelled out ("exclusiveGateway" -> "exclusive
+     * gateway", "dataObjectReference" -> "data object reference").
+     */
+    private fun elementNoun(element: BpmnElement?): String {
+        if (element == null || element.isActivity) return "activity"
+        val spelled = element.type
+            .replace(Regex("([a-z0-9])([A-Z])"), "$1 $2")
+            .lowercase()
+            .trim()
+        return spelled.takeIf { it.isNotBlank() } ?: "element"
     }
 
 }
