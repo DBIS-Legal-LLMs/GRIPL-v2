@@ -59,7 +59,7 @@ export function useEvaluationConfig(
             setAvailableEvaluationEndpoints(eps);
             if (eps.length > 0) {
                 const preferredEndpoint = eps.find((ep) => ep.endpoint === preferredDefaultEndpoint);
-                setDefaultPresetEndpoint((current) => current || preferredEndpoint?.endpoint || eps[0].endpoint);
+                setDefaultPresetEndpoint(preferredEndpoint?.endpoint || eps[0].endpoint);
             }
         });
     }, [preferredDefaultEndpoint]);
