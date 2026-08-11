@@ -18,6 +18,9 @@ interface TestCaseReportCardReasoningProps {
 }
 
 export default function TestCaseReportCardReasoning({ report }: TestCaseReportCardReasoningProps) {
+    const hasClassifications = report.result?.some(
+        (result) => result.classification && result.classification.length > 0
+    );
 
     return report.result && report.result.length > 0 && <div>
         <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
@@ -28,7 +31,9 @@ export default function TestCaseReportCardReasoning({ report }: TestCaseReportCa
             <table className="w-full text-foreground">
                 <thead>
                     <tr className="bg-muted">
-                        <th className="text-left text-sm font-semibold p-2 text-foreground">Activity / Classification</th>
+                        <th className="text-left text-sm font-semibold p-2 text-foreground">
+                            {hasClassifications ? "Activity / Classification" : "Activity"}
+                        </th>
                         <th className="text-left text-sm font-semibold p-2 text-foreground">Reasoning</th>
                     </tr>
                 </thead>
