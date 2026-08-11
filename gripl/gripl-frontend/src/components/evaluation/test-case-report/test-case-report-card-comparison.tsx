@@ -2,10 +2,35 @@ import {ListChecks, Target} from "lucide-react";
 import {Card} from "@/components/ui/card";
 import {TestCaseReport} from "@/models/dto/ReportData";
 import {Badge} from "@/components/ui/badge";
+import {GdprCategory, toFrontendGdprCategory} from "@/models/GdprCategory";
+
+const categoryBadgeClass: Record<GdprCategory, string> = {
+    Collection:   "bg-emerald-600 text-white border-transparent",
+    Storage:      "bg-blue-600 text-white border-transparent",
+    Usage:        "bg-amber-500 text-black border-transparent",
+    Transferal:   "bg-violet-600 text-white border-transparent",
+    Modification: "bg-sky-600 text-white border-transparent",
+    Deletion:     "bg-red-600 text-white border-transparent",
+    Access:       "bg-teal-600 text-white border-transparent",
+};
 
 function extractElementId(nameWithId: string): string | null {
     const match = nameWithId.match(/\(([^)]+)\)\s*$/);
     return match?.[1] ?? null;
+}
+
+/** Strips the trailing "(id)" from "Name (id)" for display. */
+function extractDisplayName(nameWithId: string): string {
+    return nameWithId.replace(/\s*\([^)]+\)\s*$/, "").trim();
+}
+
+function normalizeBadgeClass(raw: string): string {
+    const cat = toFrontendGdprCategory(raw);
+    return cat ? (categoryBadgeClass[cat] ?? "") : "";
+}
+
+function normalizeLabel(raw: string): string {
+    return toFrontendGdprCategory(raw) ?? raw;
 }
 
 function addClassification(target: Record<string, string[]>, value: string) {
@@ -53,12 +78,12 @@ export default function TestCaseReportCardComparison({ report }: TestCaseReportC
                         const classifications = elementId ? (expectedClassifications[elementId] ?? []) : []
                         const isCorrect = elementId ? correctlyDetectedIds.has(elementId) : false
                         return <div key={index} className={`text-sm ${isCorrect ? 'text-chart-success' : 'text-warning'}`}>
-                            <div>• {item}</div>
+                            <div>• {extractDisplayName(item)}</div>
                             {classifications.length > 0 && (
                                 <div className="mt-1 ml-3 flex flex-wrap gap-1">
                                     {classifications.map((classification) => (
-                                        <Badge key={`${elementId}-${classification}`} variant="secondary" className="text-[10px]">
-                                            {classification}
+                                        <Badge key={`${elementId}-${classification}`} variant="outline" className={`text-[10px] ${normalizeBadgeClass(classification)}`}>
+                                            {normalizeLabel(classification)}
                                         </Badge>
                                     ))}
                                 </div>
@@ -81,12 +106,12 @@ export default function TestCaseReportCardComparison({ report }: TestCaseReportC
                         const classifications = elementId ? (actualClassifications[elementId] ?? []) : []
                         const isCorrect = elementId ? correctlyDetectedIds.has(elementId) : false
                         return <div key={index} className={`text-sm ${isCorrect ? 'text-chart-success' : 'text-destructive'}`}>
-                            <div>• {item}</div>
+                            <div>• {extractDisplayName(item)}</div>
                             {classifications.length > 0 && (
                                 <div className="mt-1 ml-3 flex flex-wrap gap-1">
                                     {classifications.map((classification) => (
-                                        <Badge key={`${elementId}-${classification}`} variant="secondary" className="text-[10px]">
-                                            {classification}
+                                        <Badge key={`${elementId}-${classification}`} variant="outline" className={`text-[10px] ${normalizeBadgeClass(classification)}`}>
+                                            {normalizeLabel(classification)}
                                         </Badge>
                                     ))}
                                 </div>
