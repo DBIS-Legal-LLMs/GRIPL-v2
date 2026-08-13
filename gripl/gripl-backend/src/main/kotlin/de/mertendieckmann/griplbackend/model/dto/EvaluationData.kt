@@ -1,7 +1,7 @@
 package de.mertendieckmann.griplbackend.model.dto
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
+import tools.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.module.kotlin.readValue
 
 data class EvaluationData(
     val id: Long,

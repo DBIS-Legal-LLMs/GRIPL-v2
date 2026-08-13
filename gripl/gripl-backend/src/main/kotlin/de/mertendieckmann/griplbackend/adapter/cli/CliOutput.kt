@@ -1,6 +1,6 @@
 package de.mertendieckmann.griplbackend.adapter.cli
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.module.kotlin.jacksonObjectMapper
 
 object CliOutput {
     fun print(res: Any, mode: String) =

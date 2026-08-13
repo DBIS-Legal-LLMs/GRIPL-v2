@@ -1,6 +1,6 @@
 package de.mertendieckmann.griplbackend.evaluation.service
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRequest
 import de.mertendieckmann.griplbackend.model.dto.ExpectedValue

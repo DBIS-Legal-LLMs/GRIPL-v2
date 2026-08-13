@@ -3,10 +3,10 @@ package de.mertendieckmann.griplbackend.application
 import de.mertendieckmann.griplbackend.model.BpmnElement
 import de.mertendieckmann.griplbackend.model.BpmnFlowLabel
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.camunda.bpm.model.bpmn.Bpmn
-import org.camunda.bpm.model.bpmn.BpmnModelInstance
-import org.camunda.bpm.model.bpmn.impl.instance.ProcessImpl
-import org.camunda.bpm.model.bpmn.instance.*
+import io.camunda.zeebe.model.bpmn.Bpmn
+import io.camunda.zeebe.model.bpmn.BpmnModelInstance
+import io.camunda.zeebe.model.bpmn.impl.instance.ProcessImpl
+import io.camunda.zeebe.model.bpmn.instance.*
 import org.camunda.bpm.model.xml.ModelParseException
 import org.camunda.bpm.model.xml.ModelValidationException
 import org.springframework.http.HttpStatus

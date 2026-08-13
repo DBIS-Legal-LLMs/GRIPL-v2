@@ -1,6 +1,6 @@
 package de.mertendieckmann.griplbackend.repository
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import de.mertendieckmann.griplbackend.model.dto.PreviewCache
 import de.mertendieckmann.griplbackend.model.dto.PreviewCacheInsert
 import org.springframework.jdbc.core.JdbcTemplate
