@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import fetchAnalysisEndpoints from "@/actions/analysis-endpoints";
 import { Dataset } from "@/models/dto/Dataset";
 import { ModelRunConfig, MultiEvaluationRequest } from "@/models/dto/MultiEvaluationRequest";
 import {AnalysisEndpoint, EndpointChoice, ModelRowState} from "@/models/evaluation/Config";
@@ -28,12 +27,10 @@ export function useEvaluationConfig(
     datasets: Dataset[],
     onMultiConfigChanged: (config: MultiEvaluationRequest) => void
 ) {
-    const { isMulticlass } = useAnalysisEndpoint();
-    const preferredDefaultEndpoint = isMulticlass
-        ? "/gdpr/analysis/multiclass"
-        : "/gdpr/analysis/prompt-engineering";
+    const { backendEndpoint, availableEndpoints } = useAnalysisEndpoint();
+    const preferredDefaultEndpoint = backendEndpoint;
 
-    const [availableEvaluationEndpoints, setAvailableEvaluationEndpoints] = useState<AnalysisEndpoint[]>([]);
+    const availableEvaluationEndpoints: AnalysisEndpoint[] = availableEndpoints;
 
     const [defaultEndpointChoice, setDefaultEndpointChoice] = useState<EndpointChoice>("preset");
     const [defaultPresetEndpoint, setDefaultPresetEndpoint] = useState<string>("");
@@ -55,22 +52,6 @@ export function useEvaluationConfig(
     const [activitiesOnly, setActivitiesOnly] = useState<boolean>(false);
 
     useEffect(() => {
-        fetchAnalysisEndpoints().then((eps) => {
-            setAvailableEvaluationEndpoints(eps);
-            if (eps.length === 0) {
-                return;
-            }
-
-            const preferredEndpoint = eps.find((ep) => ep.endpoint === preferredDefaultEndpoint);
-            const nextEndpoint = preferredEndpoint?.endpoint || eps[0].endpoint;
-
-            if (defaultEndpointChoice === "preset") {
-                setDefaultPresetEndpoint(nextEndpoint);
-            }
-        });
-    }, [preferredDefaultEndpoint, defaultEndpointChoice]);
-
-    useEffect(() => {
         if (defaultEndpointChoice !== "preset") {
             return;
         }
@@ -82,7 +63,7 @@ export function useEvaluationConfig(
         const preferredEndpoint = availableEvaluationEndpoints.find((ep) => ep.endpoint === preferredDefaultEndpoint);
         const nextEndpoint = preferredEndpoint?.endpoint || availableEvaluationEndpoints[0].endpoint;
 
-        setDefaultPresetEndpoint(nextEndpoint);
+        setDefaultPresetEndpoint((current) => current === nextEndpoint ? current : nextEndpoint);
     }, [availableEvaluationEndpoints, preferredDefaultEndpoint, defaultEndpointChoice]);
 
     const effectiveDefaultEndpoint = useMemo(() => {
