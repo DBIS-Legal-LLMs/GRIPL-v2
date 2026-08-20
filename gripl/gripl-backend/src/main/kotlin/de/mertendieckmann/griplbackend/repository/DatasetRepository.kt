@@ -1,6 +1,6 @@
 package de.mertendieckmann.griplbackend.repository
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import de.mertendieckmann.griplbackend.model.dto.CreateDatasetRequest
 import de.mertendieckmann.griplbackend.model.dto.Dataset
 import org.springframework.jdbc.core.JdbcTemplate

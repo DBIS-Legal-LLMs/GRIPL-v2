@@ -1,11 +1,10 @@
 package de.mertendieckmann.griplbackend.adapter.cli
 
 
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.module.kotlin.readValue
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import tools.jackson.databind.DeserializationFeature
+import tools.jackson.dataformat.yaml.YAMLMapper
+import tools.jackson.module.kotlin.readValue
+import tools.jackson.module.kotlin.kotlinModule
 import de.mertendieckmann.griplbackend.evaluation.MultiEvaluationRunner
 import de.mertendieckmann.griplbackend.model.dto.EvaluationReportStepInfo
 import de.mertendieckmann.griplbackend.model.dto.MultiEvaluationRequest
@@ -98,9 +97,10 @@ class EvaluationCommand(
         val raw = Files.readString(path, StandardCharsets.UTF_8)
         val resolved = substituteEnv(raw)
 
-        val mapper = ObjectMapper(YAMLFactory())
-            .registerKotlinModule()
+        val mapper = YAMLMapper.builder()
+            .addModule(kotlinModule())
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            .build()
 
         return mapper.readValue<MultiEvaluationRequest>(resolved)
     }

@@ -1,7 +1,7 @@
 package de.mertendieckmann.griplbackend.config
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
+import tools.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.module.kotlin.readValue
 import de.mertendieckmann.griplbackend.model.dto.AnalysisEndpoint
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

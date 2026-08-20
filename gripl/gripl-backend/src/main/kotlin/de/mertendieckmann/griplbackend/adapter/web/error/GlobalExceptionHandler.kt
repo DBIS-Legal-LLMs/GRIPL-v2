@@ -33,8 +33,8 @@ class GlobalExceptionHandler {
             .body(ApiError(code = "RESOURCE_NOT_FOUND", message = "The requested resource was not found"))
             .also { ex.printStackTrace() }
 
-    @ExceptionHandler(com.fasterxml.jackson.core.JsonParseException::class)
-    fun handleJsonParseException(ex: com.fasterxml.jackson.core.JsonParseException): ResponseEntity<ApiError> =
+    @ExceptionHandler(tools.jackson.core.exc.StreamReadException::class)
+    fun handleJsonParseException(ex: tools.jackson.core.exc.StreamReadException): ResponseEntity<ApiError> =
         ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
             .body(ApiError(code = "JSON_PARSE_ERROR", message = ex.message))
