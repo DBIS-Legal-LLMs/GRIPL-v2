@@ -28,6 +28,7 @@ import {ColorProvider, useColors} from "@/components/evaluation/charts/common/co
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
 import {useToast} from "@/components/ui/toast";
 import {toErrorMessage} from "@/lib/http-error";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 type ModelReportEnvelope = {
     modelLabel: string;
@@ -141,7 +142,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
         if (!evaluationRequest) return;
         resetState();
         console.log("Sending request", evaluationRequest);
-        const res = await fetch(`/api/gdpr/evaluation/stream`, {
+        const res = await authenticatedFetch(`/api/gdpr/evaluation/stream`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(evaluationRequest)

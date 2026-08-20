@@ -14,6 +14,7 @@ import LabelingEditorLabelCard from "@/components/labeling/labeling-editor-label
 import {Spinner} from "@/components/ui/spinner";
 import {useToast} from "@/components/ui/toast";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 interface LabelingEditorProps {
     className?: string;
@@ -44,7 +45,7 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
         );
         formData.append('expectedValues', expectedValuesBlob, 'expectedValues.json');
 
-        fetch(`/api/dataset/testcase/${evaluationData.id}`, {
+        authenticatedFetch(`/api/dataset/testcase/${evaluationData.id}`, {
             method: "POST",
             headers: {
                 Accept: "application/json",

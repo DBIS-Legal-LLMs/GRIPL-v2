@@ -92,11 +92,42 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=gripldb
 
+  ragulate-backend:
+    build:
+      context: ../RAGulate_v2/Backend
+      dockerfile: Dockerfile
+    image: ragulate-b:latest
+    container_name: ragulate-backend
+    restart: unless-stopped
+    depends_on:
+      - ragulate-mongo
+    env_file:
+      - .env.local
+    environment:
+      - APP_ENV=docker
+      - MONGO_URL=mongodb://ragulate-mongo:27017
+    networks:
+      - app
+    ports:
+      - "8090:8000"
+
+  ragulate-mongo:
+    image: mongo:7
+    container_name: ragulate-mongo
+    restart: unless-stopped
+    volumes:
+      - ragulate-mongo-data:/data/db
+    networks:
+      - app
+    ports:
+      - "27018:27017"
+
 volumes:
   playwright-browsers:
   gripl-postgres-data:
   huggingface_cache:
   neo4j_data:
+  ragulate-mongo-data:
 
 networks:
   app:

@@ -55,6 +55,26 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
 
+  ragulate-backend:
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ragulate-backend.rule=Host(`${GRIPL_HOST}`) && PathPrefix(`/chat-api/`) || Host(`www.${GRIPL_HOST}`) && PathPrefix(`/chat-api/`)
+      - traefik.http.routers.ragulate-backend.entrypoints=websecure
+      - traefik.http.routers.ragulate-backend.tls=true
+      - traefik.http.routers.ragulate-backend.tls.certresolver=lets-encrypt
+      - traefik.http.middlewares.ragulate-backend-strip-prefix.stripprefix.prefixes=/chat-api
+      - traefik.http.routers.ragulate-backend.middlewares=ragulate-backend-strip-prefix
+      - traefik.http.services.ragulate-backend.loadbalancer.server.port=8000
+      - traefik.docker.network=${TRAEFIK_NETWORK:-web}
+      - com.centurylinklabs.watchtower.enable=true
+    networks:
+      - app
+      - traefik
+
+  ragulate-mongo:
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+
 networks:
   traefik:
     external: true

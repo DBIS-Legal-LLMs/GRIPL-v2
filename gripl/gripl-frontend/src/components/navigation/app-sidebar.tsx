@@ -1,3 +1,5 @@
+"use client"
+
 import {
     Sidebar,
     SidebarContent,
@@ -7,9 +9,10 @@ import {
     SidebarMenuItem
 } from "@/components/ui/sidebar";
 import Link from "next/link";
-import {BookA, ChartBarDecreasing, Newspaper, Tag, Workflow} from "lucide-react";
+import {BookA, ChartBarDecreasing, LogOut, Newspaper, Tag, Workflow} from "lucide-react";
 import React, {ReactNode} from "react";
 import Image from "next/image";
+import {useAuth} from "@/context/auth-context";
 
 interface Page {
     href: string;
@@ -18,6 +21,8 @@ interface Page {
 }
 
 export default function AppSidebar() {
+
+    const { logout, userId } = useAuth();
 
     const pages = [
         {
@@ -60,6 +65,17 @@ export default function AppSidebar() {
                 })}
             </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter />
+        <SidebarFooter className="p-2">
+            {userId && (
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton onClick={logout}>
+                            <LogOut />
+                            <p>Log out</p>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            )}
+        </SidebarFooter>
     </Sidebar>
 }

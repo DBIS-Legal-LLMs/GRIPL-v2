@@ -1,14 +1,18 @@
 import {EvaluationData} from "@/models/dto/EvaluationData";
 import LabelingEditor from "@/components/labeling/labeling-editor";
 import React from "react";
+import {cookies} from "next/headers";
+import {AUTH_COOKIE_NAME} from "@/lib/auth-cookie";
 
 export default async function LabelingPageWithEditor({ params }: { params: Promise<{ testCaseId: string }> }) {
 
     const {testCaseId} = await params;
+    const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
     const evaluationData: EvaluationData | null = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/dataset/testcase/${testCaseId}`, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
+            ...(token ? {Authorization: `Bearer ${token}`} : {}),
         },
     })
         .then(response => {

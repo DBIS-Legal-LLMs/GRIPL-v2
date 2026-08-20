@@ -77,10 +77,38 @@ services:
     networks:
       - app
 
+  ragulate-backend:
+    build:
+      context: ../RAGulate_v2/Backend
+      dockerfile: Dockerfile
+    image: ${RAGULATE_BACKEND_IMAGE:-mertend/ragulate-backend:latest}
+    container_name: ${RAGULATE_BACKEND_CONTAINER_NAME:-ragulate-backend}
+    restart: unless-stopped
+    depends_on:
+      - ragulate-mongo
+    env_file:
+      - ./.env.local
+    environment:
+      # Always the Docker service name — a MONGO_URL from .env.local (meant for
+      # running the backend outside Docker) must not leak into the container.
+      - MONGO_URL=mongodb://ragulate-mongo:27017
+    networks:
+      - app
+
+  ragulate-mongo:
+    image: mongo:7
+    container_name: ${RAGULATE_MONGO_CONTAINER_NAME:-ragulate-mongo}
+    restart: unless-stopped
+    volumes:
+      - ragulate-mongo-data:/data/db
+    networks:
+      - app
+
 volumes:
   playwright-browsers:
   gripl-postgres-data:
   gripl-rag-working-dir:
+  ragulate-mongo-data:
   neo4j_data:
     name: gripl-neo4j-data
 

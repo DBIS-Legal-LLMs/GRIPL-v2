@@ -18,6 +18,7 @@ import emptyDiagram from "@/data/empty-diagram.bpmn";
 import {Dataset} from "@/models/dto/Dataset";
 import {useToast} from "@/components/ui/toast";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 interface CreateTestCaseButtonProps {
     dataset: Dataset;
@@ -47,7 +48,7 @@ export default function CreateTestCaseButton({ dataset }: CreateTestCaseButtonPr
         formData.append('expectedValues', expectedValuesBlob, 'expectedValues.json');
         formData.append("datasetId", dataset.id.toString());
 
-        fetch("/api/dataset/testcase", {
+        authenticatedFetch("/api/dataset/testcase", {
             method: "POST",
             body: formData,
         } as RequestInit).then(async response => {

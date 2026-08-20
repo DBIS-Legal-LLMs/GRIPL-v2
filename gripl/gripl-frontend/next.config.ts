@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
     },
     async rewrites() {
         const ragBase = process.env.RAG_INTERNAL_URL ?? "http://gripl-rag:8081";
+        const ragulateBase = process.env.RAGULATE_INTERNAL_URL ?? "http://ragulate-backend:8000";
         return [
             {
                 source: '/api/:path*',
@@ -25,6 +26,10 @@ const nextConfig: NextConfig = {
             {
                 source: '/rag/:path*',
                 destination: `${ragBase}/:path*`,
+            },
+            {
+                source: '/chat/:path*',
+                destination: `${ragulateBase}/:path*`,
             }
         ];
     },

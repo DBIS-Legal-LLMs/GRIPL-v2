@@ -20,6 +20,7 @@ import {Switch} from "@/components/ui/switch";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {useToast} from "@/components/ui/toast";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 interface AnalysisToolCardProps {
     bpmnXml: string;
@@ -64,7 +65,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             formData.append("ragMode", searchMode);
         }
 
-        fetch(`/api/gdpr/analysis/prompt-engineering`, {
+        authenticatedFetch(`/api/gdpr/analysis/prompt-engineering`, {
             method: "POST",
             headers: {
                 Accept: "application/json"

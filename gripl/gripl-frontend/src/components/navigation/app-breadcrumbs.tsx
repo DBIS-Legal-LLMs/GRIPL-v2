@@ -7,6 +7,7 @@ import Link from "next/link";
 import {useEffect, useState} from "react";
 import {Crumb} from "@/models/Crumb";
 import {EvaluationData} from "@/models/dto/EvaluationData";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 const nameMap = {
     "": 'Sandbox',
@@ -25,7 +26,7 @@ export default function AppBreadCrumbs() {
 
         // If the user is on the labeling page and has a test case selected the name of the test case should be displayed instead of the id
         if (newCrumbs[0].label === nameMap["labeling"] && newCrumbs.length === 2) {
-            fetch(`/api/dataset/testcase/${newCrumbs[1].label}`).then(response => {
+            authenticatedFetch(`/api/dataset/testcase/${newCrumbs[1].label}`).then(response => {
                 if (!response.ok) {
                     throw new Error(`Failed to fetch test case with id ${newCrumbs[1].label}: ${response.statusText}`);
                 }
