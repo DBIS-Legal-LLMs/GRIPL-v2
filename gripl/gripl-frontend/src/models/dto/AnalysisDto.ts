@@ -13,7 +13,9 @@ export interface BinaryAnalysisResponse {
 export interface CriticalElement {
     id: string;
     name?: string | null;
+    type?: string;
     reason: string;
+    references?: LlmReference[];
 }
 
 export interface MulticlassAnalysisResponse {
