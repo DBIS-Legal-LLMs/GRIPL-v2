@@ -121,20 +121,23 @@ Alternatively, you can use `docker-compose.local.yaml` to bring up the entire st
 ## Tool Components
 The GRIPL tool consists of three main components:
 
-1. The Sandbox
+**1. The Sandbox**
+
 Here, users can model or import processes and let the LLM analyze the process model. 
 <img width="2232" height="1265" alt="sandbox-analyzed-model-annotated" src="https://github.com/user-attachments/assets/1e7ac03b-2f76-4e10-8f21-ed4fc1d4af16" />
 
 The model also creates a reasoning for the activity classification.
 <img width="1138" height="607" alt="sandbox-ai-reasoning" src="https://github.com/user-attachments/assets/7ed9f60b-18d8-4a06-b8b5-09e4e15d682b" />
 
-2. The Labeling Editor
+**2. The Labeling Editor**
+   
 Here, users can create and label their own BPMN 2.0 dataset. A reasoning can also be added to the labels.
 <img width="2227" height="1258" alt="labeling-datasets" src="https://github.com/user-attachments/assets/7651e26e-b3a5-48bb-beca-67daee7d6c7e" />
 
 <img width="2232" height="1260" alt="labeling-editor-annotated" src="https://github.com/user-attachments/assets/e7f03bc1-2a74-44c6-adf7-e05f906594a2" />
 
-3. The evaluation plattform
+**3. The evaluation plattform**
+   
 Evaluations can be configured via the GUI or a YAML file.
 <img width="1137" height="1183" alt="evaluation-config_new" src="https://github.com/user-attachments/assets/7ccd4c36-a674-4a69-88c5-6ae181fae186" />
 
