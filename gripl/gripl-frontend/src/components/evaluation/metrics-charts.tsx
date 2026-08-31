@@ -12,14 +12,25 @@ import {ResultsPerModelStacked} from "@/components/evaluation/charts/multi/resul
 
 type SingleProps = { reportSummary: EvaluationReportSummary; reportSummaries?: undefined };
 type MultiProps  = { reportSummary?: undefined; reportSummaries: Array<{ label: string; summary: EvaluationReportSummary }> };
-type Props = SingleProps | MultiProps;
+type CommonProps = {
+    isMulticlass?: boolean;
+    showExactMatchMetric?: boolean;
+};
+type Props = (SingleProps | MultiProps) & CommonProps;
 
 export default function MetricsCharts(props: Props) {
+    const isMulticlass = props.isMulticlass ?? false;
+    const showExactMatchMetric = props.showExactMatchMetric ?? true;
+
     if ("reportSummaries" in props && props.reportSummaries) {
         const items = props.reportSummaries;
         return (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <PerformanceMetricsBarsMulti reportSummaries={items} />
+                <PerformanceMetricsBarsMulti
+                    reportSummaries={items}
+                    isMulticlass={isMulticlass}
+                    showExactMatchMetric={showExactMatchMetric}
+                />
                 <ResultsPerModelStacked reportSummaries={items} />
                 <ConfusionMatrixBarsMulti reportSummaries={items} />
                 <AmountOfRetriesPerModel reportSummaries={items} />
@@ -31,8 +42,16 @@ export default function MetricsCharts(props: Props) {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <TestResultDistributionPieSingle summary={reportSummary} />
-            <PerformanceMetricsOverviewRadarSingle summary={reportSummary} />
-            <PerformanceMetricsBarsSingle summary={reportSummary} />
+            <PerformanceMetricsOverviewRadarSingle
+                summary={reportSummary}
+                isMulticlass={isMulticlass}
+                showExactMatchMetric={showExactMatchMetric}
+            />
+            <PerformanceMetricsBarsSingle
+                summary={reportSummary}
+                isMulticlass={isMulticlass}
+                showExactMatchMetric={showExactMatchMetric}
+            />
             <ConfusionMatrixBarsSingle summary={reportSummary} />
         </div>
     );

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo
 import de.mertendieckmann.griplbackend.model.evaluation.ElementTypeCounts
 import de.mertendieckmann.griplbackend.model.evaluation.RagMetrics
 import java.sql.Timestamp
+import de.mertendieckmann.griplbackend.model.analysis.GdprProcessingClass
 
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
@@ -115,6 +116,7 @@ data class TestCaseReport(
     }
 }
 
+
 data class RagSummaryMetrics(
     val faithfulnessMean: Double? = null,
     val contextUtilizationMean: Double? = null,
@@ -136,6 +138,17 @@ data class ElementTypeSummary(
     val accuracy: Double
 )
 
+data class PerClassEvaluationMetrics(
+    val truePositives: Int,
+    val falsePositives: Int,
+    val falseNegatives: Int,
+    val trueNegatives: Int,
+    val precision: Double,
+    val recall: Double,
+    val f1Score: Double,
+    val accuracy: Double
+)
+
 data class EvaluationReportSummary(
     val total: Int,
     val passed: Int,
@@ -146,13 +159,15 @@ data class EvaluationReportSummary(
     val recall: Double,
     val f1Score: Double,
     val accuracy: Double,
+    val exactMatchAccuracy: Double,
     val totalTruePositives: Int,
     val totalFalsePositives: Int,
     val totalFalseNegatives: Int,
     val totalTrueNegatives: Int,
     val ragMetrics: RagSummaryMetrics? = null,
     /** Metrics broken down by element category, keyed by category key (activity, event, ...). */
-    val perElementType: Map<String, ElementTypeSummary> = emptyMap()
+    val perElementType: Map<String, ElementTypeSummary> = emptyMap(),
+    val perClassMetrics: Map<GdprProcessingClass, PerClassEvaluationMetrics> = emptyMap()
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
@@ -186,6 +201,7 @@ data class EvaluationReportSummary(
             |
             |### Metrics
             |Accuracy: ${"%.3f".format(accuracy)}
+            |Exact Match Accuracy: ${"%.3f".format(exactMatchAccuracy)}
             |Precision: ${"%.3f".format(precision)}
             |Recall: ${"%.3f".format(recall)}
             |F1-Score: ${"%.3f".format(f1Score)}

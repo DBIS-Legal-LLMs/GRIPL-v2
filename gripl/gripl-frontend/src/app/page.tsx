@@ -6,7 +6,7 @@ import {useMemo, useState} from "react";
 import {BpmnToolCard} from "@/models/BpmnToolCard";
 import AnalysisToolCard from "@/components/sandbox/analysis-tool-card";
 import emptyDiagram from "@/data/empty-diagram.bpmn";
-import {AnalysisResponse} from "@/models/dto/AnalysisDto";
+import {AnalysisResponse, getAnalysisElements} from "@/models/dto/AnalysisDto";
 import AnalysisResultCard, {humanizeType} from "@/components/sandbox/analysis-result-card";
 import RagContextCard from "@/components/sandbox/rag-context-card";
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
@@ -26,6 +26,7 @@ export default function Home() {
   const [diagram, setDiagram] = useState<string>(emptyDiagram as string)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
+  const analysisElements = getAnalysisElements(analysisResult)
   const [pdfViewer, setPdfViewer] = useState<PdfViewerState | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(true)
 
@@ -39,14 +40,17 @@ export default function Home() {
     }
   }
 
-  const hasRagContext = analysisResult?.ragContext && Object.keys(analysisResult.ragContext).length > 0;
+  const hasRagContext = analysisResult && "ragContext" in analysisResult && analysisResult.ragContext && Object.keys(analysisResult.ragContext).length > 0;
 
   // Stable reference so RagContextCard (and the knowledge graph below it)
   // doesn't receive a fresh object on every render of this page.
   const elementNames = useMemo(
       () =>
           Object.fromEntries(
-              (analysisResult?.criticalElements ?? [])
+              (analysisResult && "criticalElements" in analysisResult
+                  ? analysisResult.criticalElements
+                  : []
+              )
                   .filter(e => e.name)
                   .map(e => [e.id, e.name])
           ),
@@ -54,7 +58,7 @@ export default function Home() {
   );
 
   const bottomPanel = analysisResult ? (
-      hasRagContext ? (
+      hasRagContext && "ragContext" in analysisResult ? (
           <Collapsible open={isPanelOpen} onOpenChange={setIsPanelOpen}>
           <Card className="container">
               <CollapsibleTrigger className="w-full">
@@ -94,7 +98,7 @@ export default function Home() {
                               </tr>
                               </thead>
                               <tbody>
-                              {analysisResult.criticalElements.map((element, index) => {
+                              {("criticalElements" in analysisResult ? analysisResult.criticalElements : []).map((element, index) => {
                                   const isSelected = element.id === selectedElementId
                                   const hasRefs = element.references && element.references.length > 0
                                   return <tr key={index} className={`border-t align-top ${isSelected ? "bg-destructive/50" : ""}`}>
@@ -138,7 +142,7 @@ export default function Home() {
                       </TabsContent>
                       <TabsContent value="rag-context">
                           <RagContextCard
-                              ragContext={analysisResult.ragContext!}
+                              ragContext={"ragContext" in analysisResult ? analysisResult.ragContext! : {}}
                               selectedElementId={selectedElementId}
                               elementNames={elementNames}
                           />
@@ -173,7 +177,7 @@ export default function Home() {
         <div className="w-full h-full">
           <BpmnEditor
               bpmnXml={diagram}
-              highlightedActivityIds={analysisResult?.criticalElements?.map(e => e.id) || []}
+              highlightedActivityIds={(analysisResult && "criticalElements" in analysisResult ? analysisResult.criticalElements : [])?.map(e => e.id) || []}
               onNew={handleCreateNewDiagram}
               onDiagramChanged={setDiagram}
               cards={editorToolCards}

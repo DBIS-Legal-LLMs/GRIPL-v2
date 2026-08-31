@@ -1,3 +1,5 @@
+"use client"
+
 import {
     Sidebar,
     SidebarContent,
@@ -7,9 +9,12 @@ import {
     SidebarMenuItem
 } from "@/components/ui/sidebar";
 import Link from "next/link";
-import {BookA, ChartBarDecreasing, Newspaper, Tag, Workflow} from "lucide-react";
+import {ChartBarDecreasing, Tag, Workflow} from "lucide-react";
 import React, {ReactNode} from "react";
 import Image from "next/image";
+import {Label} from "@/components/ui/label";
+import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 
 interface Page {
     href: string;
@@ -18,6 +23,12 @@ interface Page {
 }
 
 export default function AppSidebar() {
+    const {
+        selectedEndpoint,
+        setSelectedEndpoint,
+        availableEndpoints,
+        backendEndpoint,
+    } = useAnalysisEndpoint();
 
     const pages = [
         {
@@ -34,11 +45,6 @@ export default function AppSidebar() {
             href: "/evaluation",
             label: "Evaluation",
             icon: <ChartBarDecreasing />
-        },
-        {
-            href: "/thesis",
-            label: "Thesis",
-            icon: <Newspaper />
         }
     ] as Page[]
 
@@ -60,6 +66,27 @@ export default function AppSidebar() {
                 })}
             </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter />
+        <SidebarFooter className="px-3 pt-1 pb-12 border-t">
+            <div className="space-y-2">
+                <div className="space-y-1">
+                    <Label className="text-xs font-medium">Global Analysis Endpoint</Label>
+                    <div className="w-[250px] max-w-full overflow-hidden">
+                        <Select value={selectedEndpoint} onValueChange={setSelectedEndpoint}>
+                            <SelectTrigger className="h-8 w-full overflow-hidden text-xs">
+                                <SelectValue placeholder="Select endpoint" />
+                            </SelectTrigger>
+                            <SelectContent className="w-[250px] max-w-[250px]">
+                                {availableEndpoints.map((endpoint) => (
+                                    <SelectItem key={endpoint.endpoint} value={endpoint.endpoint} className="max-w-[242px]">
+                                        <span className="block w-full truncate">{endpoint.name}</span>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground break-all">{backendEndpoint}</p>
+            </div>
+        </SidebarFooter>
     </Sidebar>
 }

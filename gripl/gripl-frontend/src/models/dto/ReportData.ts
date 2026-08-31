@@ -1,3 +1,24 @@
+import {GdprCategory} from "@/models/GdprCategory";
+
+export interface PerClassMetricValues {
+    totalTruePositives?: number;
+    totalFalsePositives?: number;
+    totalFalseNegatives?: number;
+    totalTrueNegatives?: number;
+    truePositives?: number;
+    falsePositives?: number;
+    falseNegatives?: number;
+    trueNegatives?: number;
+    tp?: number;
+    fp?: number;
+    fn?: number;
+    tn?: number;
+    precision?: number;
+    recall?: number;
+    f1Score?: number;
+    f1?: number;
+}
+
 export interface EvaluationMetadataReport {
     type: "metadata";
     modelLabels: string[],
@@ -55,7 +76,7 @@ export interface TestCaseReport {
     expectedNamesWithIds: string[],
     actualNamesWithIds: string[];
     isSuccessful: boolean;
-    result: { value: string; reason?: string }[];
+    result: { value: string; reason?: string; classification?: GdprCategory[] }[];
     amountOfRetries: number | null;
     ragMetrics?: TestCaseRagMetrics | null;
     ragPromptContext?: string[] | null;
@@ -74,12 +95,14 @@ export interface EvaluationReportSummary {
     recall: number;
     f1Score: number;
     accuracy: number;
+    exactMatchAccuracy: number;
     totalTruePositives: number;
     totalFalsePositives: number;
     totalFalseNegatives: number;
     totalTrueNegatives: number;
     ragMetrics?: RagSummaryMetrics | null;
     perElementType?: Record<string, ElementTypeSummary>;
+    perClassMetrics?: Partial<Record<string, PerClassMetricValues>>;
     markdown: string;
 }
 

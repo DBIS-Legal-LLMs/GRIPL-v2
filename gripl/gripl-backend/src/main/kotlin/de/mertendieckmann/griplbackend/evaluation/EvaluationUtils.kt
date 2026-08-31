@@ -23,18 +23,23 @@ import kotlin.math.floor
 suspend fun parseBpmn(xml: String): BpmnModelInstance =
     withContext(Dispatchers.Default) { Bpmn.readModelFromStream(xml.byteInputStream()) }
 
-fun computeClassificationSets(
-    expectedIds: List<String>,
-    actualIds: List<String>
-): ClassificationSets {
-    val expected = expectedIds.toSet()
-    val actual = actualIds.toSet()
-    val truePositiveIds = expected.intersect(actual).toList()
-    val falsePositiveIds = (actual - expected).toList()
-    val falseNegativeIds = (expected - actual).toList()
-    return ClassificationSets(truePositiveIds, falsePositiveIds, falseNegativeIds)
-}
+fun <T> computeClassificationSets(
+    expectedValues: List<T>,
+    actualValues: List<T>
+): ClassificationSets<T> {
+    val expected = expectedValues.toSet()
+    val actual = actualValues.toSet()
 
+    val truePositiveValues = expected.intersect(actual).toList()
+    val falsePositiveValues = (actual - expected).toList()
+    val falseNegativeValues = (expected - actual).toList()
+
+    return ClassificationSets(
+        truePositiveIds = truePositiveValues,
+        falsePositiveIds = falsePositiveValues,
+        falseNegativeIds = falseNegativeValues
+    )
+}
 fun computeTrueNegativesCount(
     bpmnModel: BpmnModelInstance,
     truePositivesCount: Int,
@@ -93,7 +98,7 @@ private fun categorize(element: BaseElement): ElementCategory = when (element) {
  */
 fun computePerElementTypeCounts(
     bpmnModel: BpmnModelInstance,
-    classification: ClassificationSets,
+    classification: ClassificationSets<String>,
     activitiesOnly: Boolean = false
 ): Map<String, ElementTypeCounts> {
     val categoryById = classifiableElements(bpmnModel, activitiesOnly).associate { it.id to categorize(it) }

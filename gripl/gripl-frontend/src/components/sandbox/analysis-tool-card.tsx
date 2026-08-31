@@ -20,6 +20,8 @@ import {Switch} from "@/components/ui/switch";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {useToast} from "@/components/ui/toast";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
+import {getAnalysisElements} from "@/models/dto/AnalysisDto";
+import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 
 interface AnalysisToolCardProps {
     bpmnXml: string;
@@ -38,17 +40,15 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
     const [useRag, setUseRag] = useState<boolean>(false)
     const [searchMode, setSearchMode] = useState<string>("hybrid")
     const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
+    const {apiEndpoint, backendEndpoint} = useAnalysisEndpoint()
+    const analysisElements = getAnalysisElements(analysisResult)
 
     const {showError} = useToast()
 
-    function handleAnalyzeClick() {
-        setAnalysisResult(null);
-        setIsAnalyzing(true);
-
+    function buildFormData(): FormData {
         const xmlBlob = new Blob([bpmnXml], { type: "application/xml" });
         const formData = new FormData();
         formData.append("bpmnFile", xmlBlob, "diagram.bpmn");
-
         const llmProps = {
             baseUrl: llmBaseUrl || null,
             modelName: modelName || null,
@@ -56,15 +56,22 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             seed: seed || null,
             temperature: temperature || null,
             topP: topP || null
-        } as LlmPropsOverride
-        const jsonBlob = new Blob([JSON.stringify(llmProps)], { type: "application/json" });
-        formData.append("llmProps", jsonBlob);
+        } as LlmPropsOverride;
+        formData.append("llmProps", new Blob([JSON.stringify(llmProps)], { type: "application/json" }));
+        return formData;
+    }
+
+    function handleAnalyzeClick() {
+        setAnalysisResult(null);
+        setIsAnalyzing(true);
+
+        const formData = buildFormData();
         formData.append("useRag", String(useRag));
         if (useRag) {
             formData.append("ragMode", searchMode);
         }
 
-        fetch(`/api/gdpr/analysis/prompt-engineering`, {
+        fetch(apiEndpoint, {
             method: "POST",
             headers: {
                 Accept: "application/json"
@@ -89,7 +96,6 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
 
     function handleDownloadResultClick() {
         if (!analysisResult) return;
-
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(analysisResult, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
@@ -186,6 +192,9 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             <div className="py-2">
                 <Separator/>
             </div>
+            <div className="text-xs text-muted-foreground break-all">
+                Selected endpoint: {backendEndpoint}
+            </div>
             <Button
                 onClick={handleAnalyzeClick}
                 variant="default"
@@ -202,7 +211,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             <Button
                 onClick={handleDownloadResultClick}
                 variant="outline"
-                disabled={!analysisResult || analysisResult.criticalElements.length === 0 || isAnalyzing}
+                disabled={!analysisResult || analysisElements.length === 0 || isAnalyzing}
             >
                 <Download className="mr-2 h-4 w-4"/>
                 Download Report (Json)
@@ -210,7 +219,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             <Button
                 onClick={() => setAnalysisResult(null)}
                 variant="outline"
-                disabled={!analysisResult || analysisResult.criticalElements.length === 0 || isAnalyzing}
+                disabled={!analysisResult || analysisElements.length === 0 || isAnalyzing}
             >
                 <RefreshCw className="mr-2 h-4 w-4"/>
                 Clear Analysis Results

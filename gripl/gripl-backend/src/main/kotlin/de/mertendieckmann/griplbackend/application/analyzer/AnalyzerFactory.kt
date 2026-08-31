@@ -15,4 +15,7 @@ class AnalyzerFactory(
     fun createBaselineAnalyzer(chatModel: ChatModel): BaselineBpmnAnalyzer {
         return BaselineBpmnAnalyzer(chatModel)
     }
+    fun createMulticlassAnalyzer(chatModel: ChatModel): MulticlassBpmnAnalyzer {
+        return MulticlassBpmnAnalyzer(chatModel)
+}
 }

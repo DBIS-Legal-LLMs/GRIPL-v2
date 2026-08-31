@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import fetchAnalysisEndpoints from "@/actions/analysis-endpoints";
 import { Dataset } from "@/models/dto/Dataset";
 import { ModelRunConfig, MultiEvaluationRequest } from "@/models/dto/MultiEvaluationRequest";
-import {EndpointChoice, ModelRowState} from "@/models/evaluation/Config";
+import {AnalysisEndpoint, EndpointChoice, ModelRowState} from "@/models/evaluation/Config";
 import {cryptoRandomId, normalize} from "@/lib/evaluation-config-utils";
+import { useAnalysisEndpoint } from "@/components/providers/analysis-endpoint-provider";
 
 export function newModelRow(index: number): ModelRowState {
     return {
@@ -27,7 +27,10 @@ export function useEvaluationConfig(
     datasets: Dataset[],
     onMultiConfigChanged: (config: MultiEvaluationRequest) => void
 ) {
-    const [availableEvaluationEndpoints, setAvailableEvaluationEndpoints] = useState<AnalysisEndpoint[]>([]);
+    const { backendEndpoint, availableEndpoints } = useAnalysisEndpoint();
+    const preferredDefaultEndpoint = backendEndpoint;
+
+    const availableEvaluationEndpoints: AnalysisEndpoint[] = availableEndpoints;
 
     const [defaultEndpointChoice, setDefaultEndpointChoice] = useState<EndpointChoice>("preset");
     const [defaultPresetEndpoint, setDefaultPresetEndpoint] = useState<string>("");
@@ -49,13 +52,19 @@ export function useEvaluationConfig(
     const [activitiesOnly, setActivitiesOnly] = useState<boolean>(false);
 
     useEffect(() => {
-        fetchAnalysisEndpoints().then((eps) => {
-            setAvailableEvaluationEndpoints(eps);
-            if (eps.length > 0 && !defaultPresetEndpoint) {
-                setDefaultPresetEndpoint(eps[0].endpoint);
-            }
-        });
-    }, []);
+        if (defaultEndpointChoice !== "preset") {
+            return;
+        }
+
+        if (availableEvaluationEndpoints.length === 0) {
+            return;
+        }
+
+        const preferredEndpoint = availableEvaluationEndpoints.find((ep) => ep.endpoint === preferredDefaultEndpoint);
+        const nextEndpoint = preferredEndpoint?.endpoint || availableEvaluationEndpoints[0].endpoint;
+
+        setDefaultPresetEndpoint((current) => current === nextEndpoint ? current : nextEndpoint);
+    }, [availableEvaluationEndpoints, preferredDefaultEndpoint, defaultEndpointChoice]);
 
     const effectiveDefaultEndpoint = useMemo(() => {
         if (defaultEndpointChoice === "custom") return defaultCustomEndpoint.trim();

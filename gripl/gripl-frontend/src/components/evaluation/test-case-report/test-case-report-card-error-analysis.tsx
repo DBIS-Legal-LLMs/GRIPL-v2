@@ -15,7 +15,7 @@ export default function TestCaseReportCardErrorAnalysis({ report }: TestCaseRepo
         if (!report.falsePositiveIds) return []
         return report.falsePositiveIds.map((id) => {
             const found = report.actualNamesWithIds.find((nameWithId) => nameWithId.includes(`(${id})`))
-            return found || `Activity ${id}`
+            return found || `Classification ${id}`
         })
     }
 
@@ -23,7 +23,7 @@ export default function TestCaseReportCardErrorAnalysis({ report }: TestCaseRepo
         if (!report.falseNegativeIds) return []
         return report.falseNegativeIds.map((id) => {
             const found = report.expectedNamesWithIds.find((nameWithId) => nameWithId.includes(`(${id})`))
-            return found || `Activity ${id}`
+            return found || `Classification ${id}`
         })
     }
 
@@ -42,7 +42,7 @@ export default function TestCaseReportCardErrorAnalysis({ report }: TestCaseRepo
                         False Positives ({falsePositiveCount})
                     </h4>
                     <p className="text-xs text-orange-600 dark:text-orange-400 mb-3">
-                        BPMN elements detected but not expected
+                        Predicted activity-classifications that were not expected
                     </p>
                     <div className="space-y-1">
                         {falsePositiveNames.map((name, index) => (
@@ -62,7 +62,7 @@ export default function TestCaseReportCardErrorAnalysis({ report }: TestCaseRepo
                         False Negatives ({falseNegativeCount})
                     </h4>
                     <p className="text-xs text-red-600 dark:text-red-400 mb-3">
-                        Expected BPMN elements not detected
+                        Expected activity-classifications that were not predicted
                     </p>
                     <div className="space-y-1">
                         {falseNegativeNames.map((name, index) => (
