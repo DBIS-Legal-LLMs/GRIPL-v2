@@ -7,9 +7,10 @@ import Link from "next/link";
 import {useEffect, useState} from "react";
 import {Crumb} from "@/models/Crumb";
 import {EvaluationData} from "@/models/dto/EvaluationData";
+import {ProcessModelDetail} from "@/models/dto/ProcessModel";
 
 const nameMap = {
-    "": 'Sandbox',
+    "process-analysis": "Process Analysis",
     labeling: "Labeling",
     thesis: "Thesis",
 }
@@ -43,6 +44,31 @@ export default function AppBreadCrumbs() {
                 setCrumbs(updatedCrumbs);
             }).catch(error => {
                 console.error("Error fetching dataset name:", error);
+                setCrumbs(newCrumbs)
+            })
+            return
+        }
+
+        // If the user has a process model selected, show its name instead of the id
+        if (newCrumbs[0].label === nameMap["process-analysis"] && newCrumbs.length === 2) {
+            fetch(`/api/process-models/${newCrumbs[1].label}`).then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch process model with id ${newCrumbs[1].label}: ${response.statusText}`);
+                }
+                return response.json()
+            }).then((data: ProcessModelDetail) => {
+                const updatedCrumbs = newCrumbs.map((crumb, index) => {
+                    if (index === 1) {
+                        return {
+                            ...crumb,
+                            label: `${data.name} (${data.id})`,
+                        };
+                    }
+                    return crumb;
+                });
+                setCrumbs(updatedCrumbs);
+            }).catch(error => {
+                console.error("Error fetching process model name:", error);
                 setCrumbs(newCrumbs)
             })
             return

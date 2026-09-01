@@ -32,8 +32,8 @@ export default function AppSidebar() {
 
     const pages = [
         {
-            href: "/",
-            label: "Sandbox",
+            href: "/process-analysis",
+            label: "Process Analysis",
             icon: <Workflow />
         },
         {

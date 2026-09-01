@@ -1,7 +1,7 @@
 package de.mertendieckmann.griplbackend.adapter.web
 
 import de.mertendieckmann.griplbackend.adapter.web.utils.ControllerUtils
-import de.mertendieckmann.griplbackend.application.analyzer.AnalyzerFactory
+import de.mertendieckmann.griplbackend.application.analyzer.AnalysisService
 import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.AnalysisEndpoint
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
@@ -9,7 +9,6 @@ import de.mertendieckmann.griplbackend.model.dto.RagMode
 import de.mertendieckmann.griplbackend.model.dto.MulticlassAnalysisResponse
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.core.env.Environment
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -22,10 +21,8 @@ import reactor.core.scheduler.Schedulers
 @RestController
 @RequestMapping("/gdpr/analysis")
 class AnalysisController(
-    private val analyzerFactory: AnalyzerFactory,
-    private val llmConfig: LlmConfig,
-    @Qualifier("analysisEndpoints") private val analysisEndpoints: List<AnalysisEndpoint>,
-    private val env: Environment
+    private val analysisService: AnalysisService,
+    @Qualifier("analysisEndpoints") private val analysisEndpoints: List<AnalysisEndpoint>
 ) {
 
     @Operation(
@@ -60,18 +57,17 @@ class AnalysisController(
         val activitiesOnly = activitiesOnlyPart?.value()?.toBooleanStrictOrNull() ?: false
 
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
-        val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
 
         return bpmnXmlMono.flatMap { bpmnXml ->
             Mono.fromCallable {
-                val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
-                val analyzer = analyzerFactory.createPromptEngineeringAnalyzer(llm)
-                analyzer.analyzeBpmnForGdpr(
+                analysisService.analyzePromptEngineering(
                     bpmnXml = bpmnXml,
+                    llmPropsOverride = llmPropsOverrides,
                     useRag = useRag,
                     ragMode = ragMode,
                     activitiesOnly = activitiesOnly
-                )            }.subscribeOn(Schedulers.boundedElastic())
+                )
+            }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
 
@@ -97,18 +93,17 @@ class AnalysisController(
         val ragMode = parseRagMode(ragModePart)
         val activitiesOnly = activitiesOnlyPart?.value()?.toBooleanStrictOrNull() ?: false
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
-        val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
 
         return bpmnXmlMono.flatMap { bpmnXml ->
             Mono.fromCallable {
-                val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
-                val analyzer = analyzerFactory.createBaselineAnalyzer(llm)
-                analyzer.analyzeBpmnForGdpr(
+                analysisService.analyzeBaseline(
                     bpmnXml = bpmnXml,
+                    llmPropsOverride = llmPropsOverrides,
                     useRag = useRag,
                     ragMode = ragMode,
                     activitiesOnly = activitiesOnly
-                )            }.subscribeOn(Schedulers.boundedElastic())
+                )
+            }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
 
@@ -136,13 +131,13 @@ class AnalysisController(
     ): Mono<ResponseEntity<MulticlassAnalysisResponse>> {
 
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
-        val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
 
         return bpmnXmlMono.flatMap { bpmnXml ->
             Mono.fromCallable {
-                val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
-                val analyzer = analyzerFactory.createMulticlassAnalyzer(llm)
-                analyzer.analyzeBpmnForGdpr(bpmnXml)
+                analysisService.analyzeMulticlass(
+                    bpmnXml = bpmnXml,
+                    llmPropsOverride = llmPropsOverrides
+                )
             }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
