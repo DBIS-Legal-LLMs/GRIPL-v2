@@ -11,6 +11,7 @@ import AppSidebar from "@/components/navigation/app-sidebar";
 import AppBreadCrumbs from "@/components/navigation/app-breadcrumbs";
 import {ThemeToggle} from "@/components/ui/theme-toggle";
 import {AnalysisEndpointProvider} from "@/components/providers/analysis-endpoint-provider";
+import {ToastProvider} from "@/components/ui/toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,21 +44,23 @@ export default function RootLayout({
         defaultTheme="system"
         enableSystem={true}
       >
-        <AnalysisEndpointProvider>
-          <SidebarProvider className="h-full w-full">
-            <AppSidebar />
-            <SidebarInset className="h-full w-full">
-              <header className="h-16 flex-shrink-0 px-2 flex flex-row items-center justify-between space-x-4 bg-sidebar sticky top-0 z-10">
-                <div className="flex flex-row space-x-4 items-center">
-                  <SidebarTrigger/>
-                  <AppBreadCrumbs />
-                </div>
-                <ThemeToggle />
-              </header>
-              {children}
-            </SidebarInset>
-          </SidebarProvider>
-        </AnalysisEndpointProvider>
+        <ToastProvider>
+          <AnalysisEndpointProvider>
+            <SidebarProvider className="h-full w-full">
+              <AppSidebar />
+              <SidebarInset className="h-full w-full">
+                <header className="h-16 flex-shrink-0 px-2 flex flex-row items-center justify-between space-x-4 bg-sidebar sticky top-0 z-10">
+                  <div className="flex flex-row space-x-4 items-center">
+                    <SidebarTrigger/>
+                    <AppBreadCrumbs />
+                  </div>
+                  <ThemeToggle />
+                </header>
+                {children}
+              </SidebarInset>
+            </SidebarProvider>
+          </AnalysisEndpointProvider>
+        </ToastProvider>
       </ThemeProvider>
     </body>
   </html>

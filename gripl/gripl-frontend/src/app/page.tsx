@@ -51,7 +51,7 @@ export default function Home() {
                   ? analysisResult.criticalElements
                   : []
               )
-                  .filter(e => e.name)
+                  .filter((e): e is typeof e & { name: string } => Boolean(e.name))
                   .map(e => [e.id, e.name])
           ),
       [analysisResult]
