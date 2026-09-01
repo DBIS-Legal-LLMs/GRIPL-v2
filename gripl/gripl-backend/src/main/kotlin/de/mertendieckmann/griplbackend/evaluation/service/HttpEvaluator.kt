@@ -4,6 +4,8 @@ import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRequest
 import de.mertendieckmann.griplbackend.model.dto.ExpectedValue
 import de.mertendieckmann.griplbackend.model.dto.MulticlassAnalysisResponse
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.MediaType
@@ -14,11 +16,16 @@ import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
 import org.springframework.web.reactive.function.client.awaitBody
 import tools.jackson.module.kotlin.jacksonObjectMapper
+import kotlin.time.Duration.Companion.minutes
 
 @Service
 class HttpEvaluator(
     @Value("\${server.port:8080}") private val serverPort: Int
 ) : Evaluator {
+
+    companion object {
+        private val EVALUATION_CALL_TIMEOUT = 15.minutes
+    }
 
     private val webClient = WebClient.builder()
         .codecs {
@@ -82,88 +89,95 @@ class HttpEvaluator(
             }
 
         try {
-            if (
-                evaluationRequest.evaluationEndpoint.contains(
-                    "multiclass",
-                    ignoreCase = true
-                )
-            ) {
-                val multiclassResponse:
-                    MulticlassAnalysisResponse =
-                    webClient
-                        .post()
-                        .uri(absoluteEndpoint)
-                        .contentType(
-                            MediaType.MULTIPART_FORM_DATA
-                        )
-                        .body(
-                            BodyInserters.fromMultipartData(
-                                bodyBuilder.build()
+            return withTimeout(EVALUATION_CALL_TIMEOUT) {
+                if (
+                    evaluationRequest.evaluationEndpoint.contains(
+                        "multiclass",
+                        ignoreCase = true
+                    )
+                ) {
+                    val multiclassResponse:
+                        MulticlassAnalysisResponse =
+                        webClient
+                            .post()
+                            .uri(absoluteEndpoint)
+                            .contentType(
+                                MediaType.MULTIPART_FORM_DATA
                             )
-                        )
-                        .retrieve()
-                        .awaitBody()
+                            .body(
+                                BodyInserters.fromMultipartData(
+                                    bodyBuilder.build()
+                                )
+                            )
+                            .retrieve()
+                            .awaitBody()
 
-                val expectedValues =
-                    multiclassResponse.classifiedElements.map {
-                        ExpectedValue(
-                            value = it.id,
-                            reason = it.reason,
-                            classification = it.classification
-                        )
-                    }
+                    val expectedValues =
+                        multiclassResponse.classifiedElements.map {
+                            ExpectedValue(
+                                value = it.id,
+                                reason = it.reason,
+                                classification = it.classification
+                            )
+                        }
 
-                val compatibleAnalysisResponse =
-                    AnalysisResponse(
-                        criticalElements =
-                            multiclassResponse
-                                .classifiedElements
-                                .map {
-                                    AnalysisResponse.CriticalElement(
-                                        id = it.id,
-                                        name = it.name,
-                                        reason = it.reason
-                                    )
-                                },
+                    val compatibleAnalysisResponse =
+                        AnalysisResponse(
+                            criticalElements =
+                                multiclassResponse
+                                    .classifiedElements
+                                    .map {
+                                        AnalysisResponse.CriticalElement(
+                                            id = it.id,
+                                            name = it.name,
+                                            reason = it.reason
+                                        )
+                                    },
+                            amountOfRetries =
+                                multiclassResponse.amountOfRetries
+                        )
+
+                    EvaluationCallResult(
+                        expectedValues = expectedValues,
                         amountOfRetries =
-                            multiclassResponse.amountOfRetries
+                            multiclassResponse.amountOfRetries,
+                        analysisResponse =
+                            compatibleAnalysisResponse
                     )
+                } else {
+                    val analysisResponse: AnalysisResponse =
+                        webClient
+                            .post()
+                            .uri(absoluteEndpoint)
+                            .contentType(
+                                MediaType.MULTIPART_FORM_DATA
+                            )
+                            .body(
+                                BodyInserters.fromMultipartData(
+                                    bodyBuilder.build()
+                                )
+                            )
+                            .retrieve()
+                            .awaitBody()
 
-                return EvaluationCallResult(
-                    expectedValues = expectedValues,
-                    amountOfRetries =
-                        multiclassResponse.amountOfRetries,
-                    analysisResponse =
-                        compatibleAnalysisResponse
-                )
+                    EvaluationCallResult(
+                        expectedValues =
+                            analysisResponse.criticalElements.map {
+                                ExpectedValue(
+                                    value = it.id,
+                                    reason = it.reason
+                                )
+                            },
+                        amountOfRetries =
+                            analysisResponse.amountOfRetries,
+                        analysisResponse = analysisResponse
+                    )
+                }
             }
-
-            val analysisResponse: AnalysisResponse =
-                webClient
-                    .post()
-                    .uri(absoluteEndpoint)
-                    .contentType(
-                        MediaType.MULTIPART_FORM_DATA
-                    )
-                    .body(
-                        BodyInserters.fromMultipartData(
-                            bodyBuilder.build()
-                        )
-                    )
-                    .retrieve()
-                    .awaitBody()
-
-            return EvaluationCallResult(
-                expectedValues =
-                    analysisResponse.criticalElements.map {
-                        ExpectedValue(
-                            value = it.id,
-                            reason = it.reason
-                        )
-                    },
-                amountOfRetries =
-                    analysisResponse.amountOfRetries,
-                analysisResponse = analysisResponse
+        } catch (e: TimeoutCancellationException) {
+            throw RuntimeException(
+                "Evaluation call to endpoint '$absoluteEndpoint' timed out after $EVALUATION_CALL_TIMEOUT",
+                e
             )
         } catch (e: WebClientResponseException) {
             throw RuntimeException(

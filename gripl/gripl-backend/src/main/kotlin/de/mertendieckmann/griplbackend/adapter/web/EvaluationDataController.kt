@@ -15,12 +15,14 @@ import org.springframework.http.server.reactive.ServerHttpRequest
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 
 @RestController
 @RequestMapping("/dataset/testcase")
 class EvaluationDataController(
     private val evaluationDataRepository: EvaluationDataRepository,
-    private val previewCacheRepository: PreviewCacheRepository
+    private val previewCacheRepository: PreviewCacheRepository,
+    private val previewGenerator: PreviewGenerator
 ) {
     private val log = KotlinLogging.logger { }
 
@@ -161,13 +163,29 @@ class EvaluationDataController(
         @RequestParam falseNegativeIds: List<String> = emptyList(),
         @RequestParam theme: String = "light",
         request: ServerHttpRequest
-    ): ResponseEntity<String> {
+    ): Mono<ResponseEntity<String>> {
 
         val requestPath = request.uri.path
         val requestQueryWithoutSalt = request.uri.query
             ?.replace(Regex("&salt=[^&]*"), "")
             ?.let { "?$it" }.orEmpty()
         val relativeRequestUrl = "$requestPath$requestQueryWithoutSalt"
+
+        // Preview rendering (Playwright/Chromium) and the repository lookups below are all
+        // blocking, so they must run off the Netty event-loop thread.
+        return Mono.fromCallable {
+            renderSvgPreview(id, relativeRequestUrl, correctIds, falsePositiveIds, falseNegativeIds, theme)
+        }.subscribeOn(Schedulers.boundedElastic())
+    }
+
+    private fun renderSvgPreview(
+        id: Long,
+        relativeRequestUrl: String,
+        correctIds: List<String>,
+        falsePositiveIds: List<String>,
+        falseNegativeIds: List<String>,
+        theme: String
+    ): ResponseEntity<String> {
         val cachedPreview = previewCacheRepository.getCachedPreview(id, relativeRequestUrl)
 
         if (cachedPreview != null) {
@@ -176,8 +194,6 @@ class EvaluationDataController(
                 .header("Content-Type", "image/svg+xml")
                 .body(cachedPreview.svg)
         }
-
-        val previewGenerator = PreviewGenerator()
 
         val datasetEntry = evaluationDataRepository.getEvaluationDataById(id)
             ?: return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Kein Datensatz gefunden für Id: $id")

@@ -32,11 +32,13 @@ class EvaluationRunner(
         val metricsAccumulator = MetricsAccumulator()
         val startedCounter = AtomicInteger(0)
 
-        val entriesFlow = (if (request.evaluationDataIds.isNotEmpty()) {
+        val entries = (if (request.evaluationDataIds.isNotEmpty()) {
             evaluationDataRepository.getEvaluationDataByIds(request.evaluationDataIds)
         } else {
             evaluationDataRepository.getEvaluationDataByDatasetIdsOrAll(request.datasets)
-        }).sortedBy { it.id }.asFlow()
+        }).sortedBy { it.id }
+        val totalCount = entries.size
+        val entriesFlow = entries.asFlow()
 
         log.info { "Starting evaluation with endpoint=${request.evaluationEndpoint}; maxConcurrent=${request.maxConcurrent}; evaluateRag=${request.evaluateRag}" }
 
@@ -44,7 +46,7 @@ class EvaluationRunner(
             .flatMapMerge(concurrency = request.maxConcurrent.coerceAtLeast(1)) { entry ->
                 flow {
                     val currentNumber = startedCounter.incrementAndGet()
-                    emit(buildStepInfo(entry, currentNumber, entriesFlow.count()))
+                    emit(buildStepInfo(entry, currentNumber, totalCount))
 
                     when (val outcome = evaluateSingleEntry(entry, request)) {
                         is EvaluationOutcome.Error -> {
