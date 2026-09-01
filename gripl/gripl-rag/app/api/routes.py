@@ -4,16 +4,19 @@ FastAPI router for the RAG query API.
 Exposes:
   POST /api/query    query the knowledge graph
   GET  /api/health   basic health/readiness check
+  GET  /api/status   whether the knowledge graph currently holds ingested data
 """
 import logging
 import asyncio
 from fastapi import APIRouter, HTTPException
 from lightrag import QueryParam
+from neo4j import AsyncGraphDatabase
 
 from app.schemas.query import (
     QueryRequest,
     QueryResponse,
     HealthResponse,
+    RagStatusResponse,
 )
 from app.config import settings
 from app.rag.engine import create_rag_instance
@@ -51,6 +54,31 @@ async def _get_rag():
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     return HealthResponse()
+
+
+@router.get("/status", response_model=RagStatusResponse)
+async def rag_status():
+    """
+    Reports whether the knowledge graph currently holds any data, independent
+    of the LightRAG singleton (queries Neo4j directly) so it also works
+    before the first /api/query call has lazily initialised LightRAG.
+    """
+    driver = AsyncGraphDatabase.driver(
+        settings.neo4j_uri,
+        auth=(settings.neo4j_username, settings.neo4j_password),
+    )
+    try:
+        async with driver.session() as session:
+            result = await session.run("MATCH (n) RETURN count(n) AS node_count")
+            record = await result.single()
+            node_count = record["node_count"] if record else 0
+    except Exception as exc:
+        logger.exception("RAG status check failed: %s", exc)
+        raise HTTPException(status_code=503, detail=f"Status check failed: {exc}")
+    finally:
+        await driver.close()
+
+    return RagStatusResponse(ingested=node_count > 0, node_count=node_count)
 
 
 @router.post("/query", response_model=QueryResponse)

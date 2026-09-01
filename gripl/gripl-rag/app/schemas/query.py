@@ -89,3 +89,9 @@ class HealthResponse(BaseModel):
     """Health check response."""
     status: str = "ok"
     service: str = "gripl-rag"
+
+
+class RagStatusResponse(BaseModel):
+    """Whether the knowledge graph currently holds any ingested data."""
+    ingested: bool
+    node_count: int

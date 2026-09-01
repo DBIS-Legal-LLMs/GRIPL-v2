@@ -119,6 +119,8 @@ class AnalysisController(
         } catch (e: IllegalArgumentException) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
         }
+    }
+
     @Operation(
         summary = "Analyzes BPMN-XML for GDPR processing classes",
         description = "Upload a BPMN XML document (file part **bpmnFile**). The service analyzes it with an LLM and returns GDPR-relevant activity elements classified into processing classes."
@@ -144,5 +146,4 @@ class AnalysisController(
             }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
-}
 }

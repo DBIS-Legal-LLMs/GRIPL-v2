@@ -4,6 +4,7 @@ import de.mertendieckmann.griplbackend.config.RagApiProperties
 import de.mertendieckmann.griplbackend.model.dto.RagMode
 import de.mertendieckmann.griplbackend.model.dto.RagRequest
 import de.mertendieckmann.griplbackend.model.dto.RagResponseWrapper
+import de.mertendieckmann.griplbackend.model.dto.RagStatusResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.stereotype.Service
@@ -72,6 +73,25 @@ class RagApiClient(
 
     private fun cacheKey(queryText: String, ragMode: RagMode): String =
         "$ragMode::${queryText.trim().lowercase()}"
+
+    /**
+     * Checks whether the RAG service's knowledge graph currently holds any ingested
+     * data. Not cached — always hits the RAG service live so it reflects the current
+     * state (e.g. after a re-ingestion run).
+     */
+    suspend fun checkStatus(): RagStatusResponse {
+        return try {
+            webClient.get()
+                .uri("/api/status")
+                .retrieve()
+                .bodyToMono(RagStatusResponse::class.java)
+                .timeout(Duration.ofSeconds(10))
+                .awaitSingle()
+        } catch (e: Exception) {
+            log.error(e) { "RAG status check failed" }
+            throw RuntimeException("Failed to check RAG status", e)
+        }
+    }
 
     companion object {
         private const val MAX_CACHE_ENTRIES = 500

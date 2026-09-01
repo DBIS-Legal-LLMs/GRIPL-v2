@@ -1,6 +1,7 @@
 package de.mertendieckmann.griplbackend.model.dto
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonValue
 
 enum class RagMode(@get:JsonValue val value: String) {
@@ -32,4 +33,13 @@ data class RagResponseWrapper(
     val mode: String,
     val status: String,
     val response: Map<String, Any>
+)
+
+/**
+ * Mirror of the Python /api/status endpoint contract (whether the knowledge
+ * graph currently holds ingested data).
+ */
+data class RagStatusResponse(
+    val ingested: Boolean,
+    @JsonProperty("node_count") val nodeCount: Int
 )

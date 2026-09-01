@@ -11,6 +11,7 @@ import AppSidebar from "@/components/navigation/app-sidebar";
 import AppBreadCrumbs from "@/components/navigation/app-breadcrumbs";
 import {ThemeToggle} from "@/components/ui/theme-toggle";
 import {AnalysisEndpointProvider} from "@/components/providers/analysis-endpoint-provider";
+import {KgStatusBanner} from "@/components/providers/kg-status-banner";
 import {ToastProvider} from "@/components/ui/toast";
 
 const geistSans = Geist({
@@ -44,6 +45,7 @@ export default function RootLayout({
         defaultTheme="system"
         enableSystem={true}
       >
+        <KgStatusBanner />
         <ToastProvider>
           <AnalysisEndpointProvider>
             <SidebarProvider className="h-full w-full">
