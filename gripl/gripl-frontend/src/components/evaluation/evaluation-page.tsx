@@ -1,12 +1,9 @@
 "use client";
 
 import {Button} from "@/components/ui/button";
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useMemo, useState} from "react";
 import {
-    EvaluationMetadataReport,
-    EvaluationReport,
     EvaluationReportError,
-    EvaluationReportStepInfo,
     EvaluationReportSummary,
     TestCaseReport
 } from "@/models/dto/ReportData";
@@ -27,6 +24,7 @@ import MetricChart from "@/components/evaluation/charts/aggregated/metric-chart"
 import {ColorProvider, useColors} from "@/components/evaluation/charts/common/color-context";
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
 import {useToast} from "@/components/ui/toast";
+import {useEvaluationJob} from "@/components/providers/evaluation-job-provider";
 import {toErrorMessage} from "@/lib/http-error";
 import {
     applyClassSelectionToSummary,
@@ -43,26 +41,22 @@ import {
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 
-type ModelReportEnvelope = {
-    modelLabel: string;
-    report: EvaluationReport;
-    runNumber: number;
-};
-
 interface EvaluationPageProps {
     datasets: Dataset[];
 }
 
 export default function EvaluationPage({ datasets }: EvaluationPageProps) {
-    const [evaluationRequest, setEvaluationRequest] = useState<MultiEvaluationRequest | null>(null);
-
-    const [metadata, setMetadata] = useState<EvaluationMetadataReport | null>(null);
-    const [testCasesByRun, setTestCasesByRun] = useState<Map<number, (TestCaseReport & { modelLabel: string })[]>>(new Map());
-    const [summaryByRun, setSummaryByRun] = useState<Map<number, Map<string, EvaluationReportSummary>>>(new Map());
-    const [currentStepInfos, setCurrentStepInfos] = useState<(EvaluationReportStepInfo & { modelLabel: string, runNumber: number })[]>([]);
-    const [errorsByRun, setErrorsByRun] = useState<Map<number, (EvaluationReportError & { modelLabel: string })[]>>(new Map());
-    const [isLoading, setIsLoading] = useState(false);
-    const [isFinished, setIsFinished] = useState(false);
+    const {
+        evaluationRequest, setEvaluationRequest,
+        metadata, setMetadata,
+        testCasesByRun, setTestCasesByRun,
+        summaryByRun, setSummaryByRun,
+        currentStepInfos,
+        errorsByRun, setErrorsByRun,
+        isLoading,
+        isFinished, setIsFinished,
+        startEvaluation,
+    } = useEvaluationJob();
 
     const [selectedRun, setSelectedRun] = useState<number>(1);
     const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
@@ -74,113 +68,12 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const { colors, setColors } = useColors()
     const { showToast, showError } = useToast()
 
-    const processNdjsonStream = async (res: Response) => {
-        if (!res.ok || !res.body) {
-            console.error("Request failed:", res.status, res.statusText);
-            setIsLoading(false);
-            return;
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-
-            for (let i = 0; i < lines.length - 1; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-
-                try {
-                    const env = JSON.parse(line) as ModelReportEnvelope;
-                    const { modelLabel, report, runNumber } = env;
-
-                    if (report.type === "metadata") {
-                        setMetadata(report);
-                    } else if (report.type === "testCase") {
-                        setTestCasesByRun((prev) => {
-                            const next = new Map(prev);
-                            const runCases = next.get(runNumber) || [];
-                            next.set(runNumber, [...runCases, { ...(report as TestCaseReport), modelLabel }]);
-                            return next;
-                        });
-                    } else if (report.type === "summary") {
-                        setSummaryByRun((prev) => {
-                            const next = new Map(prev);
-                            const runSummaries = next.get(runNumber) || new Map();
-                            runSummaries.set(modelLabel, report as EvaluationReportSummary);
-                            next.set(runNumber, runSummaries);
-                            return next;
-                        });
-                    } else if (report.type === "stepInfo") {
-                        setCurrentStepInfos((prev) => [...prev, { ...(report as EvaluationReportStepInfo), modelLabel, runNumber }]);
-                    } else if (report.type === "error") {
-                        setErrorsByRun((prev) => {
-                            const next = new Map(prev);
-                            const runErrors = next.get(runNumber) || [];
-                            next.set(runNumber, [...runErrors, { ...(report as EvaluationReportError), modelLabel }]);
-                            return next;
-                        });
-                    } else {
-                        console.warn("Unknown report type:", report);
-                    }
-                } catch (e) {
-                    console.error("Failed to parse NDJSON line:", e);
-                }
-            }
-
-            buffer = lines[lines.length - 1];
-        }
-
-        setIsLoading(false);
-        setIsFinished(true);
-    };
-
-    const resetState = () => {
-        setMetadata(null);
-        setTestCasesByRun(new Map());
-        setSummaryByRun(new Map());
-        setCurrentStepInfos([]);
-        setErrorsByRun(new Map());
-        setIsLoading(true);
-        setIsFinished(false);
-        setSelectedRun(1);
-    };
-
+    // Resetting the run/job state itself lives in the provider (so it survives
+    // navigation); resetting which run tab is selected is page-local view state.
     const handleEvaluationStart = async () => {
-        if (!evaluationRequest) return;
-        resetState();
-        console.log("Sending request", evaluationRequest);
-        const res = await fetch(`/api/gdpr/evaluation/stream`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(evaluationRequest)
-        });
-        await processNdjsonStream(res);
+        setSelectedRun(1);
+        await startEvaluation();
     };
-
-    useEffect(() => {
-        setCurrentStepInfos((infos) =>
-            infos.filter((info) => {
-                const runTestCases = testCasesByRun.get(info.runNumber) || [];
-                const runErrors = errorsByRun.get(info.runNumber) || [];
-                return !runTestCases.some(
-                    (testCase) =>
-                        testCase.modelLabel === info.modelLabel &&
-                        testCase.testCaseId === info.currentTestCaseId
-                ) && !runErrors.some(
-                    (error) =>
-                        error.modelLabel === info.modelLabel &&
-                        error.testCaseId === info.currentTestCaseId
-                );
-            })
-        );
-    }, [testCasesByRun, errorsByRun]);
 
     const isMulticlassEvaluation = useMemo(() => {
         const endpoint = evaluationRequest?.defaultEvaluationEndpoint

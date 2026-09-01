@@ -5,8 +5,8 @@ import BpmnEditor from "@/components/bpmn-editor";
 import {useMemo, useState} from "react";
 import {BpmnToolCard} from "@/models/BpmnToolCard";
 import AnalysisToolCard from "@/components/sandbox/analysis-tool-card";
-import emptyDiagram from "@/data/empty-diagram.bpmn";
-import {AnalysisResponse, getAnalysisElements} from "@/models/dto/AnalysisDto";
+import {getAnalysisElements} from "@/models/dto/AnalysisDto";
+import {useAnalysisJob} from "@/components/providers/analysis-job-provider";
 import AnalysisResultCard, {humanizeType} from "@/components/sandbox/analysis-result-card";
 import RagContextCard from "@/components/sandbox/rag-context-card";
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
@@ -23,8 +23,7 @@ interface PdfViewerState {
 }
 
 export default function Home() {
-  const [diagram, setDiagram] = useState<string>(emptyDiagram as string)
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null)
+  const {diagram, setDiagram, analysisResult, setAnalysisResult} = useAnalysisJob()
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const analysisElements = getAnalysisElements(analysisResult)
   const [pdfViewer, setPdfViewer] = useState<PdfViewerState | null>(null)
@@ -41,6 +40,17 @@ export default function Home() {
   }
 
   const hasRagContext = analysisResult && "ragContext" in analysisResult && analysisResult.ragContext && Object.keys(analysisResult.ragContext).length > 0;
+
+  // Works for both binary (plain "critical" red) and multiclass (per-category
+  // color, or the "multi" marker for elements with more than one class) results
+  // — classification is always [] for binary elements, so BpmnEditor's marker
+  // logic falls back to the plain critical-red marker for those.
+  const highlightedActivityIds = analysisElements.map(e => e.id);
+  const highlightedActivityCategories = Object.fromEntries(
+      analysisElements
+          .filter(e => e.classification.length > 0)
+          .map(e => [e.id, e.classification])
+  );
 
   // Stable reference so RagContextCard (and the knowledge graph below it)
   // doesn't receive a fresh object on every render of this page.
@@ -160,11 +170,7 @@ export default function Home() {
   const editorToolCards: BpmnToolCard[] = [
     {
       position: "top-right",
-      content: <AnalysisToolCard
-          bpmnXml={diagram}
-          analysisResult={analysisResult}
-          setAnalysisResult={setAnalysisResult}
-      />
+      content: <AnalysisToolCard/>
     } as BpmnToolCard,
     ...(bottomPanel ? [{
       position: "bottom-center" as const,
@@ -177,7 +183,8 @@ export default function Home() {
         <div className="w-full h-full">
           <BpmnEditor
               bpmnXml={diagram}
-              highlightedActivityIds={(analysisResult && "criticalElements" in analysisResult ? analysisResult.criticalElements : [])?.map(e => e.id) || []}
+              highlightedActivityIds={highlightedActivityIds}
+              highlightedActivityCategories={highlightedActivityCategories}
               onNew={handleCreateNewDiagram}
               onDiagramChanged={setDiagram}
               cards={editorToolCards}

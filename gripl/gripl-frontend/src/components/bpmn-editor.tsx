@@ -235,7 +235,7 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
             fill: rgba(239, 68, 68, 0.45) !important;
           }
           .highlight-gdpr-collection .djs-visual > :nth-child(1) {
-            fill: rgba(34, 197, 94, 0.45) !important;
+            fill: rgba(16, 185, 129, 0.45) !important;
           }
           .highlight-gdpr-storage .djs-visual > :nth-child(1) {
             fill: rgba(59, 130, 246, 0.45) !important;
@@ -244,7 +244,7 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
             fill: rgba(245, 158, 11, 0.45) !important;
           }
           .highlight-gdpr-transferal .djs-visual > :nth-child(1) {
-            fill: rgba(168, 85, 247, 0.45) !important;
+            fill: rgba(139, 92, 246, 0.45) !important;
           }
           .highlight-gdpr-modification .djs-visual > :nth-child(1) {
             fill: rgba(14, 165, 233, 0.45) !important;

@@ -4,7 +4,6 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/compo
 import {Button} from "@/components/ui/button";
 import {Download, FileText, RefreshCw} from "lucide-react";
 import {useState} from "react";
-import {AnalysisResponse} from "@/models/dto/AnalysisDto";
 import {Spinner} from "@/components/ui/spinner";
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
@@ -18,18 +17,11 @@ import {GenerateRandomInput} from "@/components/ui/input-generate-random";
 import {safeFloatOrNull} from "@/lib/evaluation-config-utils";
 import {Switch} from "@/components/ui/switch";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {useToast} from "@/components/ui/toast";
-import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 import {getAnalysisElements} from "@/models/dto/AnalysisDto";
 import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
+import {useAnalysisJob} from "@/components/providers/analysis-job-provider";
 
-interface AnalysisToolCardProps {
-    bpmnXml: string;
-    analysisResult: AnalysisResponse | null;
-    setAnalysisResult: (result: AnalysisResponse | null) => void;
-}
-
-export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisResult }: AnalysisToolCardProps) {
+export default function AnalysisToolCard() {
 
     const [llmBaseUrl, setLlmBaseUrl] = useState<string>("")
     const [modelName, setModelName] = useState<string>("")
@@ -39,14 +31,12 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
     const [topP, setTopP] = useState<number | null>(null)
     const [useRag, setUseRag] = useState<boolean>(false)
     const [searchMode, setSearchMode] = useState<string>("hybrid")
-    const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
-    const {apiEndpoint, backendEndpoint} = useAnalysisEndpoint()
+    const {apiEndpoint, backendEndpoint, isMulticlass} = useAnalysisEndpoint()
+    const {diagram, analysisResult, setAnalysisResult, isAnalyzing, startAnalysis} = useAnalysisJob()
     const analysisElements = getAnalysisElements(analysisResult)
 
-    const {showError} = useToast()
-
     function buildFormData(): FormData {
-        const xmlBlob = new Blob([bpmnXml], { type: "application/xml" });
+        const xmlBlob = new Blob([diagram], { type: "application/xml" });
         const formData = new FormData();
         formData.append("bpmnFile", xmlBlob, "diagram.bpmn");
         const llmProps = {
@@ -62,36 +52,15 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
     }
 
     function handleAnalyzeClick() {
-        setAnalysisResult(null);
-        setIsAnalyzing(true);
-
         const formData = buildFormData();
-        formData.append("useRag", String(useRag));
-        if (useRag) {
-            formData.append("ragMode", searchMode);
+        if (!isMulticlass) {
+            formData.append("useRag", String(useRag));
+            if (useRag) {
+                formData.append("ragMode", searchMode);
+            }
         }
 
-        fetch(apiEndpoint, {
-            method: "POST",
-            headers: {
-                Accept: "application/json"
-            },
-            body: formData
-        } as RequestInit).then(async response => {
-            if (!response.ok) {
-                const details = await extractErrorDetails(response);
-                throw new Error(details);
-            }
-            return response.json();
-        }).then((data: AnalysisResponse) => {
-            console.log("Analysis complete:", data);
-            setIsAnalyzing(false);
-            setAnalysisResult(data);
-        }).catch(error => {
-            console.error("Error during analysis:", error);
-            setIsAnalyzing(false);
-            showError("Failed to analyze the diagram", toErrorMessage(error));
-        })
+        startAnalysis(apiEndpoint, formData);
     }
 
     function handleDownloadResultClick() {
@@ -165,29 +134,33 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
                 <Input type="number" placeholder="1.0" value={topP ?? ""}
                        onChange={(e) => setTopP(safeFloatOrNull(e.target.value))}/>
             </div>
-            <div className="flex items-center space-x-2 pt-2">
-                <Switch 
-                    id="use-rag" 
-                    checked={useRag} 
-                    onCheckedChange={setUseRag} 
-                />
-                <Label htmlFor="use-rag" className="cursor-pointer">Use RAG for the Analysis</Label>
-            </div>
-            {useRag && (
-                <div className="space-y-1 pt-2">
-                    <Label>RAG Search Mode</Label>
-                    <Select value={searchMode} onValueChange={setSearchMode}>
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select search mode" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="naive">Naive</SelectItem>
-                            <SelectItem value="local">Local</SelectItem>
-                            <SelectItem value="global">Global</SelectItem>
-                            <SelectItem value="hybrid">Hybrid</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+            {!isMulticlass && (
+                <>
+                    <div className="flex items-center space-x-2 pt-2">
+                        <Switch
+                            id="use-rag"
+                            checked={useRag}
+                            onCheckedChange={setUseRag}
+                        />
+                        <Label htmlFor="use-rag" className="cursor-pointer">Use RAG for the Analysis</Label>
+                    </div>
+                    {useRag && (
+                        <div className="space-y-1 pt-2">
+                            <Label>RAG Search Mode</Label>
+                            <Select value={searchMode} onValueChange={setSearchMode}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select search mode" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="naive">Naive</SelectItem>
+                                    <SelectItem value="local">Local</SelectItem>
+                                    <SelectItem value="global">Global</SelectItem>
+                                    <SelectItem value="hybrid">Hybrid</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                </>
             )}
             <div className="py-2">
                 <Separator/>
@@ -198,7 +171,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
             <Button
                 onClick={handleAnalyzeClick}
                 variant="default"
-                disabled={isAnalyzing || !bpmnXml}
+                disabled={isAnalyzing || !diagram}
             >
                 <>{isAnalyzing ? <>
                     <Spinner className="text-white mr-2 h-4 w-4"/>

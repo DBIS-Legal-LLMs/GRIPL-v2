@@ -11,6 +11,8 @@ import AppSidebar from "@/components/navigation/app-sidebar";
 import AppBreadCrumbs from "@/components/navigation/app-breadcrumbs";
 import {ThemeToggle} from "@/components/ui/theme-toggle";
 import {AnalysisEndpointProvider} from "@/components/providers/analysis-endpoint-provider";
+import {AnalysisJobProvider} from "@/components/providers/analysis-job-provider";
+import {EvaluationJobProvider} from "@/components/providers/evaluation-job-provider";
 import {KgStatusBanner} from "@/components/providers/kg-status-banner";
 import {ToastProvider} from "@/components/ui/toast";
 
@@ -48,19 +50,23 @@ export default function RootLayout({
         <KgStatusBanner />
         <ToastProvider>
           <AnalysisEndpointProvider>
-            <SidebarProvider className="h-full w-full">
-              <AppSidebar />
-              <SidebarInset className="h-full w-full">
-                <header className="h-16 flex-shrink-0 px-2 flex flex-row items-center justify-between space-x-4 bg-sidebar sticky top-0 z-10">
-                  <div className="flex flex-row space-x-4 items-center">
-                    <SidebarTrigger/>
-                    <AppBreadCrumbs />
-                  </div>
-                  <ThemeToggle />
-                </header>
-                {children}
-              </SidebarInset>
-            </SidebarProvider>
+            <AnalysisJobProvider>
+              <EvaluationJobProvider>
+                <SidebarProvider className="h-full w-full">
+                  <AppSidebar />
+                  <SidebarInset className="h-full w-full">
+                    <header className="h-16 flex-shrink-0 px-2 flex flex-row items-center justify-between space-x-4 bg-sidebar sticky top-0 z-10">
+                      <div className="flex flex-row space-x-4 items-center">
+                        <SidebarTrigger/>
+                        <AppBreadCrumbs />
+                      </div>
+                      <ThemeToggle />
+                    </header>
+                    {children}
+                  </SidebarInset>
+                </SidebarProvider>
+              </EvaluationJobProvider>
+            </AnalysisJobProvider>
           </AnalysisEndpointProvider>
         </ToastProvider>
       </ThemeProvider>
