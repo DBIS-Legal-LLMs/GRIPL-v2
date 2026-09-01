@@ -5,6 +5,7 @@ import de.mertendieckmann.griplbackend.ai.SharedChatMemoryProvider
 import de.mertendieckmann.griplbackend.application.BpmnExtractor
 import de.mertendieckmann.griplbackend.application.SafetyNet
 import de.mertendieckmann.griplbackend.adapter.rag.RagApiClient
+import de.mertendieckmann.griplbackend.config.RagApiProperties
 import de.mertendieckmann.griplbackend.model.BpmnElement
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.RagDocument
@@ -22,7 +23,8 @@ import java.util.*
 
 class PromptBpmnAnalyzer(
     private val llm: ChatModel,
-    private val ragApiClient: RagApiClient
+    private val ragApiClient: RagApiClient,
+    private val ragApiProperties: RagApiProperties
 ) : BpmnAnalyzer {
 
     private val log = KotlinLogging.logger { }
@@ -37,7 +39,9 @@ class PromptBpmnAnalyzer(
         if (useRag) {
             // RAG-augmented path
             val bpmnAnalysisAiServiceWithRag = PromptBpmnAnalysisAiServiceFactory.create(llm, memoryProvider, activitiesOnly)
-            val ragContextMap = fetchRagContext(bpmnElements, ragMode, activitiesOnly = activitiesOnly)
+            val ragContextMap = fetchRagContext(
+                bpmnElements, ragMode, maxConcurrency = ragApiProperties.maxConcurrency, activitiesOnly = activitiesOnly
+            )
 
             val pool = buildDedupedPool(ragContextMap)
 
@@ -89,54 +93,74 @@ class PromptBpmnAnalyzer(
         val semaphore = Semaphore(maxConcurrency)
 
         val result = kotlinx.coroutines.runBlocking {
-            bpmnElements
-                .map { element ->
+            // Build the query text per classifiable element first (cheap, no I/O). Only
+            // textAnnotation is excluded, as it is never classified; in activitiesOnly
+            // mode, only activities are classified.
+            val elementQueries: List<Pair<String, String>> = bpmnElements.mapNotNull { element ->
+                if (element.type.equals("textAnnotation", ignoreCase = true)) return@mapNotNull null
+                if (activitiesOnly && !element.isActivity) return@mapNotNull null
+
+                val flowLabelText = (element.outgoingFlowLabels + element.incomingFlowLabels +
+                        element.outgoingMessageFlowLabels + element.incomingMessageFlowLabels)
+                    .map { it.label }
+                    .filterNot { it.matches(Regex("""(?i)\s*(yes|no|ja|nein|ok|true|false)\s*""")) }
+                    .distinct()
+                    .joinToString(" - ")
+
+                val queryText = sequenceOf(
+                    element.name, element.documentation, flowLabelText, element.poolName, element.laneName
+                )
+                    .filterNotNull()
+                    .filter { it.isNotBlank() }
+                    .filter { !it.matches(Regex("""[\d/.\-]+""")) }
+                    .joinToString(" - ")
+
+                if (queryText.isNotBlank()) element.id to queryText else null
+            }
+
+            // Elements with the same (normalized) query text — e.g. repeated activity
+            // names/labels across a process — would otherwise fire one RAG query each
+            // for an identical retrieval. Group them and issue a single query per
+            // distinct text, then fan the shared result back out to every element.
+            val elementsByNormalizedQuery: Map<String, List<Pair<String, String>>> =
+                elementQueries.groupBy { normalizeKey(it.second) }
+
+            log.info {
+                "${elementQueries.size} elements need RAG context, " +
+                    "${elementsByNormalizedQuery.size} distinct queries after dedup"
+            }
+
+            val contextByNormalizedQuery: Map<String, Map<String, Any>?> = elementsByNormalizedQuery.entries
+                .map { (normalized, group) ->
                     async {
-                        // Retrieve GDPR context for every classifiable element (activities,
-                        // events, gateways, data objects/stores) — not just activities. Only
-                        // textAnnotation is excluded, as it is never classified.
-                        // In activitiesOnly mode, only activities are classified
-                        if (element.type.equals("textAnnotation", ignoreCase = true)) return@async null
-                        if (activitiesOnly && !element.isActivity) return@async null
-
-                        val flowLabelText = (element.outgoingFlowLabels + element.incomingFlowLabels +
-                                element.outgoingMessageFlowLabels + element.incomingMessageFlowLabels)
-                            .map { it.label }
-                            .filterNot { it.matches(Regex("""(?i)\s*(yes|no|ja|nein|ok|true|false)\s*""")) }
-                            .distinct()
-                            .joinToString(" - ")
-
-                        val queryText = sequenceOf(
-                            element.name, element.documentation, flowLabelText, element.poolName, element.laneName
-                        )
-                            .filterNotNull()
-                            .filter { it.isNotBlank() }
-                            .filter { !it.matches(Regex("""[\d/.\-]+""")) }
-                            .joinToString(" - ")
-
-                        if (queryText.isNotBlank()) {
-                            try {
-                                semaphore.withPermit {
-                                    val response = ragApiClient.queryRag(queryText, ragMode)
-                                    val parsed = response.response
-                                    log.debug {
-                                        val entities = parsed["entities"] as? List<*> ?: emptyList<Any>()
-                                        val rels = parsed["relationships"] as? List<*> ?: emptyList<Any>()
-                                        val docs = parsed["documents"] as? List<*> ?: emptyList<Any>()
-                                        "RAG for ${element.id} (${element.name}): " +
-                                            "${entities.size} entities / ${rels.size} relationships / ${docs.size} documents"
-                                    }
-                                    element.id to parsed
+                        val queryText = group.first().second
+                        normalized to try {
+                            semaphore.withPermit {
+                                val response = ragApiClient.queryRag(queryText, ragMode)
+                                val parsed = response.response
+                                log.debug {
+                                    val entities = parsed["entities"] as? List<*> ?: emptyList<Any>()
+                                    val rels = parsed["relationships"] as? List<*> ?: emptyList<Any>()
+                                    val docs = parsed["documents"] as? List<*> ?: emptyList<Any>()
+                                    "RAG for \"$queryText\" (${group.size} element(s)): " +
+                                        "${entities.size} entities / ${rels.size} relationships / ${docs.size} documents"
                                 }
-                            } catch (e: Exception) {
-                                log.error(e) { "RAG query failed for element ${element.id}" }
-                                null
+                                parsed
                             }
-                        } else null
+                        } catch (e: Exception) {
+                            log.error(e) { "RAG query failed for text: $queryText" }
+                            null
+                        }
                     }
                 }
                 .awaitAll()
-                .filterNotNull()
+                .toMap()
+
+            elementsByNormalizedQuery.entries
+                .flatMap { (normalized, group) ->
+                    val parsed = contextByNormalizedQuery[normalized] ?: return@flatMap emptyList()
+                    group.map { (elementId, _) -> elementId to parsed }
+                }
                 .toMap()
         }
 

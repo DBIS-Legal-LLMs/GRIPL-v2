@@ -19,4 +19,13 @@ class RagApiProperties {
      */
     val baseUrl: String
         get() = url.trimEnd('/').removeSuffix("/query").removeSuffix("/api")
+
+    /**
+     * Max number of concurrent /api/query calls fired per analysis. The RAG
+     * service currently only calls out to hosted LLM/embedding APIs (no local
+     * CPU models), so this is I/O-bound and can run higher than a CPU-bound
+     * default would allow — tune down if the upstream LLM/embedding provider
+     * starts rate-limiting.
+     */
+    var maxConcurrency: Int = 16
 }

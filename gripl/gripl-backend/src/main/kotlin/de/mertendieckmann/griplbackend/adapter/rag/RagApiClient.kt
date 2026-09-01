@@ -9,6 +9,8 @@ import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import java.time.Duration
+import java.util.Collections
+import java.util.LinkedHashMap
 
 @Service
 class RagApiClient(
@@ -25,12 +27,33 @@ class RagApiClient(
         .build()
 
     /**
-     * Calls the RAG service and returns a typed response.
+     * Bounded, process-lifetime cache of RAG responses keyed by normalized query text +
+     * mode. Element query texts (activity/lane/label combinations) frequently repeat
+     * across elements within one analysis and across repeated/similar analyses, and a
+     * cache hit skips a full LightRAG retrieval (embedding + graph traversal + keyword
+     * extraction) entirely. LRU-evicted via access-order LinkedHashMap; synchronized
+     * since queryRag is called concurrently from multiple coroutines.
+     */
+    private val responseCache: MutableMap<String, RagResponseWrapper> =
+        Collections.synchronizedMap(object : LinkedHashMap<String, RagResponseWrapper>(16, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, RagResponseWrapper>): Boolean =
+                size > MAX_CACHE_ENTRIES
+        })
+
+    /**
+     * Calls the RAG service and returns a typed response, reusing a cached response for
+     * an identical (mode, normalized query text) pair when available.
      */
     suspend fun queryRag(queryText: String, ragMode: RagMode): RagResponseWrapper {
+        val cacheKey = cacheKey(queryText, ragMode)
+        responseCache[cacheKey]?.let {
+            log.debug { "RAG cache hit for mode=$ragMode" }
+            return it
+        }
+
         log.info { "Querying RAG service with mode=$ragMode" }
 
-        return try {
+        val response = try {
             webClient.post()
                 .uri("/api/query")
                 .bodyValue(RagRequest(query = queryText, mode = ragMode))
@@ -42,5 +65,15 @@ class RagApiClient(
             log.error(e) { "RAG service call failed for query: $queryText" }
             throw RuntimeException("Failed to query RAG service", e)
         }
+
+        responseCache[cacheKey] = response
+        return response
+    }
+
+    private fun cacheKey(queryText: String, ragMode: RagMode): String =
+        "$ragMode::${queryText.trim().lowercase()}"
+
+    companion object {
+        private const val MAX_CACHE_ENTRIES = 500
     }
 }

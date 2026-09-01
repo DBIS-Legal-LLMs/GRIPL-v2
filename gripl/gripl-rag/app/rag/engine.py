@@ -214,6 +214,22 @@ async def create_rag_instance() -> LightRAG:
         graph_storage="Neo4JStorage",
         vector_storage="NanoVectorDBStorage",
         kv_storage="JsonKVStorage",
+        # LLM response cache defaults to on in LightRAG, but is made explicit here.
+        # It's keyed on the exact prompt (incl. the query text), so it only helps
+        # repeat/identical element queries. embedding_cache_config defaults to
+        # *disabled* upstream — enabling it lets LightRAG skip re-embedding (and
+        # reuse the retrieval) for queries whose embedding is highly similar to a
+        # previously cached one, e.g. near-duplicate BPMN element names/labels
+        # across elements and across analysis runs. Both caches persist to
+        # rag_working_dir (JsonKVStorage), which is a mounted volume, so they
+        # survive container restarts.
+        enable_llm_cache=True,
+        enable_llm_cache_for_entity_extract=True,
+        embedding_cache_config={
+            "enabled": True,
+            "similarity_threshold": 0.95,
+            "use_llm_check": False,
+        },
     )
     
     await rag.initialize_storages()
