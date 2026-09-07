@@ -2,6 +2,7 @@
 
 import React, {createContext, ReactNode, useContext, useEffect, useMemo, useState} from "react";
 import {AnalysisEndpoint} from "@/models/evaluation/Config";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 type AnalysisEndpointMode = "binary" | "multiclass";
 
@@ -62,7 +63,7 @@ export function AnalysisEndpointProvider({children}: { children: ReactNode }) {
     };
 
     useEffect(() => {
-        fetch("/api/gdpr/analysis/endpoints")
+        authenticatedFetch("/api/gdpr/analysis/endpoints")
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error("Failed to load analysis endpoints");

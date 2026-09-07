@@ -3,6 +3,7 @@
 import {JSX, ReactNode, useEffect, useState} from "react";
 import Image from "next/image";
 import {useTheme} from "next-themes";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 interface UseLoadPreviewImageProps {
     testCaseId: number
@@ -31,7 +32,7 @@ export default function useLoadPreviewImage({testCaseId, correctActivityIds, fal
                     // The salt is used to prevent caching issues with the preview image
                     `&salt=${Math.floor(Math.random() * 99999)}`
 
-                const response = await fetch(relativeImageUrl)
+                const response = await authenticatedFetch(relativeImageUrl)
 
                 if (!response.ok) {
                     throw new Error(`Failed to fetch preview for url "${relativeImageUrl}": ${response.statusText}`)

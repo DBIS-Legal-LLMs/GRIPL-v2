@@ -10,6 +10,7 @@ import {
     TestCaseReport
 } from "@/models/dto/ReportData";
 import {MultiEvaluationRequest} from "@/models/dto/MultiEvaluationRequest";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 type ModelReportEnvelope = {
     modelLabel: string;
@@ -140,7 +141,7 @@ export function EvaluationJobProvider({children}: { children: ReactNode }) {
         if (!evaluationRequest) return;
         resetState();
         console.log("Sending request", evaluationRequest);
-        const res = await fetch(`/api/gdpr/evaluation/stream`, {
+        const res = await authenticatedFetch(`/api/gdpr/evaluation/stream`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(evaluationRequest)

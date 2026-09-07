@@ -10,6 +10,11 @@ services:
     restart: unless-stopped
     environment:
       - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
+      # Where the /auth/* rewrite proxies login/register to (see next.config.ts).
+      - AUTH_SERVICE_INTERNAL_URL=${AUTH_SERVICE_INTERNAL_URL:-http://host.docker.internal:8100}
+    extra_hosts:
+      # Reach auth-service's separate compose stack on the host.
+      - "host.docker.internal:host-gateway"
     networks:
       - app
 
@@ -29,6 +34,11 @@ services:
       - PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
       - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
       - RAG_API_URL=${RAG_API_URL:-http://gripl-rag:8081}
+      # auth-service JWKS endpoint — gripl-backend verifies RS256 JWTs against it.
+      - AUTH_SERVICE_JWKS_URI=${AUTH_SERVICE_JWKS_URI:-http://host.docker.internal:8100/.well-known/jwks.json}
+    extra_hosts:
+      # Reach auth-service's separate compose stack on the host.
+      - "host.docker.internal:host-gateway"
     volumes:
       - playwright-browsers:/root/.cache/ms-playwright
     networks:
@@ -76,6 +86,11 @@ services:
       - gripl-postgres-data:/var/lib/postgresql/data
     networks:
       - app
+
+  # auth (login/register/JWT issuance) is provided by auth-service, which runs
+  # as its own docker-compose stack (see the auth-service repo) — it is not
+  # bundled here. gripl-backend verifies its JWTs via AUTH_SERVICE_JWKS_URI and
+  # gripl-frontend proxies /auth/* to it via AUTH_SERVICE_INTERNAL_URL.
 
 volumes:
   playwright-browsers:

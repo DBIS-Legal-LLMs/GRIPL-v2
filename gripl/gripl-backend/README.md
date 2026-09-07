@@ -10,6 +10,21 @@ Please ensure that you have the following installed and configured on your syste
 
 If needed change the database connection settings in `src/main/resources/application.properties` to match your local Postgres configuration.
 
+### Authentication
+
+The backend does not issue tokens. It verifies incoming RS256 JWTs against
+[`auth-service`](https://github.com/DBIS-Legal-LLMs/auth-service)'s JWKS
+(`JwtAuthenticationWebFilter` → `JwksProvider`). Point it at a running
+`auth-service` with:
+
+```
+app.jwt.jwks-uri = ${AUTH_SERVICE_JWKS_URI:http://localhost:8100/.well-known/jwks.json}
+```
+
+The default suits `auth-service` running locally on `:8100`. In Docker, set
+`AUTH_SERVICE_JWKS_URI=http://host.docker.internal:8100/.well-known/jwks.json`.
+See the repo root README's *Authentication* section for the full picture.
+
 ## Running Locally with Maven
 
 You can run the backend locally using **Maven**. Make sure Maven is installed on your system.

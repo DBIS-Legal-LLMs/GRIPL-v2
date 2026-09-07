@@ -55,6 +55,11 @@ services:
     labels:
       - com.centurylinklabs.watchtower.enable=true
 
+  # auth-service (login/register/JWT issuance) is deployed separately, as its
+  # own compose stack behind the same traefik. gripl-backend reaches its JWKS
+  # via AUTH_SERVICE_JWKS_URI and gripl-frontend proxies /auth/* to it via
+  # AUTH_SERVICE_INTERNAL_URL — both set in .env.prod.
+
 networks:
   traefik:
     external: true
