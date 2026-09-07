@@ -116,7 +116,7 @@ class HttpEvaluator(
                         multiclassResponse.classifiedElements.map {
                             ExpectedValue(
                                 value = it.id,
-                                reason = it.reason,
+                                explanation = it.reason,
                                 classification = it.classification
                             )
                         }
@@ -165,7 +165,7 @@ class HttpEvaluator(
                             analysisResponse.criticalElements.map {
                                 ExpectedValue(
                                     value = it.id,
-                                    reason = it.reason
+                                    explanation = it.reason
                                 )
                             },
                         amountOfRetries =

@@ -109,7 +109,7 @@ data class TestCaseReport(
             |<details>
             |<summary><h3>Reasoning of the LLM</h3></summary>
             |
-            |${result.joinToString("\n") { res -> "- **${actualNamesWithIds.find { it.contains(res.value) } ?: res.value}**: ${res.reason ?: "No reason provided"}" }}
+            |${result.joinToString("\n") { res -> "- **${actualNamesWithIds.find { it.contains(res.value) } ?: res.value}**: ${res.explanation ?: "No reason provided"}" }}
             |
             |</details>
         """.trimMargin()

@@ -76,7 +76,7 @@ export interface TestCaseReport {
     expectedNamesWithIds: string[],
     actualNamesWithIds: string[];
     isSuccessful: boolean;
-    result: { value: string; reason?: string; classification?: GdprCategory[] }[];
+    result: { value: string; explanation?: string; classification?: GdprCategory[] }[];
     amountOfRetries: number | null;
     ragMetrics?: TestCaseRagMetrics | null;
     ragPromptContext?: string[] | null;
