@@ -13,7 +13,7 @@ export interface LabelingEditorLabelCardProps {
     criticalActivities: ExpectedValues[];
     allowMulticlass: boolean;
     /** null removes the label; an empty array means "critical, no class assigned yet" (binary / legacy label) */
-    onLabelingChange: (elementId: string, classification: GdprCategory[] | null, reason?: string) => void;
+    onLabelingChange: (elementId: string, classification: GdprCategory[] | null, explanation?: string) => void;
 }
 
 export default function LabelingEditorLabelCard({ className, elementName, elementId, criticalActivities, allowMulticlass, onLabelingChange }: LabelingEditorLabelCardProps) {
@@ -30,12 +30,12 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
 
     const existing = criticalActivities.find(c => c.value === elementId);
     const [selectedCategories, setSelectedCategories] = useState<GdprCategory[]>(existing?.classification ?? []);
-    const [reason, setReason] = useState<string>(existing?.reason ?? "");
+    const [explanation, setExplanation] = useState<string>(existing?.explanation ?? "");
 
     useEffect(() => {
         const found = criticalActivities.find(c => c.value === elementId);
         setSelectedCategories(found?.classification ?? []);
-        setReason(found?.reason ?? "");
+        setExplanation(found?.explanation ?? "");
     }, [elementId, criticalActivities]);
 
     // An element is critical as soon as it has a label, with or without classes
@@ -47,16 +47,16 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
             : [...selectedCategories, cat];
         setSelectedCategories(next);
         // Deselecting the last class removes the label
-        onLabelingChange(elementId, next.length > 0 ? next : null, reason);
+        onLabelingChange(elementId, next.length > 0 ? next : null, explanation);
     }
 
     function toggleBinaryCritical() {
         // Binary labels carry no class; existing classes are kept until the label is removed
-        onLabelingChange(elementId, isCritical ? null : selectedCategories, reason);
+        onLabelingChange(elementId, isCritical ? null : selectedCategories, explanation);
     }
 
-    function handleReasonChange(value: string) {
-        setReason(value);
+    function handleExplanationChange(value: string) {
+        setExplanation(value);
         if (isCritical) {
             onLabelingChange(elementId, selectedCategories, value);
         }
@@ -124,14 +124,14 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
                 </div>
             )}</>
             <div className="flex flex-col space-y-1">
-                <Label htmlFor="reason" className="text-xs">Notes (optional)</Label>
+                <Label htmlFor="explanation" className="text-xs">Notes (optional)</Label>
                 <Textarea
-                    id="reason"
+                    id="explanation"
                     className="p-2 border rounded text-xs"
                     placeholder="Additional notes..."
                     rows={3}
-                    value={reason}
-                    onChange={(e) => handleReasonChange(e.target.value)}
+                    value={explanation}
+                    onChange={(e) => handleExplanationChange(e.target.value)}
                 />
             </div>
         </CardContent>
