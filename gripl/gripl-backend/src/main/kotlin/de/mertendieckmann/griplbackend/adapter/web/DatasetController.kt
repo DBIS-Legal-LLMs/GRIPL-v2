@@ -40,6 +40,27 @@ class DatasetController(
     }
 
     @Operation(
+        summary = "Update a Dataset",
+        description = "Updates the metadata (name and description) of an existing dataset and returns the updated dataset."
+    )
+    @PostMapping("/{datasetId}", produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun updateDataset(
+        @PathVariable("datasetId") datasetId: Long,
+        @RequestBody request: CreateDatasetRequest
+    ): ResponseEntity<Dataset> {
+        if (datasetRepository.getDatasetById(datasetId) == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        }
+        val affectedRows = datasetRepository.updateDataset(datasetId, request.name, request.description)
+        return if (affectedRows > 0) {
+            val updatedDataset = datasetRepository.getDatasetById(datasetId)
+            ResponseEntity.ok(updatedDataset)
+        } else {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
+        }
+    }
+
+    @Operation(
         summary = "Delete Dataset",
         description = "Deletes an dataset and set all associated to be not associated anymore."
     )

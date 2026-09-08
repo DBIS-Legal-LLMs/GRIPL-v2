@@ -3,6 +3,7 @@
 import {Card} from "@/components/ui/card";
 import Link from "next/link";
 import DeleteTestCaseButton from "@/components/labeling/delete-test-case-button";
+import EditTestcaseButton from "@/components/labeling/edit-testcase-button";
 import {EvaluationDataMeta} from "@/models/dto/EvaluationData";
 import {Skeleton} from "@/components/ui/skeleton";
 import useLoadPreviewImage from "@/hooks/use-load-preview-image";
@@ -22,12 +23,13 @@ export default function TestCaseCard({ metadata } : TestCaseCardProps) {
         <Card className="flex-1 relative hover:bg-card/40">
             <Link href={`/labeling/${metadata.id}`}>
                 <div className="p-4">
-                    <h2 className="text-lg font-bold mb-6 mr-12">{metadata.name || "Test Case"} ({metadata.id})</h2>
+                    <h2 className="text-lg font-bold mb-6 mr-24">{metadata.name || "Test Case"}</h2>
                     { isLoading && !previewImage && <Skeleton className="h-28 w-full" /> }
                     { previewImage }
                 </div>
             </Link>
-            <div className="absolute right-4 top-4">
+            <div className="absolute right-4 top-4 flex flex-row gap-2">
+                <EditTestcaseButton testcase={metadata} />
                 <DeleteTestCaseButton testCaseId={metadata.id} testCaseName={metadata.name}/>
             </div>
         </Card>

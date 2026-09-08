@@ -90,6 +90,30 @@ class EvaluationDataController(
     }
 
     @Operation(
+        summary = "Update Testcase name by Id",
+        description = "Updates only the name of an existing testcase entry."
+    )
+    @PostMapping(
+        "/{id}/name",
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun updateBpmnDatasetName(
+        @PathVariable("id") id: Long,
+        @RequestBody request: UpdateTestcaseNameRequest
+    ): ResponseEntity<EvaluationDataMeta> {
+        if (evaluationDataRepository.getEvaluationDataById(id) == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        }
+        val affectedRows = evaluationDataRepository.updateEvaluationDataName(id, request.name)
+        return if (affectedRows > 0) {
+            val updated = evaluationDataRepository.getEvaluationDataById(id)
+            ResponseEntity.ok(EvaluationDataMeta(updated!!.id, updated.name, updated.datasetId))
+        } else {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
+        }
+    }
+
+    @Operation(
         summary = "Update Testcase by Id",
         description = "Updates an existing dataset entry with the provided data."
     )

@@ -4,7 +4,7 @@ import {usePathname} from "next/navigation";
 import {generateBreadcrumbs} from "@/lib/breadcrumbs";
 import {Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbSeparator} from "@/components/ui/breadcrumb";
 import Link from "next/link";
-import {useEffect, useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Crumb} from "@/models/Crumb";
 import {EvaluationData} from "@/models/dto/EvaluationData";
 
@@ -53,14 +53,14 @@ export default function AppBreadCrumbs() {
 
     return <Breadcrumb>
         <BreadcrumbList>
-            <>
-            {crumbs.map((crumb, index) => <>
-                <BreadcrumbItem key={index}>
-                    <Link href={crumb.href}>{crumb.label}</Link>
-                </BreadcrumbItem>
-                { index < crumbs.length - 1 && <BreadcrumbSeparator /> }
-            </> )}
-            </>
+            {crumbs.map((crumb, index) => (
+                <React.Fragment key={index}>
+                    <BreadcrumbItem>
+                        <Link href={crumb.href}>{crumb.label}</Link>
+                    </BreadcrumbItem>
+                    {index < crumbs.length - 1 && <BreadcrumbSeparator />}
+                </React.Fragment>
+            ))}
         </BreadcrumbList>
     </Breadcrumb>
 }

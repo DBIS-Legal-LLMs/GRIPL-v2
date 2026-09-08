@@ -29,9 +29,8 @@ export default function DeleteDatasetButton({ dataset }: DeleteDatasetButtonProp
     }
 
     return <Dialog open={showDeleteDatasetDialog} onOpenChange={setShowDeleteDatasetDialog}>
-        <Button variant="destructive" className="h-full" onClick={() => setShowDeleteDatasetDialog(true)}>
+        <Button variant="destructive" className="h-full w-20 aspect-square p-0" onClick={() => setShowDeleteDatasetDialog(true)}>
             <Trash2 />
-            <span className="pl-2 text-center">Delete Dataset</span>
         </Button>
         <DialogContent>
             <DialogHeader>
