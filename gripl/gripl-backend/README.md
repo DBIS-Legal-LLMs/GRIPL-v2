@@ -25,6 +25,25 @@ The default suits `auth-service` running locally on `:8100`. In Docker, set
 `AUTH_SERVICE_JWKS_URI=http://host.docker.internal:8100/.well-known/jwks.json`.
 See the repo root README's *Authentication* section for the full picture.
 
+### Dataset ownership
+
+Datasets are private to the `auth-service` user (JWT `sub`) that created them
+(GRIPL-v2#33). `POST /dataset` stamps the caller as `owner_user_id`; `GET
+/dataset` and `DELETE /dataset/{id}` only see the caller's own rows. Test cases
+(`/dataset/testcase/**`) inherit this through their parent `dataset_id` — a test
+case must live in a dataset you own, and accessing anyone else's returns `404`.
+
+Rows created before this feature (migration `V5`) have `owner_user_id = NULL`
+and are owned by nobody, so they disappear from these endpoints until an owner
+is assigned by hand:
+
+```sql
+UPDATE dataset SET owner_user_id = '<your auth-service user id>' WHERE owner_user_id IS NULL;
+```
+
+The evaluation-run code paths still read all datasets regardless of owner;
+role-based gating for those is GRIPL-v2#40.
+
 ## Running Locally with Maven
 
 You can run the backend locally using **Maven**. Make sure Maven is installed on your system.
