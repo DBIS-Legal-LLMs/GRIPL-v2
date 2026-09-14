@@ -28,8 +28,10 @@ services:
     container_name: gripl-backend
     restart: unless-stopped
     depends_on:
-      - gripl-postgres
-      - gripl-neo4j
+      gripl-postgres:
+        condition: service_healthy
+      gripl-neo4j:
+        condition: service_started
     env_file:
       - .env.local
     environment:
@@ -59,7 +61,8 @@ services:
     container_name: gripl-rag
     restart: unless-stopped
     depends_on:
-      - gripl-neo4j
+      gripl-neo4j:
+        condition: service_healthy
     env_file:
       - .env.local
     environment:
@@ -88,6 +91,15 @@ services:
     ports:
       - "7474:7474"
       - "7687:7687"
+    healthcheck:
+      # cypher-shell needs a real, authenticated connection — a much more
+      # reliable readiness signal than "the container process is running"
+      # (Neo4j can take a while past that point on first start).
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p gripl-rag-2026 'RETURN 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
 
   gripl-postgres:
     image: postgres:15
@@ -103,6 +115,16 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=gripl_db
+    healthcheck:
+      # depends_on's plain form only waits for the container to *start*, not
+      # for Postgres to actually accept connections — on a fresh volume,
+      # gripl-backend's Flyway migration can (and does, intermittently) lose
+      # that race and crash with "Connection refused". This makes
+      # gripl-backend's depends_on actually wait for readiness.
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
 
   # auth-service is not bundled here — run it from its own repo's
   # docker-compose (it listens on :8100). gripl-backend verifies its JWTs via
