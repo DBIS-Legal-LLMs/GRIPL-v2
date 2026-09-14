@@ -9,12 +9,22 @@ import {
     SidebarMenuItem
 } from "@/components/ui/sidebar";
 import Link from "next/link";
-import {ChartBarDecreasing, Tag, Workflow} from "lucide-react";
+import {ChartBarDecreasing, LogIn, LogOut, Tag, User, Workflow} from "lucide-react";
 import React, {ReactNode} from "react";
 import Image from "next/image";
 import {Label} from "@/components/ui/label";
 import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {useAuth} from "@/context/auth-context";
+import {isPrivilegedGriplRole} from "@/lib/gripl-role";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Page {
     href: string;
@@ -30,22 +40,31 @@ export default function AppSidebar() {
         backendEndpoint,
     } = useAnalysisEndpoint();
 
+    const { logout, token, username, griplRole } = useAuth();
+
+    // GRIPL-v2#40: Labeling/Evaluation are admin/researcher only — dpo and
+    // end-user only see Sandbox. Real enforcement is server-side
+    // (gripl-backend's requireGriplRole); this just keeps the nav honest.
+    const canManageDatasets = isPrivilegedGriplRole(griplRole);
+
     const pages = [
         {
             href: "/",
             label: "Sandbox",
             icon: <Workflow />
         },
-        {
-            href: "/labeling",
-            label: "Labeling",
-            icon: <Tag />
-        },
-        {
-            href: "/evaluation",
-            label: "Evaluation",
-            icon: <ChartBarDecreasing />
-        }
+        ...(canManageDatasets ? [
+            {
+                href: "/labeling",
+                label: "Labeling",
+                icon: <Tag />
+            },
+            {
+                href: "/evaluation",
+                label: "Evaluation",
+                icon: <ChartBarDecreasing />
+            }
+        ] : [])
     ] as Page[]
 
     return <Sidebar>
@@ -66,7 +85,7 @@ export default function AppSidebar() {
                 })}
             </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="px-3 pt-1 pb-12 border-t">
+        <SidebarFooter className="px-3 pt-1 pb-6 border-t space-y-3">
             <div className="space-y-2">
                 <div className="space-y-1">
                     <Label className="text-xs font-medium">Global Analysis Endpoint</Label>
@@ -87,6 +106,39 @@ export default function AppSidebar() {
                 </div>
                 <p className="text-[11px] text-muted-foreground break-all">{backendEndpoint}</p>
             </div>
+
+            {/* Auth row — independent of the analysis-endpoint controls above.
+                Logged out: a link to log in / register. Logged in: the username,
+                opening a menu with Log out. */}
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    {token ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <SidebarMenuButton>
+                                    <User />
+                                    <p className="truncate">{username ?? "Account"}</p>
+                                </SidebarMenuButton>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent side="top" align="start" className="w-[--radix-popper-anchor-width]">
+                                <DropdownMenuLabel className="truncate">{username ?? "Signed in"}</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={logout}>
+                                    <LogOut />
+                                    Log out
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : (
+                        <SidebarMenuButton asChild>
+                            <Link href="/login">
+                                <LogIn />
+                                <p>Log in / Register</p>
+                            </Link>
+                        </SidebarMenuButton>
+                    )}
+                </SidebarMenuItem>
+            </SidebarMenu>
         </SidebarFooter>
     </Sidebar>
 }
