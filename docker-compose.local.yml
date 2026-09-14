@@ -16,7 +16,9 @@ services:
     networks:
       - app
     ports:
-      - "3000:3000"
+      # Host-side only — 3000 is taken by RAGulate's frontend on this
+      # machine. The container still listens on its normal 3000 internally.
+      - "3001:3000"
 
   gripl-backend:
     build:
@@ -31,9 +33,9 @@ services:
     env_file:
       - .env.local
     environment:
-      - FRONTEND_BASE_URL=http://localhost:3000
+      - FRONTEND_BASE_URL=http://localhost:3001
       - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/gripldb
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/gripl_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
       - RAG_API_URL=http://gripl-rag:8081
@@ -45,7 +47,9 @@ services:
     networks:
       - app
     ports:
-      - "8000:8080"
+      # Host-side only — 8000 is taken by RAGulate's backend on this
+      # machine. The container still listens on its normal 8080 internally.
+      - "8001:8080"
 
   gripl-rag:
     build:
@@ -98,7 +102,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=gripldb
+      - POSTGRES_DB=gripl_db
 
   # auth-service is not bundled here — run it from its own repo's
   # docker-compose (it listens on :8100). gripl-backend verifies its JWTs via

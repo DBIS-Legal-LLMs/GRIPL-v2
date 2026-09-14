@@ -40,11 +40,11 @@ Starts:
 
 | Service | URL |
 |---|---|
-| Frontend | http://localhost:3000 |
-| Backend (Swagger UI) | http://localhost:8000/swagger-ui |
+| Frontend | http://localhost:3001 (3000 is reserved for RAGulate's frontend on this machine) |
+| Backend (Swagger UI) | http://localhost:8001/swagger-ui (8000 is reserved for RAGulate's backend) |
 | RAG service | http://localhost:8081 |
 | Neo4j browser | http://localhost:7474 |
-| Postgres | `localhost:5432` |
+| Postgres | `localhost:5432`, database `gripl_db` |
 
 Login/register go through `auth-service` — it must already be running (its own `docker compose up`).
 
@@ -81,7 +81,7 @@ Everything above already done once (`.env.local` filled in, images built) — ju
 docker compose -f docker-compose.local.yml up -d
 ```
 
-Health checks: backend Swagger at `http://localhost:8000/swagger-ui`, frontend at `http://localhost:3000`, RAG service status via the frontend or `GET /gdpr/rag/status` on the backend.
+Health checks: backend Swagger at `http://localhost:8001/swagger-ui`, frontend at `http://localhost:3001`, RAG service status via the frontend or `GET /gdpr/rag/status` on the backend.
 
 ## Features
 
@@ -219,7 +219,7 @@ docker logs -f auth-service      # separate compose project
 docker exec -it gripl-backend bash
 
 # Open a Postgres shell
-docker exec -it gripl-postgres psql -U postgres -d gripldb
+docker exec -it gripl-postgres psql -U postgres -d gripl_db
 ```
 
 ## TODOs
