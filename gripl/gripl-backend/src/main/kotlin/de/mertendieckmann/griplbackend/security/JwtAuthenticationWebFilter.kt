@@ -16,6 +16,17 @@ import reactor.core.scheduler.Schedulers
 /** Key under which the authenticated user's id (JWT `sub`) is stored on the exchange. */
 const val AUTHENTICATED_USER_ID_ATTRIBUTE = "userId"
 
+/**
+ * Key under which the caller's resolved GRIPL role (JWT `app_roles.gripl`,
+ * e.g. `"admin"`, `"researcher"`, `"dpo"`, `"end-user"`) is stored on the
+ * exchange, when present. auth-service embeds a fully-resolved role for every
+ * app it knows about (GRIPL-v2#5/#6/#7 on that side) — absent means either the
+ * token predates GRIPL being registered there, or auth-service doesn't have
+ * GRIPL registered at all. See [de.mertendieckmann.griplbackend.security.requireGriplRole]
+ * (GRIPL-v2#40).
+ */
+const val AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE = "griplRole"
+
 private val PUBLIC_PATH_PREFIXES = listOf(
     "/actuator/health",
     "/swagger-ui",
@@ -50,10 +61,11 @@ class JwtAuthenticationWebFilter(
 
         // JWKS resolution / verification can touch the network (cache miss or
         // key rotation) — keep it off the event loop.
-        return Mono.fromCallable { verifyAndExtractSubject(token) }
+        return Mono.fromCallable { verifyAndExtractIdentity(token) }
             .subscribeOn(Schedulers.boundedElastic())
-            .flatMap { userId ->
-                exchange.attributes[AUTHENTICATED_USER_ID_ATTRIBUTE] = userId
+            .flatMap { identity ->
+                exchange.attributes[AUTHENTICATED_USER_ID_ATTRIBUTE] = identity.userId
+                identity.griplRole?.let { exchange.attributes[AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE] = it }
                 chain.filter(exchange)
             }
             .onErrorResume { e ->
@@ -62,8 +74,10 @@ class JwtAuthenticationWebFilter(
             }
     }
 
-    private fun verifyAndExtractSubject(token: String): String {
-        val subject = Jwts.parser()
+    private data class AuthenticatedIdentity(val userId: String, val griplRole: String?)
+
+    private fun verifyAndExtractIdentity(token: String): AuthenticatedIdentity {
+        val claims = Jwts.parser()
             .keyLocator { header ->
                 val kid = (header as? ProtectedHeader)?.keyId
                     ?: throw JwtException("JWT is missing the 'kid' header")
@@ -73,10 +87,14 @@ class JwtAuthenticationWebFilter(
             .build()
             .parseSignedClaims(token)
             .payload
-            .subject
 
-        return subject?.takeIf { it.isNotBlank() }
+        val subject = claims.subject?.takeIf { it.isNotBlank() }
             ?: throw JwtException("JWT is missing the 'sub' claim")
+
+        @Suppress("UNCHECKED_CAST")
+        val griplRole = (claims["app_roles"] as? Map<String, String>)?.get("gripl")
+
+        return AuthenticatedIdentity(subject, griplRole)
     }
 
     private fun unauthorized(exchange: ServerWebExchange): Mono<Void> {

@@ -42,6 +42,29 @@ a standalone identity service shared with RAGulate and future DBIS tools.
 The same account works across GRIPL and RAGulate — both verify the same
 `auth-service` tokens.
 
+### Role-based access control (GRIPL-v2#40)
+
+`auth-service` resolves each user's GRIPL role (`admin`, `researcher`, `dpo`,
+`end-user`) into the token's `app_roles.gripl` claim. GRIPL gates on it at two
+layers:
+
+- **Backend** (real enforcement): `JwtAuthenticationWebFilter` extracts the
+  claim; `requireGriplRole`/`requirePrivilegedGriplRole`
+  (`security/AuthenticatedUser.kt`) gate individual endpoints — 403 if the
+  caller's role isn't one of the allowed ones.
+- **Frontend** (UX only, not a security boundary): `AuthContext` decodes the
+  same claim client-side; the sidebar hides nav entries the caller can't use,
+  and `middleware.ts` redirects direct navigation to them.
+
+| Surface | Routes / endpoints | Roles |
+|---|---|---|
+| Sandbox | `/`, `/gdpr/analysis/**`, `/bpmn/**`, `/gdpr/rag/status` | all four |
+| Labeling | `/labeling`, `/dataset/**` | `admin`, `researcher` |
+| Evaluation | `/evaluation`, `/gdpr/evaluation/**` | `admin`, `researcher` |
+
+`dpo`'s RAG-knowledge-base access is GRIPL-v2#37/#38 (not built yet) — until
+then `dpo` gets the sandbox only, same as `end-user`.
+
 ## Docker Setup
 
 > NOTE: The Production hosting is still under development, for local setup refer to [Run Locally](#1-run-locally)

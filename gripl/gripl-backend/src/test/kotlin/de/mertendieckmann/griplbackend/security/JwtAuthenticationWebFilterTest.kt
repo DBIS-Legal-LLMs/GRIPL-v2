@@ -60,9 +60,14 @@ class JwtAuthenticationWebFilterTest {
         server.stop(0)
     }
 
-    private fun signedToken(subject: String?, signingKid: String = kid): String {
+    private fun signedToken(
+        subject: String?,
+        signingKid: String = kid,
+        appRoles: Map<String, String>? = null,
+    ): String {
         val builder = Jwts.builder().header().keyId(signingKid).and()
         if (subject != null) builder.subject(subject)
+        if (appRoles != null) builder.claim("app_roles", appRoles)
         return builder.signWith(keyPair.private, Jwts.SIG.RS256).compact()
     }
 
@@ -123,6 +128,24 @@ class JwtAuthenticationWebFilterTest {
 
         assertEquals(false, chainCalled)
         assertEquals(HttpStatus.UNAUTHORIZED, exchange.response.statusCode)
+    }
+
+    @Test
+    fun `exposes the caller's resolved gripl role from app_roles (GRIPL-v2#40)`() {
+        val token = signedToken("user-123", appRoles = mapOf("gripl" to "researcher", "ragulate" to "admin"))
+        val (exchange, chainCalled) = runFilter("Bearer $token")
+
+        assertEquals(true, chainCalled)
+        assertEquals("researcher", exchange.getAttribute<String>(AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE))
+    }
+
+    @Test
+    fun `no gripl role attribute when app_roles has no gripl entry (or is absent)`() {
+        val withoutGripl = signedToken("user-123", appRoles = mapOf("ragulate" to "admin"))
+        assertNull(runFilter("Bearer $withoutGripl").first.getAttribute<String>(AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE))
+
+        val noClaimAtAll = signedToken("user-123")
+        assertNull(runFilter("Bearer $noClaimAtAll").first.getAttribute<String>(AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE))
     }
 
     @Test

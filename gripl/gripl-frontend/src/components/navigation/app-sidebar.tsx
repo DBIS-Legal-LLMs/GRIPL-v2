@@ -16,6 +16,7 @@ import {Label} from "@/components/ui/label";
 import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {useAuth} from "@/context/auth-context";
+import {isPrivilegedGriplRole} from "@/lib/gripl-role";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -39,7 +40,12 @@ export default function AppSidebar() {
         backendEndpoint,
     } = useAnalysisEndpoint();
 
-    const { logout, token, username } = useAuth();
+    const { logout, token, username, griplRole } = useAuth();
+
+    // GRIPL-v2#40: Labeling/Evaluation are admin/researcher only — dpo and
+    // end-user only see Sandbox. Real enforcement is server-side
+    // (gripl-backend's requireGriplRole); this just keeps the nav honest.
+    const canManageDatasets = isPrivilegedGriplRole(griplRole);
 
     const pages = [
         {
@@ -47,16 +53,18 @@ export default function AppSidebar() {
             label: "Sandbox",
             icon: <Workflow />
         },
-        {
-            href: "/labeling",
-            label: "Labeling",
-            icon: <Tag />
-        },
-        {
-            href: "/evaluation",
-            label: "Evaluation",
-            icon: <ChartBarDecreasing />
-        }
+        ...(canManageDatasets ? [
+            {
+                href: "/labeling",
+                label: "Labeling",
+                icon: <Tag />
+            },
+            {
+                href: "/evaluation",
+                label: "Evaluation",
+                icon: <ChartBarDecreasing />
+            }
+        ] : [])
     ] as Page[]
 
     return <Sidebar>

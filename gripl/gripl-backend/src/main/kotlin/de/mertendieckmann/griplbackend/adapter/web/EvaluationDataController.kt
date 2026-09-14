@@ -6,6 +6,7 @@ import de.mertendieckmann.griplbackend.repository.DatasetRepository
 import de.mertendieckmann.griplbackend.repository.EvaluationDataRepository
 import de.mertendieckmann.griplbackend.repository.PreviewCacheRepository
 import de.mertendieckmann.griplbackend.security.authenticatedUserId
+import de.mertendieckmann.griplbackend.security.requirePrivilegedGriplRole
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.core.io.buffer.DataBufferUtils
@@ -34,6 +35,8 @@ class EvaluationDataController(
     // the test case's parent dataset. A test case must belong to a dataset the
     // caller owns; anything else is a 404 (existence is not leaked) or, for a
     // create without a dataset, a 400.
+    // GRIPL-v2#40: the whole "Labeling" surface (this controller) is admin/
+    // researcher only — dpo and end-user only get the sandbox.
 
     @Operation(
         summary = "Get all Testcases Metadata",
@@ -45,7 +48,9 @@ class EvaluationDataController(
         @RequestParam(required = false) datasetId: Int? = null,
         exchange: ServerWebExchange
     ): List<EvaluationDataMeta> {
-        val datasets = evaluationDataRepository.getEvaluationDataForOwner(exchange.authenticatedUserId(), datasetId)
+        val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
+        val datasets = evaluationDataRepository.getEvaluationDataForOwner(userId, datasetId)
         return datasets.map { EvaluationDataMeta(it.id, it.name, it.datasetId) }
     }
 
@@ -67,6 +72,7 @@ class EvaluationDataController(
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<Int>> {
         val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
         val parentDatasetId = datasetId?.toLongOrNull()
             ?: throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
@@ -106,7 +112,9 @@ class EvaluationDataController(
     )
     @GetMapping("/{id}", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun getBpmnDataset(@PathVariable("id") id: Long, exchange: ServerWebExchange): EvaluationData {
-        return evaluationDataRepository.getEvaluationDataByIdForOwner(id, exchange.authenticatedUserId())
+        val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
+        return evaluationDataRepository.getEvaluationDataByIdForOwner(id, userId)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No dataset entry found for Id: $id")
     }
 
@@ -127,6 +135,7 @@ class EvaluationDataController(
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<String>> {
         val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
         val existingEntry = evaluationDataRepository.getEvaluationDataByIdForOwner(id, userId)
             ?: return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("No dataset entry found for Id: $id"))
 
@@ -164,6 +173,7 @@ class EvaluationDataController(
     @DeleteMapping("/{id}")
     fun deleteBpmnDataset(@PathVariable("id") id: Long, exchange: ServerWebExchange): ResponseEntity<String> {
         val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
         if (evaluationDataRepository.getEvaluationDataByIdForOwner(id, userId) == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No dataset entry found for Id: $id")
         }
@@ -193,6 +203,7 @@ class EvaluationDataController(
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<String>> {
         val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
 
         val requestPath = request.uri.path
         val requestQueryWithoutSalt = request.uri.query
