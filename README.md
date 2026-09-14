@@ -98,8 +98,8 @@ docker compose -f docker-compose.local.yml up
 
 You will then have these docker containers running:
 
-* frontend: [http://localhost:3000](http://localhost:3000)
-* backend (swagger): [http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)
+* frontend: [http://localhost:3001](http://localhost:3001) (3000 is reserved for RAGulate's frontend on this machine)
+* backend (swagger): [http://localhost:8001/swagger-ui](http://localhost:8001/swagger-ui) (8000 is reserved for RAGulate's backend)
 * Postgres: localhost:5432
 * Neo4j: localhost:7474 / localhost:7687
 * RAG service: [http://localhost:8081](http://localhost:8081)
