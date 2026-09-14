@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useRouter } from "next/navigation";
 import { clearClientToken, readClientToken, writeClientToken } from "@/lib/auth-cookie";
 import { extractErrorDetails } from "@/lib/http-error";
+import { decodeGriplRole } from "@/lib/gripl-role";
 
 // Login/register are proxied to auth-service through the /auth/* rewrite (see
 // next.config.ts) — the browser only ever talks to this origin, and
@@ -21,6 +22,9 @@ interface AuthContextValue {
     userId: string | null;
     /** The logged-in user's username, from auth-service's login response. */
     username: string | null;
+    /** The JWT `app_roles.gripl` claim, decoded client-side for display/UI
+     * gating only (GRIPL-v2#40) — see `@/lib/gripl-role`. */
+    griplRole: string | null;
     isLoading: boolean;
     login: (usernameOrEmail: string, password: string) => Promise<void>;
     register: (email: string, username: string, password: string, fullName?: string) => Promise<void>;
@@ -127,8 +131,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [router]);
 
     const userId = token ? decodeSubject(token) : null;
+    const griplRole = token ? decodeGriplRole(token) : null;
 
-    return <AuthContext.Provider value={{ token, userId, username, isLoading, login, register, logout }}>
+    return <AuthContext.Provider value={{ token, userId, username, griplRole, isLoading, login, register, logout }}>
         {children}
     </AuthContext.Provider>;
 }

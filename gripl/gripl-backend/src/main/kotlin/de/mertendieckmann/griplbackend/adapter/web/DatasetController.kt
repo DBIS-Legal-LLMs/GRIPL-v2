@@ -4,6 +4,7 @@ import de.mertendieckmann.griplbackend.model.dto.CreateDatasetRequest
 import de.mertendieckmann.griplbackend.model.dto.Dataset
 import de.mertendieckmann.griplbackend.repository.DatasetRepository
 import de.mertendieckmann.griplbackend.security.authenticatedUserId
+import de.mertendieckmann.griplbackend.security.requirePrivilegedGriplRole
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -26,7 +27,9 @@ class DatasetController(
         @RequestBody request: CreateDatasetRequest,
         exchange: ServerWebExchange
     ): ResponseEntity<Int> {
-        val idOfCreatedDataset = datasetRepository.createDataset(request, exchange.authenticatedUserId())
+        val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
+        val idOfCreatedDataset = datasetRepository.createDataset(request, userId)
         return if (idOfCreatedDataset > 0) {
             ResponseEntity.status(HttpStatus.CREATED).body(idOfCreatedDataset)
         } else {
@@ -40,7 +43,9 @@ class DatasetController(
     )
     @GetMapping("", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun getAllDatasets(exchange: ServerWebExchange): List<Dataset> {
-        return datasetRepository.getDatasetsByOwner(exchange.authenticatedUserId())
+        val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
+        return datasetRepository.getDatasetsByOwner(userId)
     }
 
     @Operation(
@@ -54,6 +59,7 @@ class DatasetController(
         exchange: ServerWebExchange
     ): ResponseEntity<String> {
         val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
         if (datasetRepository.getDatasetByIdAndOwner(datasetId, userId) == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No dataset found for Id: $datasetId")
         }

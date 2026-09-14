@@ -25,6 +25,20 @@ The default suits `auth-service` running locally on `:8100`. In Docker, set
 `AUTH_SERVICE_JWKS_URI=http://host.docker.internal:8100/.well-known/jwks.json`.
 See the repo root README's *Authentication* section for the full picture.
 
+### Role-based access control (GRIPL-v2#40)
+
+The filter also puts the caller's resolved GRIPL role (`app_roles.gripl`) on
+the exchange. `security/AuthenticatedUser.kt`'s `requireGriplRole(allowedRoles)`
+/ `requirePrivilegedGriplRole()` gate individual endpoints, throwing `403` —
+call it after `authenticatedUserId()` (401 for "not logged in" should win over
+403 for "logged in but not allowed"). See the repo root README for the full
+role→endpoint table.
+
+Note: `ResponseStatusException` (used by both this and the dataset-ownership
+guards, GRIPL-v2#33) needs `GlobalExceptionHandler`'s dedicated handler to keep
+its real status code — without it, the catch-all `RuntimeException` handler
+turns every 403/404 from a guard into a `500`.
+
 ### Dataset ownership
 
 Datasets are private to the `auth-service` user (JWT `sub`) that created them
