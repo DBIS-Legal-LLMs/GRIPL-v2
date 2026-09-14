@@ -15,6 +15,56 @@ In addition to the code, the repository includes:
 
 The datasets are provided as CSV exports of the database and can be imported to run the application with the same data used in the experiments.
 
+## Authentication
+
+User accounts, login, registration, and JWT issuance are **not** handled by this
+repository. They live in [`auth-service`](https://github.com/DBIS-Legal-LLMs/auth-service),
+a standalone identity service shared with RAGulate and future DBIS tools.
+
+- `auth-service` signs tokens with RS256 and publishes its public key at
+  `/.well-known/jwks.json`. `gripl-backend` only *verifies* incoming tokens
+  against that JWKS (`JwtAuthenticationWebFilter`) — there is **no shared secret**
+  and nothing to keep in sync between repos.
+- `gripl-frontend` never talks to `auth-service` cross-origin: its `/login` page
+  calls `/auth/*`, which Next.js rewrites server-side to `auth-service` (see
+  `next.config.ts`, `AUTH_SERVICE_INTERNAL_URL`).
+- `auth-service` runs as its **own** `docker-compose` stack (see its README),
+  listening on `:8100`. It must be running and reachable before login/register
+  work. The two env vars that point GRIPL at it:
+
+  | Variable | Used by | Example (Docker on same host) |
+  |---|---|---|
+  | `AUTH_SERVICE_JWKS_URI` | `gripl-backend` | `http://host.docker.internal:8100/.well-known/jwks.json` |
+  | `AUTH_SERVICE_INTERNAL_URL` | `gripl-frontend` | `http://host.docker.internal:8100` |
+
+  Running `gripl-backend` outside Docker: use `http://localhost:8100/...` instead.
+
+The same account works across GRIPL and RAGulate — both verify the same
+`auth-service` tokens.
+
+### Role-based access control (GRIPL-v2#40)
+
+`auth-service` resolves each user's GRIPL role (`admin`, `researcher`, `dpo`,
+`end-user`) into the token's `app_roles.gripl` claim. GRIPL gates on it at two
+layers:
+
+- **Backend** (real enforcement): `JwtAuthenticationWebFilter` extracts the
+  claim; `requireGriplRole`/`requirePrivilegedGriplRole`
+  (`security/AuthenticatedUser.kt`) gate individual endpoints — 403 if the
+  caller's role isn't one of the allowed ones.
+- **Frontend** (UX only, not a security boundary): `AuthContext` decodes the
+  same claim client-side; the sidebar hides nav entries the caller can't use,
+  and `middleware.ts` redirects direct navigation to them.
+
+| Surface | Routes / endpoints | Roles |
+|---|---|---|
+| Sandbox | `/`, `/gdpr/analysis/**`, `/bpmn/**`, `/gdpr/rag/status` | all four |
+| Labeling | `/labeling`, `/dataset/**` | `admin`, `researcher` |
+| Evaluation | `/evaluation`, `/gdpr/evaluation/**` | `admin`, `researcher` |
+
+`dpo`'s RAG-knowledge-base access is GRIPL-v2#37/#38 (not built yet) — until
+then `dpo` gets the sandbox only, same as `end-user`.
+
 ## Docker Setup
 
 > NOTE: The Production hosting is still under development, for local setup refer to [Run Locally](#1-run-locally)
@@ -51,6 +101,12 @@ Attention: If you are using **Linux**:
 
 The local setup is described in the `docker-compose.local.yml`
 
+> Login and registration require [`auth-service`](https://github.com/DBIS-Legal-LLMs/auth-service)
+> to be running in its own compose stack (`docker compose up` in that repo — it
+> listens on `:8100`). See [Authentication](#authentication) above. The GRIPL
+> stack reaches it via `host.docker.internal`; the defaults in
+> `.env.local.example` already point there.
+
 First you need to build the docker image:
 
 ```bash
@@ -63,12 +119,16 @@ Then you can start the system
 docker compose -f docker-compose.local.yml up
 ```
 
-You will then have three docker containers running:
+You will then have these docker containers running:
 
 * frontend: [http://localhost:3000](http://localhost:3000)
 * backend (swagger): [http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)
 * Postgres: localhost:5432
-* RAG service: [http://localhost/rag](http://localhost/rag)
+* Neo4j: localhost:7474 / localhost:7687
+* RAG service: [http://localhost:8081](http://localhost:8081)
+
+plus `auth-service` from its own separate compose stack on `:8100` (see
+[Authentication](#authentication)).
 
 
 ### 2. Run in production (server already has Traefik + Watchtower)

@@ -8,9 +8,23 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.server.MissingRequestValueException
+import org.springframework.web.server.ResponseStatusException
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
+
+    // Must stay ahead of the catch-all RuntimeException handler below in
+    // intent (Spring picks the most specific match regardless of declaration
+    // order, but this is the one that matters): ResponseStatusException
+    // (GRIPL-v2#33's ownership 404/400s, GRIPL-v2#40's role 403s, ...) carries
+    // its own correct status — without this it was falling through to the
+    // generic 500 handler, silently turning every "not found"/"forbidden"
+    // into an internal error. Found while testing #40's role gate for real.
+    @ExceptionHandler(ResponseStatusException::class)
+    fun handleResponseStatusException(ex: ResponseStatusException): ResponseEntity<ApiError> =
+        ResponseEntity
+            .status(ex.statusCode)
+            .body(ApiError(code = ex.statusCode.toString(), message = ex.reason))
 
     @ExceptionHandler(ModelParseException::class)
     fun handleInvalidBpmn(ex: ModelParseException): ResponseEntity<ApiError> =

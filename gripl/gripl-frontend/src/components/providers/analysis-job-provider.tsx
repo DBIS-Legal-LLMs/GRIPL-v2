@@ -5,6 +5,7 @@ import emptyDiagram from "@/data/empty-diagram.bpmn";
 import {AnalysisResponse} from "@/models/dto/AnalysisDto";
 import {useToast} from "@/components/ui/toast";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 interface AnalysisJobContextValue {
     diagram: string;
@@ -33,7 +34,7 @@ export function AnalysisJobProvider({children}: { children: ReactNode }) {
         setAnalysisResult(null);
         setIsAnalyzing(true);
 
-        fetch(apiEndpoint, {
+        authenticatedFetch(apiEndpoint, {
             method: "POST",
             headers: {
                 Accept: "application/json"

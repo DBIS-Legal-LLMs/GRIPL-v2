@@ -8,6 +8,11 @@ services:
     image: gripl-f:latest
     container_name: gripl-frontend
     restart: unless-stopped
+    environment:
+      # Where the /auth/* rewrite proxies login/register (see next.config.ts).
+      - AUTH_SERVICE_INTERNAL_URL=${AUTH_SERVICE_INTERNAL_URL:-http://host.docker.internal:8100}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - app
     ports:
@@ -32,6 +37,9 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
       - RAG_API_URL=http://gripl-rag:8081
+      - AUTH_SERVICE_JWKS_URI=${AUTH_SERVICE_JWKS_URI:-http://host.docker.internal:8100/.well-known/jwks.json}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - playwright-browsers:/root/.cache/ms-playwright
     networks:
@@ -91,6 +99,10 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=gripldb
+
+  # auth-service is not bundled here — run it from its own repo's
+  # docker-compose (it listens on :8100). gripl-backend verifies its JWTs via
+  # AUTH_SERVICE_JWKS_URI; gripl-frontend proxies /auth/* to it.
 
 volumes:
   playwright-browsers:
