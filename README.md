@@ -1,60 +1,156 @@
 # GRIPL - GDPR Risk Identification in Processes using Large Language Models
 
-Identifying GDPR-Critical Tasks in Business Processes using Large Language Models
+Identifying GDPR-critical tasks in business processes using large language
+models: model or import a BPMN process, have an LLM classify GDPR-relevant
+activities, label your own evaluation datasets, and run evaluations against
+them. Backed by a Kotlin/Spring backend, a Next.js frontend, and RAGulate's
+sibling RAG service (`gripl-rag`) for retrieval-augmented, GDPR-grounded
+reasoning.
 
-## Overview
+**[Installation Guide](#installation-guide) · [Quick Start (Already Installed)](#quick-start-already-installed) · [Features](#features) · [Project Structure](#project-structure) · [Authentication & Roles](#authentication--roles) · [Running the Tests](#running-the-tests) · [Endpoints](#endpoints) · [Useful Docker Commands](#useful-docker-commands) · [TODOs](#todos) · [Tech Stack](#tech-stack)**
 
-This repository contains the source code and research artifacts for the GRIPL framework. The system consists of a frontend, a backend, a RAG service, a PostgreSQL database, and a Neo4j database.
+---
 
-The RAG service provides a Retrieval-Augmented Generation API that queries a LightRAG knowledge graph built from GDPR-related legal documents and returns relevant legal context to the backend during analysis.
+## Installation Guide
 
-In addition to the code, the repository includes:
-- A labeled dataset of BPMN files in `dataset/` for reproducing the evaluation
-- Experiment configurations and results in `experiments/`
-- A system demo in `system demo/`
+### Prerequisites
 
-The datasets are provided as CSV exports of the database and can be imported to run the application with the same data used in the experiments.
+- [Docker](https://docs.docker.com/engine/install/) & [Docker Compose](https://docs.docker.com/compose/install/)
+- An OpenAI-compatible LLM API key (OpenRouter by default)
+- A running instance of [`auth-service`](https://github.com/DBIS-Legal-LLMs/auth-service) — login/register won't work without it. See that repo's README; by default GRIPL expects it at `http://localhost:8100` (or `http://host.docker.internal:8100` from inside Docker).
 
-## Authentication
+> **Windows**: Docker Desktop → Settings → General → enable "Expose daemon on tcp://localhost:2375 without TLS"; Settings → Docker Engine → add `"min-api-version": "1.24"`.
+> **Linux** (production Traefik setup only): `docker-compose.traefik.yml` needs `--providers.docker.endpoint=unix://var/run/docker.sock` and the socket mounted read-only — see the file.
 
-User accounts, login, registration, and JWT issuance are **not** handled by this
-repository. They live in [`auth-service`](https://github.com/DBIS-Legal-LLMs/auth-service),
-a standalone identity service shared with RAGulate and future DBIS tools.
+### 1. Local development
 
-- `auth-service` signs tokens with RS256 and publishes its public key at
-  `/.well-known/jwks.json`. `gripl-backend` only *verifies* incoming tokens
-  against that JWKS (`JwtAuthenticationWebFilter`) — there is **no shared secret**
-  and nothing to keep in sync between repos.
-- `gripl-frontend` never talks to `auth-service` cross-origin: its `/login` page
-  calls `/auth/*`, which Next.js rewrites server-side to `auth-service` (see
-  `next.config.ts`, `AUTH_SERVICE_INTERNAL_URL`).
-- `auth-service` runs as its **own** `docker-compose` stack (see its README),
-  listening on `:8100`. It must be running and reachable before login/register
-  work. The two env vars that point GRIPL at it:
+```bash
+git clone <repo-url>
+cd GRIPL-v2
+cp .env.local.example .env.local
+```
 
-  | Variable | Used by | Example (Docker on same host) |
-  |---|---|---|
-  | `AUTH_SERVICE_JWKS_URI` | `gripl-backend` | `http://host.docker.internal:8100/.well-known/jwks.json` |
-  | `AUTH_SERVICE_INTERNAL_URL` | `gripl-frontend` | `http://host.docker.internal:8100` |
+Fill in `.env.local` — at minimum an LLM key (`OPENAI_API_KEY`/`OPEN_ROUTER_API_KEY` and the `LLM_*`/`EMBEDDING_*` block for `gripl-rag`); the `AUTH_SERVICE_JWKS_URI`/`AUTH_SERVICE_INTERNAL_URL` defaults already point at `auth-service` running in Docker on the same host (see [Authentication & Roles](#authentication--roles)).
 
-  Running `gripl-backend` outside Docker: use `http://localhost:8100/...` instead.
+```bash
+docker compose -f docker-compose.local.yml up --build
+```
 
-The same account works across GRIPL and RAGulate — both verify the same
-`auth-service` tokens.
+Starts:
 
-### Role-based access control (GRIPL-v2#40)
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend (Swagger UI) | http://localhost:8000/swagger-ui |
+| RAG service | http://localhost:8081 |
+| Neo4j browser | http://localhost:7474 |
+| Postgres | `localhost:5432` |
 
-`auth-service` resolves each user's GRIPL role (`admin`, `researcher`, `dpo`,
-`end-user`) into the token's `app_roles.gripl` claim. GRIPL gates on it at two
-layers:
+Login/register go through `auth-service` — it must already be running (its own `docker compose up`).
 
-- **Backend** (real enforcement): `JwtAuthenticationWebFilter` extracts the
-  claim; `requireGriplRole`/`requirePrivilegedGriplRole`
-  (`security/AuthenticatedUser.kt`) gate individual endpoints — 403 if the
-  caller's role isn't one of the allowed ones.
-- **Frontend** (UX only, not a security boundary): `AuthContext` decodes the
-  same claim client-side; the sidebar hides nav entries the caller can't use,
-  and `middleware.ts` redirects direct navigation to them.
+> **Reproducing the paper's dataset**: `dataset/` ships the labeled BPMN corpus as CSV exports. `python scripts/import_all_data.py` (needs `psycopg2`, reads `.env.local` for the Postgres connection) imports `dataset.csv` then `evaluation_data.csv`; `scripts/check_datasets.py` sanity-checks what's already imported against the CSVs.
+
+### 2. Production (server already runs Traefik + Watchtower)
+
+```bash
+cp .env.prod.example .env.prod
+docker network create web   # only if it doesn't exist yet
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+Attaches every service to the existing `web` network, exposes the frontend on `${GRIPL_HOST}`/`www.${GRIPL_HOST}`, the backend on `${GRIPL_HOST}/api`, and enables Watchtower auto-updates for all of them (containers labeled `com.centurylinklabs.watchtower.enable=true` in `docker-compose.prod.yml`).
+
+### 3. Production, without Traefik/Watchtower already running
+
+```bash
+docker compose --env-file .env.prod \
+  -f docker-compose.yml -f docker-compose.prod.yml \
+  -f docker-compose.traefik.yml -f docker-compose.watchtower.yml up -d
+```
+
+### Running components locally without Docker
+
+See [`gripl/gripl-backend/README.md`](gripl/gripl-backend/README.md) (Maven, CLI commands, needs a Postgres instance — Flyway applies pending migrations automatically on startup) and [`gripl/gripl-frontend/README.md`](gripl/gripl-frontend/README.md). `gripl-rag` needs its own dependencies (`gripl/gripl-rag/requirements.txt`) plus a running Neo4j; on Linux it additionally needs system packages `libgl1`/`libglib2.0-0` for PyMuPDF/LightRAG (the Docker image installs these automatically).
+
+## Quick Start (Already Installed)
+
+Everything above already done once (`.env.local` filled in, images built) — just bringing the local stack back up:
+
+```bash
+# auth-service must already be running — see its own README
+docker compose -f docker-compose.local.yml up -d
+```
+
+Health checks: backend Swagger at `http://localhost:8000/swagger-ui`, frontend at `http://localhost:3000`, RAG service status via the frontend or `GET /gdpr/rag/status` on the backend.
+
+## Features
+
+The GRIPL tool has three main areas — which ones you can reach depends on your role, see [Authentication & Roles](#authentication--roles).
+
+**1. The Sandbox** — model or import a process, let the LLM analyze and classify GDPR-relevant activities, with reasoning per classification. Open to every role.
+
+<img width="2232" height="1265" alt="sandbox-analyzed-model-annotated" src="https://github.com/user-attachments/assets/1e7ac03b-2f76-4e10-8f21-ed4fc1d4af16" />
+<img width="1138" height="607" alt="sandbox-ai-reasoning" src="https://github.com/user-attachments/assets/7ed9f60b-18d8-4a06-b8b5-09e4e15d682b" />
+
+**2. The Labeling Editor** — create and label your own BPMN 2.0 evaluation datasets, with an optional reasoning per label. `admin`/`researcher` only.
+
+<img width="2227" height="1258" alt="labeling-datasets" src="https://github.com/user-attachments/assets/7651e26e-b3a5-48bb-beca-67daee7d6c7e" />
+<img width="2232" height="1260" alt="labeling-editor-annotated" src="https://github.com/user-attachments/assets/e7f03bc1-2a74-44c6-adf7-e05f906594a2" />
+
+**3. The Evaluation Platform** — configure evaluations via the GUI or a YAML file; results broken down by model, by run, and by test case. `admin`/`researcher` only.
+
+<img width="1137" height="1183" alt="evaluation-config_new" src="https://github.com/user-attachments/assets/7ccd4c36-a674-4a69-88c5-6ae181fae186" />
+<img width="1327" height="1211" alt="evaluation-result-by-model" src="https://github.com/user-attachments/assets/52a3e330-22d4-42ad-9e70-14e3a4baef7a" />
+<img width="1318" height="1125" alt="evaluation-result-by-run_new" src="https://github.com/user-attachments/assets/c82634f2-71c4-4bf8-9b94-5a059ecada9c" />
+<img width="1503" height="1268" alt="evaluation-result-by-testcase_new" src="https://github.com/user-attachments/assets/6272dfc7-533e-47dc-a57d-c143e1caa864" />
+
+Datasets are **private per user** — you only see and manage your own (see [Authentication & Roles](#authentication--roles)).
+
+## Project Structure
+
+```
+GRIPL-v2/
+├── gripl/
+│   ├── gripl-frontend/       # Next.js application (Sandbox, Labeling, Evaluation UIs)
+│   ├── gripl-backend/        # Spring Boot (Kotlin) API + CLI — analysis, datasets, evaluation
+│   └── gripl-rag/            # RAG service (FastAPI + LightRAG + Neo4j), GDPR knowledge graph
+├── dataset/                  # Labeled BPMN corpus (CSV exports) for reproducing the evaluation
+├── experiments/              # Experiment configurations and results
+├── scripts/                  # import_all_data.py, check_datasets.py — reproduce the dataset in Postgres
+├── system demo/              # Recorded demo video
+├── docker-compose.yml               # base services
+├── docker-compose.local.yml         # local dev/testing
+├── docker-compose.prod.yml          # production, Traefik + Watchtower labels
+├── docker-compose.traefik.yml       # optional Traefik container
+├── docker-compose.watchtower.yml    # optional Watchtower container
+├── .env.local.example
+└── .env.prod.example
+```
+
+## Authentication & Roles
+
+User accounts, login, registration, and JWT issuance are **not** handled by
+this repository. They live in
+[`auth-service`](https://github.com/DBIS-Legal-LLMs/auth-service), a
+standalone identity service shared with RAGulate and future DBIS tools.
+
+- `auth-service` signs tokens with RS256 and publishes its public key at `/.well-known/jwks.json`. `gripl-backend` only *verifies* incoming tokens against that JWKS (`JwtAuthenticationWebFilter`) — no shared secret, nothing to keep in sync between repos.
+- `gripl-frontend` never talks to `auth-service` cross-origin: its `/login` page calls `/auth/*`, which Next.js rewrites server-side to `auth-service` (`next.config.ts`, `AUTH_SERVICE_INTERNAL_URL`).
+- `auth-service` runs as its **own** `docker-compose` stack, listening on `:8100`, and must be running and reachable before login/register work.
+
+| Variable | Used by | Example (Docker on the same host) |
+|---|---|---|
+| `AUTH_SERVICE_JWKS_URI` | `gripl-backend` | `http://host.docker.internal:8100/.well-known/jwks.json` |
+| `AUTH_SERVICE_INTERNAL_URL` | `gripl-frontend` | `http://host.docker.internal:8100` |
+
+The same account works across GRIPL and RAGulate — both verify the same `auth-service` tokens.
+
+### Roles
+
+`auth-service` resolves each user's GRIPL role into the token's `app_roles.gripl` claim: `admin`, `researcher`, `dpo`, or `end-user`. Enforced at two layers:
+
+- **Backend** (real enforcement) — `requireGriplRole`/`requirePrivilegedGriplRole` (`security/AuthenticatedUser.kt`) gate individual endpoints, `403` if the caller's role isn't allowed.
+- **Frontend** (UX only, not a security boundary) — the sidebar hides nav entries the caller can't use, and `middleware.ts` redirects direct navigation to them.
 
 | Surface | Routes / endpoints | Roles |
 |---|---|---|
@@ -62,153 +158,82 @@ layers:
 | Labeling | `/labeling`, `/dataset/**` | `admin`, `researcher` |
 | Evaluation | `/evaluation`, `/gdpr/evaluation/**` | `admin`, `researcher` |
 
-`dpo`'s RAG-knowledge-base access is GRIPL-v2#37/#38 (not built yet) — until
-then `dpo` gets the sandbox only, same as `end-user`.
+`dpo`'s RAG-knowledge-base access (#37/#38) isn't built yet — until then `dpo` gets the sandbox only, same as `end-user`. Datasets and test cases are additionally scoped **per owner** on top of the role check — see `gripl/gripl-backend/README.md`.
 
-## Docker Setup
+## Running the Tests
 
-> NOTE: The Production hosting is still under development, for local setup refer to [Run Locally](#1-run-locally)
-
-This project can be run in different environments by **composing multiple docker-compose files**.
-
-This project provides:
-
-* `docker-compose.yml` – base services (frontend, backend, RAG service, Postgres, Neo4j)
-* `docker-compose.local.yml` – local testing and running
-* `docker-compose.prod.yml` – production style, with Traefik labels and watchtower labels, expects an existing **external** Traefik network (default: `web`)
-* `docker-compose.traefik.yml` – optional Traefik container, in case the host does **not** already run Traefik
-* `docker-compose.watchtower.yml` – optional Watchtower container
-
-Environment specific values (like hosts, Traefik network name, email, ports) are provided via `.env` files.
-
-Attention: If you are using **Windows**, make sure to adjust the following:
-- Under Settins > General enable: Expose daemon on tcp://localhost:2375 without TLS
-- Under Settings > Docker Engine add: "min-api-version": "1.24"
-
-Attention: If you are using **Linux**:
-- Change the docker-compose.traefik to use
-  ```bash
-  command:
-    - --providers.docker=true
-    - --providers.docker.endpoint=unix://var/run/docker.sock
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock:ro
-  ```
-
----
-
-### 1. Run locally
-
-The local setup is described in the `docker-compose.local.yml`
-
-> Login and registration require [`auth-service`](https://github.com/DBIS-Legal-LLMs/auth-service)
-> to be running in its own compose stack (`docker compose up` in that repo — it
-> listens on `:8100`). See [Authentication](#authentication) above. The GRIPL
-> stack reaches it via `host.docker.internal`; the defaults in
-> `.env.local.example` already point there.
-
-First you need to build the docker image:
+Backend (Kotlin/JUnit/Mockito) — no Maven install needed, runs in a throwaway container:
 
 ```bash
-docker compose -f docker-compose.local.yml build
+cd gripl/gripl-backend
+docker run --rm -v "$PWD":/app -v gripl-m2:/root/.m2 -w /app \
+  maven:3.8.6-eclipse-temurin-17 \
+  mvn -Dtest='DatasetControllerOwnershipTest,EvaluationDataControllerOwnershipTest,EvaluationControllerRoleTest,JwtAuthenticationWebFilterTest,MultiEvaluationRunnerSeedTest,GlobalExceptionHandlerTest' test
 ```
 
-Then you can start the system
+Covers JWKS verification, dataset/test-case ownership, and role-gating — 35
+tests, no external services needed. Clean the root-owned `target/` afterwards:
+`docker run --rm -v "$PWD":/app alpine rm -rf /app/target`.
+
+`GriplBackendApplicationTests` (plain `mvn test` includes it) boots the full
+Spring context and needs a live Postgres + Neo4j + a real LLM key to pass —
+not included above on purpose.
+
+Frontend has no automated test suite yet (`npm run lint` is the only check) — see [TODOs](#todos).
+
+## Endpoints
+
+All paths below except `/actuator/health`, `/swagger-ui`, `/v3/api-docs` and `/thesis/pdf` require a valid `auth-service` token; the **Role** column is the additional role check on top of that.
+
+| Surface | Method | Path | Role | Description |
+|---|---|---|---|---|
+| Sandbox | `GET` | `/gdpr/analysis/endpoints` | any | List available analysis endpoints |
+| Sandbox | `POST` | `/gdpr/analysis/prompt-engineering` | any | Analyze a BPMN file (prompt-engineering approach) |
+| Sandbox | `POST` | `/gdpr/analysis/baseline` | any | Analyze a BPMN file (baseline approach) |
+| Sandbox | `POST` | `/gdpr/analysis/multiclass` | any | Analyze a BPMN file (multiclass classification) |
+| Sandbox | `POST` | `/bpmn/extract` | any | Extract BPMN elements from an uploaded file |
+| Sandbox | `GET` | `/gdpr/rag/status` | any | Whether the RAG knowledge graph currently holds ingested data |
+| Labeling | `POST` `GET` `DELETE` | `/dataset`, `/dataset/{id}` | admin, researcher | Create/list/delete datasets (owner-scoped) |
+| Labeling | `GET` `POST` `DELETE` | `/dataset/testcase`, `/dataset/testcase/{id}` | admin, researcher | List/create/get/update/delete test cases (owner-scoped via parent dataset) |
+| Labeling | `GET` | `/dataset/testcase/{id}/preview` | admin, researcher | SVG preview of a test case's process model |
+| Evaluation | `POST` | `/gdpr/evaluation/markdown` | admin, researcher | Run an evaluation, markdown report |
+| Evaluation | `POST` | `/gdpr/evaluation/stream` | admin, researcher | Run an evaluation, NDJSON stream |
+| — | `GET` | `/thesis/pdf` | — (public) | Serves the thesis PDF |
+| — | `GET` | `/actuator/health`, `/swagger-ui`, `/v3/api-docs` | — (public) | Liveness + API docs |
+
+Full request/response shapes: Swagger UI at `/swagger-ui` once the backend is running.
+
+## Useful Docker Commands
 
 ```bash
-docker compose -f docker-compose.local.yml up
+# Show running containers
+docker ps
+
+# Follow logs for each piece
+docker logs -f gripl-backend
+docker logs -f gripl-rag
+docker logs -f gripl-neo4j
+docker logs -f auth-service      # separate compose project
+
+# Open a shell inside a container
+docker exec -it gripl-backend bash
+
+# Open a Postgres shell
+docker exec -it gripl-postgres psql -U postgres -d gripldb
 ```
 
-You will then have these docker containers running:
+## TODOs
 
-* frontend: [http://localhost:3000](http://localhost:3000)
-* backend (swagger): [http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)
-* Postgres: localhost:5432
-* Neo4j: localhost:7474 / localhost:7687
-* RAG service: [http://localhost:8081](http://localhost:8081)
+- [GRIPL#37](https://github.com/DBIS-Legal-LLMs/GRIPL-v2/issues/37) — DPO: read-only overview of the RAG knowledge base's ingested documents
+- [GRIPL#38](https://github.com/DBIS-Legal-LLMs/GRIPL-v2/issues/38) — DPO: upload/remove RAG knowledge base documents
+- [GRIPL#14](https://github.com/DBIS-Legal-LLMs/GRIPL-v2/issues/14) — Embed RAGulate's chat widget (blocked on RAGulate_v2#123, not built yet)
+- [GRIPL#8](https://github.com/DBIS-Legal-LLMs/GRIPL-v2/issues/8) — Host the application on the DBIS AI PC (deliberately last)
+- Frontend automated test suite (currently lint-only)
 
-plus `auth-service` from its own separate compose stack on `:8100` (see
-[Authentication](#authentication)).
+## Tech Stack
 
-
-### 2. Run in production (server already has Traefik + Watchtower)
-
-```bash
-cp .env.prod.example .env.prod
-# make sure the external Docker network exists:
-# docker network create web
-docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
-
-This will:
-
-* attach all services to your existing `web` network,
-* expose the frontend on `${GRIPL_HOST}` and `www.${GRIPL_HOST}`,
-* expose the backend on `${GRIPL_HOST}/api`,
-* and enable Watchtower updates for all of them.
-
----
-
-### 3. Run Watchtower and Traefik alongside (server does not have them yet)
-
-If your host does **not** run Watchtower and Traefik yet, add:
-
-```bash
-docker compose --env-file .env.prod \
-  -f docker-compose.yml \
-  -f docker-compose.prod.yml \
-  -f docker-compose.traefik.yml \
-  -f docker-compose.watchtower.yml up -d
-```
-
-Watchtower is configured to only update containers that have the label
-`com.centurylinklabs.watchtower.enable=true`, which we add in `docker-compose.prod.yml`.
-
----
-
-## Run locally without Docker for development
-
-See [gripl/gripl-backend/README.md](gripl/gripl-backend/README.md) for instructions on running the backend locally.
-
-See [gripl/gripl-frontend/README.md](gripl/gripl-frontend/README.md) for instructions on running the frontend locally.
-
-The RAG service can be run locally by installing the dependencies from `gripl/gripl-rag/requirements.txt` and starting it with `uvicorn app.main:app --reload --port 8081` from the `gripl/gripl-rag` directory. It requires a running Neo4j instance, which can be started with Docker (see `docker-compose.yml`). This is the same requirements file used by the Docker image. Note that on Linux, the system libraries `libgl1` and `libglib2.0-0` are additionally required by PyMuPDF / LightRAG (the Docker image installs them automatically; on Windows they are bundled with the pip wheels).
-
-Local development requires a running PostgreSQL database. The simplest option is to start a fresh instance with Docker and set the backend’s database connection via environment variables. On startup, the backend will automatically create any missing tables.
-
-Alternatively, you can use `docker-compose.local.yaml` to bring up the entire stack (frontend, backend, PostgreSQL) with Docker as explained above and point your locally running frontend and backend to that database as well.
-
-## Tool Components
-The GRIPL tool consists of three main components:
-
-**1. The Sandbox**
-
-Here, users can model or import processes and let the LLM analyze the process model. 
-<img width="2232" height="1265" alt="sandbox-analyzed-model-annotated" src="https://github.com/user-attachments/assets/1e7ac03b-2f76-4e10-8f21-ed4fc1d4af16" />
-
-The model also creates a reasoning for the activity classification.
-<img width="1138" height="607" alt="sandbox-ai-reasoning" src="https://github.com/user-attachments/assets/7ed9f60b-18d8-4a06-b8b5-09e4e15d682b" />
-
-**2. The Labeling Editor**
-   
-Here, users can create and label their own BPMN 2.0 dataset. A reasoning can also be added to the labels.
-<img width="2227" height="1258" alt="labeling-datasets" src="https://github.com/user-attachments/assets/7651e26e-b3a5-48bb-beca-67daee7d6c7e" />
-
-<img width="2232" height="1260" alt="labeling-editor-annotated" src="https://github.com/user-attachments/assets/e7f03bc1-2a74-44c6-adf7-e05f906594a2" />
-
-**3. The evaluation plattform**
-   
-Evaluations can be configured via the GUI or a YAML file.
-<img width="1137" height="1183" alt="evaluation-config_new" src="https://github.com/user-attachments/assets/7ccd4c36-a674-4a69-88c5-6ae181fae186" />
-
-The results are represented by model 
-<img width="1327" height="1211" alt="evaluation-result-by-model" src="https://github.com/user-attachments/assets/52a3e330-22d4-42ad-9e70-14e3a4baef7a" />
-
-or by run 
-<img width="1318" height="1125" alt="evaluation-result-by-run_new" src="https://github.com/user-attachments/assets/c82634f2-71c4-4bf8-9b94-5a059ecada9c" />
-
-And also by test case 
-<img width="1503" height="1268" alt="evaluation-result-by-testcase_new" src="https://github.com/user-attachments/assets/6272dfc7-533e-47dc-a57d-c143e1caa864" />
-
-
-
+- [Next.js](https://nextjs.org/) 15 / [React](https://react.dev/) 18, [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS](https://tailwindcss.com/) — frontend
+- [Spring Boot](https://spring.io/projects/spring-boot) 4 (Kotlin, WebFlux) — backend API + CLI
+- [FastAPI](https://fastapi.tiangolo.com/) + [LightRAG](https://github.com/HKUDS-LightRAG/LightRAG) + [Neo4j](https://neo4j.com/) — `gripl-rag`, the GDPR knowledge graph
+- [PostgreSQL](https://www.postgresql.org/) — datasets, test cases, evaluation results
+- [Docker](https://www.docker.com/) / [Docker Compose](https://docs.docker.com/compose/), [Traefik](https://traefik.io/) + [Watchtower](https://containrrr.dev/watchtower/) — running and deploying it
