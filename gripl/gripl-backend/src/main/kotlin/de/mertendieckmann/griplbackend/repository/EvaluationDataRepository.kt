@@ -37,6 +37,37 @@ class EvaluationDataRepository(
         return jdbc.query("SELECT * FROM evaluation_data WHERE dataset_id IN ($inSql)", mapper)
     }
 
+    // ── Owner-scoped access (GRIPL-v2#33) ──────────────────────────────────
+    // A test case is accessible iff its parent dataset is owned by the caller.
+    // Test cases with no dataset_id (dataset deleted, or created without one)
+    // have no owner and are excluded from every scoped read below. Wired into
+    // EvaluationDataController only; the evaluation-run paths above stay
+    // unscoped (role gating for those is GRIPL-v2#40).
+
+    fun getEvaluationDataForOwner(ownerUserId: String, datasetId: Int? = null): List<EvaluationData> {
+        val sql = buildString {
+            append(
+                """
+                SELECT ed.* FROM evaluation_data ed
+                JOIN dataset d ON ed.dataset_id = d.id
+                WHERE d.owner_user_id = ?
+                """.trimIndent()
+            )
+            if (datasetId != null) append(" AND ed.dataset_id = ?")
+        }
+        val args = listOfNotNull(ownerUserId, datasetId?.toLong()).toTypedArray()
+        return jdbc.query(sql, mapper, *args)
+    }
+
+    fun getEvaluationDataByIdForOwner(id: Long, ownerUserId: String): EvaluationData? {
+        val sql = """
+            SELECT ed.* FROM evaluation_data ed
+            JOIN dataset d ON ed.dataset_id = d.id
+            WHERE ed.id = ? AND d.owner_user_id = ?
+        """.trimIndent()
+        return jdbc.query(sql, mapper, id, ownerUserId).firstOrNull()
+    }
+
     fun getEvaluationDataByIds(ids: List<Int>): List<EvaluationData> {
         if (ids.isEmpty()) return emptyList()
         val inSql = ids.joinToString(",")
@@ -67,11 +98,12 @@ class EvaluationDataRepository(
         )!!
     }
 
-    fun updateEvaluationData(data: EvaluationData): Int {
+    fun updateEvaluationData(data: EvaluationData, ownerUserId: String): Int {
         val sql = """
             UPDATE evaluation_data
             SET name = ?, bpmn_xml = ?, expected_values = ?::jsonb, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
+              AND dataset_id IN (SELECT id FROM dataset WHERE owner_user_id = ?)
         """.trimIndent()
 
         return jdbc.update(sql) { ps ->
@@ -85,12 +117,17 @@ class EvaluationDataRepository(
             }
             ps.setObject(3, pgObject)
             ps.setLong(4, data.id)
+            ps.setString(5, ownerUserId)
         }
     }
 
-    fun deleteEvaluationData(id: Long): Int {
-        val sql = "DELETE FROM evaluation_data WHERE id = ?"
-        return jdbc.update(sql, id)
+    fun deleteEvaluationData(id: Long, ownerUserId: String): Int {
+        val sql = """
+            DELETE FROM evaluation_data
+            WHERE id = ?
+              AND dataset_id IN (SELECT id FROM dataset WHERE owner_user_id = ?)
+        """.trimIndent()
+        return jdbc.update(sql, id, ownerUserId)
     }
 
     fun countEvaluationDataForDatasets(datasetIds: List<Long>): Int {
