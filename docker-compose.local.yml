@@ -5,11 +5,17 @@ services:
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_API_BASE_URL=http://gripl-backend:8080
+        # next.config.ts's rewrites() are frozen into the build by `next
+        # build` — a runtime `environment:` entry alone does NOT change
+        # where /auth/* proxies to. Must be passed here too.
+        - AUTH_SERVICE_INTERNAL_URL=${AUTH_SERVICE_INTERNAL_URL:-http://host.docker.internal:8100}
     image: gripl-f:latest
     container_name: gripl-frontend
     restart: unless-stopped
     environment:
-      # Where the /auth/* rewrite proxies login/register (see next.config.ts).
+      # Harmless to also set at runtime (covers `npm run dev`, which re-evaluates
+      # rewrites() per request) — but the build arg above is what actually
+      # matters for this Docker image.
       - AUTH_SERVICE_INTERNAL_URL=${AUTH_SERVICE_INTERNAL_URL:-http://host.docker.internal:8100}
     extra_hosts:
       - "host.docker.internal:host-gateway"
