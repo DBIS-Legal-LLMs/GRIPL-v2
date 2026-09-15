@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import {ModelRowState} from "@/models/evaluation/Config";
+import {AnalysisEndpoint, ModelRowState} from "@/models/evaluation/Config";
 import EvaluationConfigModelRow from "@/components/evaluation/config/evaluation-config-model-row";
 
 interface EvaluationConfigModelsSettingsProps {

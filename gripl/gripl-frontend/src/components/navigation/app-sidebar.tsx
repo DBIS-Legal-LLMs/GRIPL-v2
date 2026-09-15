@@ -9,7 +9,7 @@ import {
     SidebarMenuItem
 } from "@/components/ui/sidebar";
 import Link from "next/link";
-import {ChartBarDecreasing, Tag, Workflow} from "lucide-react";
+import {ChartBarDecreasing, Sparkles, Tag, Workflow} from "lucide-react";
 import React, {ReactNode} from "react";
 import Image from "next/image";
 import {Label} from "@/components/ui/label";
@@ -32,8 +32,8 @@ export default function AppSidebar() {
 
     const pages = [
         {
-            href: "/",
-            label: "Sandbox",
+            href: "/process-analysis",
+            label: "Process Analysis",
             icon: <Workflow />
         },
         {
@@ -45,6 +45,11 @@ export default function AppSidebar() {
             href: "/evaluation",
             label: "Evaluation",
             icon: <ChartBarDecreasing />
+        },
+        {
+            href: "/custom-endpoints",
+            label: "Custom Endpoints",
+            icon: <Sparkles />
         }
     ] as Page[]
 

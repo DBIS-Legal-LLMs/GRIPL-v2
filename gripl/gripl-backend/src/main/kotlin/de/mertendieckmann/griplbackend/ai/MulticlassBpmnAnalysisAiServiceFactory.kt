@@ -7,16 +7,18 @@ import dev.langchain4j.service.AiServices
 
 object MulticlassBpmnAnalysisAiServiceFactory {
 
-    fun create(llm: ChatModel, memoryProvider: ChatMemoryProvider): MulticlassBpmnAnalysisAiService {
+    val defaultPrompt: String = getDefaultPromptTemplate().template()
+
+    fun create(llm: ChatModel, memoryProvider: ChatMemoryProvider, systemPrompt: String = defaultPrompt): MulticlassBpmnAnalysisAiService {
         return AiServices
             .builder(MulticlassBpmnAnalysisAiService::class.java)
             .chatModel(llm)
             .chatMemoryProvider(memoryProvider)
-            .systemMessageProvider { getPromptTemplate().template() }
+            .systemMessageProvider { _ -> systemPrompt }
             .build()
     }
 
-    private fun getPromptTemplate(): PromptTemplate {
+    private fun getDefaultPromptTemplate(): PromptTemplate {
         return PromptTemplate.from(buildString {
             appendLine(
                 """

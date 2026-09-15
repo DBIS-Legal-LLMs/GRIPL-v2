@@ -34,9 +34,14 @@ class PreviewCacheRepository(
     }
 
     fun insertPreviewCache(preview: PreviewCacheInsert): Int {
+        // ON CONFLICT DO UPDATE (rather than a plain INSERT) because two requests for the same
+        // preview (same model + query params, e.g. concurrent <img> loads) can both miss the
+        // cache and race to insert the same url_cache_key — without this, the loser hits the
+        // UNIQUE constraint on url_cache_key and throws instead of just reusing/refreshing the row.
         val sql = """
             INSERT INTO preview_cache (evaluation_data_id, url_cache_key, svg)
             VALUES (?, ?, ?)
+            ON CONFLICT (url_cache_key) DO UPDATE SET svg = EXCLUDED.svg, updated_at = CURRENT_TIMESTAMP
             RETURNING id
         """.trimIndent()
 
