@@ -2,9 +2,12 @@
 
 import {useState} from "react"
 import {useRouter} from "next/navigation"
+import {AlertTriangle} from "lucide-react"
 import {useProcessModelListPolling} from "@/hooks/use-process-model-list-polling"
+import {useAnalysisSettings} from "@/hooks/use-analysis-settings"
 import ProcessModelListItemRow from "@/components/process-analysis/process-model-list-item"
 import UploadProcessModelsButton from "@/components/process-analysis/upload-process-models-button"
+import AnalysisSettingsButton from "@/components/process-analysis/analysis-settings-button"
 import AnalyzeSelectedButton from "@/components/process-analysis/analyze-selected-button"
 import DownloadListReportButton from "@/components/process-analysis/download-list-report-button"
 import ClearAllButton from "@/components/process-analysis/clear-all-button"
@@ -19,6 +22,7 @@ interface ProcessModelListProps {
 export default function ProcessModelList({initialModels}: ProcessModelListProps) {
     const {models, setModels} = useProcessModelListPolling(initialModels)
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+    const settings = useAnalysisSettings()
     const router = useRouter()
     const {showError} = useToast()
 
@@ -92,11 +96,19 @@ export default function ProcessModelList({initialModels}: ProcessModelListProps)
         <div className="flex flex-row flex-wrap items-center justify-between gap-2">
             <UploadProcessModelsButton onUploaded={handleUploaded}/>
             <div className="flex flex-row gap-2">
-                <AnalyzeSelectedButton selectedIds={Array.from(selectedIds)} onEnqueued={handleEnqueued}/>
+                <AnalysisSettingsButton settings={settings}/>
+                <AnalyzeSelectedButton selectedIds={Array.from(selectedIds)} settings={settings} onEnqueued={handleEnqueued}/>
                 <DownloadListReportButton models={models}/>
                 <ClearAllButton models={models} onCleared={handleCleared}/>
             </div>
         </div>
+
+        {settings.isLoaded && !settings.isConfigured && (
+            <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="h-4 w-4 shrink-0"/>
+                <span>Analysis settings haven&apos;t been configured yet. Click &quot;Analysis Settings&quot; before starting an analysis.</span>
+            </div>
+        )}
 
         {models.length > 0 && (
             <div className="flex items-center gap-2 pb-1">

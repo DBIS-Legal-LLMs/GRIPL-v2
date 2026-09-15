@@ -38,8 +38,22 @@ class AnalysisService(
         )
     }
 
-    fun analyzeBaseline(
+    fun analyzeMulticlass(
         bpmnXml: String,
+        llmPropsOverride: LlmConfig.Companion.LlmPropsOverride?,
+        useRag: Boolean,
+        ragMode: RagMode,
+        activitiesOnly: Boolean
+    ): MulticlassAnalysisResponse {
+        val resolvedOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverride, env)
+        val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedOverride)
+        val analyzer = analyzerFactory.createMulticlassAnalyzer(llm)
+        return analyzer.analyzeBpmnForGdpr(bpmnXml, useRag, ragMode, activitiesOnly)
+    }
+
+    fun analyzeCustomBinary(
+        bpmnXml: String,
+        promptText: String,
         llmPropsOverride: LlmConfig.Companion.LlmPropsOverride?,
         useRag: Boolean,
         ragMode: RagMode,
@@ -47,22 +61,21 @@ class AnalysisService(
     ): AnalysisResponse {
         val resolvedOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverride, env)
         val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedOverride)
-        val analyzer = analyzerFactory.createBaselineAnalyzer(llm)
-        return analyzer.analyzeBpmnForGdpr(
-            bpmnXml = bpmnXml,
-            useRag = useRag,
-            ragMode = ragMode,
-            activitiesOnly = activitiesOnly
-        )
+        val analyzer = analyzerFactory.createCustomBinaryAnalyzer(llm, promptText)
+        return analyzer.analyzeBpmnForGdpr(bpmnXml, useRag, ragMode, activitiesOnly)
     }
 
-    fun analyzeMulticlass(
+    fun analyzeCustomMulticlass(
         bpmnXml: String,
-        llmPropsOverride: LlmConfig.Companion.LlmPropsOverride?
+        promptText: String,
+        llmPropsOverride: LlmConfig.Companion.LlmPropsOverride?,
+        useRag: Boolean,
+        ragMode: RagMode,
+        activitiesOnly: Boolean
     ): MulticlassAnalysisResponse {
         val resolvedOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverride, env)
         val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedOverride)
-        val analyzer = analyzerFactory.createMulticlassAnalyzer(llm)
-        return analyzer.analyzeBpmnForGdpr(bpmnXml)
+        val analyzer = analyzerFactory.createCustomMulticlassAnalyzer(llm, promptText)
+        return analyzer.analyzeBpmnForGdpr(bpmnXml, useRag, ragMode, activitiesOnly)
     }
 }

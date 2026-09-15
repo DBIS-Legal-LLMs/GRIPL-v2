@@ -11,14 +11,14 @@ import {safeFloatOrNull} from "@/lib/evaluation-config-utils";
 import {Switch} from "@/components/ui/switch";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {AnalysisSettings} from "@/hooks/use-analysis-settings";
+import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 
 interface AnalysisSettingsFieldsProps {
     settings: AnalysisSettings;
-    isMulticlass: boolean;
     idPrefix?: string;
 }
 
-export default function AnalysisSettingsFields({settings, isMulticlass, idPrefix = ""}: AnalysisSettingsFieldsProps) {
+export default function AnalysisSettingsFields({settings, idPrefix = ""}: AnalysisSettingsFieldsProps) {
     const {
         llmBaseUrl, setLlmBaseUrl,
         modelName, setModelName,
@@ -29,6 +29,8 @@ export default function AnalysisSettingsFields({settings, isMulticlass, idPrefix
         useRag, setUseRag,
         searchMode, setSearchMode,
     } = settings;
+    const {backendEndpoint} = useAnalysisEndpoint();
+    const isCustomEndpoint = backendEndpoint.startsWith("/gdpr/analysis/custom/");
 
     return <div className="flex flex-col space-y-2">
         <div className="space-y-1">
@@ -85,7 +87,11 @@ export default function AnalysisSettingsFields({settings, isMulticlass, idPrefix
             <Input type="number" placeholder="1.0" value={topP ?? ""}
                    onChange={(e) => setTopP(safeFloatOrNull(e.target.value))}/>
         </div>
-        {!isMulticlass && (
+        {isCustomEndpoint ? (
+            <p className="text-xs text-muted-foreground pt-2">
+                RAG usage is fixed on this custom endpoint (set when it was uploaded) and can&apos;t be overridden here.
+            </p>
+        ) : (
             <>
                 <div className="flex items-center space-x-2 pt-2">
                     <Switch

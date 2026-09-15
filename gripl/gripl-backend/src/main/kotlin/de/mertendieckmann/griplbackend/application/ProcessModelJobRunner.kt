@@ -1,10 +1,12 @@
 package de.mertendieckmann.griplbackend.application
 
 import de.mertendieckmann.griplbackend.application.analyzer.AnalysisService
+import de.mertendieckmann.griplbackend.model.dto.CustomAnalysisResponseType
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelAnalysisOptions
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
 import de.mertendieckmann.griplbackend.model.dto.RagMode
+import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.context.event.ApplicationReadyEvent
@@ -16,8 +18,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 
 private const val PROMPT_ENGINEERING_ENDPOINT = "/gdpr/analysis/prompt-engineering"
-private const val BASELINE_ENDPOINT = "/gdpr/analysis/baseline"
 private const val MULTICLASS_ENDPOINT = "/gdpr/analysis/multiclass"
+private const val CUSTOM_ENDPOINT_PREFIX = "/gdpr/analysis/custom/"
 
 /**
  * Runs process-model analyses one at a time on a single background thread.
@@ -28,7 +30,8 @@ private const val MULTICLASS_ENDPOINT = "/gdpr/analysis/multiclass"
 @Service
 class ProcessModelJobRunner(
     private val repository: ProcessModelRepository,
-    private val analysisService: AnalysisService
+    private val analysisService: AnalysisService,
+    private val customAnalysisEndpointRepository: CustomAnalysisEndpointRepository
 ) {
     private val log = KotlinLogging.logger { }
     private val objectMapper = jacksonObjectMapper()
@@ -123,24 +126,49 @@ class ProcessModelJobRunner(
                     )
                     Triple(objectMapper.writeValueAsString(result), result.criticalElements.size, result.amountOfRetries)
                 }
-                BASELINE_ENDPOINT -> {
-                    val result = analysisService.analyzeBaseline(
+                MULTICLASS_ENDPOINT -> {
+                    val result = analysisService.analyzeMulticlass(
                         bpmnXml = model.bpmnXml,
                         llmPropsOverride = options.llmProps,
                         useRag = options.useRag ?: false,
                         ragMode = options.ragMode ?: RagMode.HYBRID,
                         activitiesOnly = options.activitiesOnly ?: false
                     )
-                    Triple(objectMapper.writeValueAsString(result), result.criticalElements.size, result.amountOfRetries)
-                }
-                MULTICLASS_ENDPOINT -> {
-                    val result = analysisService.analyzeMulticlass(
-                        bpmnXml = model.bpmnXml,
-                        llmPropsOverride = options.llmProps
-                    )
                     Triple(objectMapper.writeValueAsString(result), result.classifiedElements.size, result.amountOfRetries)
                 }
-                else -> throw IllegalArgumentException("Unknown analysis endpoint '$endpoint'")
+                else -> if (endpoint.startsWith(CUSTOM_ENDPOINT_PREFIX)) {
+                    val customEndpointId = endpoint.removePrefix(CUSTOM_ENDPOINT_PREFIX).toLongOrNull()
+                        ?: throw IllegalArgumentException("Malformed custom analysis endpoint '$endpoint'")
+                    val customEndpoint = customAnalysisEndpointRepository.getById(customEndpointId)
+                        ?: throw IllegalArgumentException("Custom analysis endpoint $customEndpointId no longer exists")
+
+                    // RAG usage is a fixed property of the custom endpoint itself (like responseType),
+                    // not something re-picked per analysis run.
+                    when (customEndpoint.responseType) {
+                        CustomAnalysisResponseType.BINARY -> {
+                            val result = analysisService.analyzeCustomBinary(
+                                bpmnXml = model.bpmnXml,
+                                promptText = customEndpoint.promptText,
+                                llmPropsOverride = options.llmProps,
+                                useRag = customEndpoint.ragEnabled,
+                                ragMode = customEndpoint.ragMode ?: RagMode.HYBRID,
+                                activitiesOnly = options.activitiesOnly ?: false
+                            )
+                            Triple(objectMapper.writeValueAsString(result), result.criticalElements.size, result.amountOfRetries)
+                        }
+                        CustomAnalysisResponseType.MULTICLASS -> {
+                            val result = analysisService.analyzeCustomMulticlass(
+                                bpmnXml = model.bpmnXml,
+                                promptText = customEndpoint.promptText,
+                                llmPropsOverride = options.llmProps,
+                                useRag = customEndpoint.ragEnabled,
+                                ragMode = customEndpoint.ragMode ?: RagMode.HYBRID,
+                                activitiesOnly = options.activitiesOnly ?: false
+                            )
+                            Triple(objectMapper.writeValueAsString(result), result.classifiedElements.size, result.amountOfRetries)
+                        }
+                    }
+                } else throw IllegalArgumentException("Unknown analysis endpoint '$endpoint'")
             }
 
             val totalElements = BpmnExtractor().extractBpmnElements(model.bpmnXml).size

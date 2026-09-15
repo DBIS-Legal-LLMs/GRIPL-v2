@@ -13,6 +13,7 @@ const nameMap = {
     "process-analysis": "Process Analysis",
     labeling: "Labeling",
     thesis: "Thesis",
+    "custom-endpoints": "Custom Endpoints",
 }
 
 export default function AppBreadCrumbs() {

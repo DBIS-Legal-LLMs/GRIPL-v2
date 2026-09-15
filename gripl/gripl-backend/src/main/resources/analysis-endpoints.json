@@ -1,14 +1,12 @@
 [
   {
-    "name": "Preprocessing & Prompt Engineering Analysis",
-    "endpoint": "/gdpr/analysis/prompt-engineering"
-  },
-  {
-    "name": "Baseline Analysis",
-    "endpoint": "/gdpr/analysis/baseline"
+    "name": "Zero-shot Baseline",
+    "endpoint": "/gdpr/analysis/prompt-engineering",
+    "responseType": "BINARY"
   },
   {
     "name": "Multiclass Analysis",
-    "endpoint": "/gdpr/analysis/multiclass"
+    "endpoint": "/gdpr/analysis/multiclass",
+    "responseType": "MULTICLASS"
   }
 ]

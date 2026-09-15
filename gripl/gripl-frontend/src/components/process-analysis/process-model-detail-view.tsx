@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import BpmnEditor from "@/components/bpmn-editor";
 import {useMemo, useState} from "react";
 import {BpmnToolCard} from "@/models/BpmnToolCard";
-import ProcessModelToolCard from "@/components/process-analysis/process-model-tool-card";
+import ProcessModelActions from "@/components/process-analysis/process-model-actions";
 import {getAnalysisElements} from "@/models/dto/AnalysisDto";
 import AnalysisResultCard, {humanizeType} from "@/components/sandbox/analysis-result-card";
 import RagContextCard from "@/components/sandbox/rag-context-card";
@@ -56,15 +56,18 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
   );
 
   const elementNames = useMemo(
-      () =>
-          Object.fromEntries(
-              (analysisResult && "criticalElements" in analysisResult
+      () => {
+          const namedElements = analysisResult
+              ? "criticalElements" in analysisResult
                   ? analysisResult.criticalElements
-                  : []
-              )
+                  : analysisResult.classifiedElements
+              : [];
+          return Object.fromEntries(
+              namedElements
                   .filter((e): e is typeof e & { name: string } => Boolean(e.name))
                   .map(e => [e.id, e.name])
-          ),
+          );
+      },
       [analysisResult]
   );
 
@@ -101,55 +104,61 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
                   </div>
                   <CardContent className="pt-2 max-h-[640px] overflow-y-auto">
                       <TabsContent value="reasoning">
-                          <table className="w-full">
-                              <thead>
-                              <tr className="bg-muted">
-                                  <th className="text-left text-sm font-semibold p-2">Activity</th>
-                                  <th className="text-left text-sm font-semibold p-2">Reasoning</th>
-                              </tr>
-                              </thead>
-                              <tbody>
-                              {("criticalElements" in analysisResult ? analysisResult.criticalElements : []).map((element, index) => {
-                                  const isSelected = element.id === selectedElementId
-                                  const hasRefs = element.references && element.references.length > 0
-                                  return <tr key={index} className={`border-t align-top ${isSelected ? "bg-destructive/50" : ""}`}>
-                                      <td className="font-medium text-sm p-2 whitespace-nowrap">
-                                          {element.name || <span className="italic text-muted-foreground">{humanizeType(element.type)}</span>}
-                                      </td>
-                                      <td className="text-sm p-2">
-                                          <p>{element.reason || "No reasoning provided"}</p>
-                                          {hasRefs && (
-                                              <details className="mt-2">
-                                                  <summary className="cursor-pointer text-xs font-semibold text-primary/80 hover:text-primary select-none w-fit">
-                                                      <Paperclip className="inline h-3 w-3 mr-1" />References ({element.references!.length})
-                                                  </summary>
-                                                  <div className="mt-1.5 space-y-2 pl-1">
-                                                      {element.references!.map((ref, ri) => (
-                                                          <div key={ri} className="border-l-2 border-primary/30 pl-2 space-y-0.5">
-                                                              <blockquote className="text-xs text-muted-foreground italic">
-                                                                  &ldquo;{ref.exactText}&rdquo;
-                                                              </blockquote>
-                                                              {ref.sourceDocument && (
-                                                                  <button
-                                                                      className="text-xs text-primary/70 font-medium underline-offset-2 hover:underline cursor-pointer text-left"
-                                                                      onClick={() => setPdfViewer({
-                                                                          documentName: ref.sourceDocument!,
-                                                                          exactText: ref.exactText,
-                                                                      })}
-                                                                  >
-                                                                      <FileText className="inline h-3 w-3 mr-1" />{ref.sourceDocument.replace(/[_-]/g, " ")}
-                                                                  </button>
-                                                              )}
-                                                          </div>
-                                                      ))}
-                                                  </div>
-                                              </details>
-                                          )}
-                                      </td>
+                          {"criticalElements" in analysisResult ? (
+                              <table className="w-full">
+                                  <thead>
+                                  <tr className="bg-muted">
+                                      <th className="text-left text-sm font-semibold p-2">Activity</th>
+                                      <th className="text-left text-sm font-semibold p-2">Reasoning</th>
                                   </tr>
-                              })}
-                              </tbody>
-                          </table>
+                                  </thead>
+                                  <tbody>
+                                  {analysisResult.criticalElements.map((element, index) => {
+                                      const isSelected = element.id === selectedElementId
+                                      const hasRefs = element.references && element.references.length > 0
+                                      return <tr key={index} className={`border-t align-top ${isSelected ? "bg-destructive/50" : ""}`}>
+                                          <td className="font-medium text-sm p-2 whitespace-nowrap">
+                                              {element.name || <span className="italic text-muted-foreground">{humanizeType(element.type)}</span>}
+                                          </td>
+                                          <td className="text-sm p-2">
+                                              <p>{element.reason || "No reasoning provided"}</p>
+                                              {hasRefs && (
+                                                  <details className="mt-2">
+                                                      <summary className="cursor-pointer text-xs font-semibold text-primary/80 hover:text-primary select-none w-fit">
+                                                          <Paperclip className="inline h-3 w-3 mr-1" />References ({element.references!.length})
+                                                      </summary>
+                                                      <div className="mt-1.5 space-y-2 pl-1">
+                                                          {element.references!.map((ref, ri) => (
+                                                              <div key={ri} className="border-l-2 border-primary/30 pl-2 space-y-0.5">
+                                                                  <blockquote className="text-xs text-muted-foreground italic">
+                                                                      &ldquo;{ref.exactText}&rdquo;
+                                                                  </blockquote>
+                                                                  {ref.sourceDocument && (
+                                                                      <button
+                                                                          className="text-xs text-primary/70 font-medium underline-offset-2 hover:underline cursor-pointer text-left"
+                                                                          onClick={() => setPdfViewer({
+                                                                              documentName: ref.sourceDocument!,
+                                                                              exactText: ref.exactText,
+                                                                          })}
+                                                                      >
+                                                                          <FileText className="inline h-3 w-3 mr-1" />{ref.sourceDocument.replace(/[_-]/g, " ")}
+                                                                      </button>
+                                                                  )}
+                                                              </div>
+                                                          ))}
+                                                      </div>
+                                                  </details>
+                                              )}
+                                          </td>
+                                      </tr>
+                                  })}
+                                  </tbody>
+                              </table>
+                          ) : (
+                              // Multiclass elements have no per-element citations (no `references`
+                              // field in that schema) — just the classification badges + reasoning.
+                              <AnalysisResultCard analysisResult={analysisResult} selectedElementId={selectedElementId}/>
+                          )}
                       </TabsContent>
                       <TabsContent value="rag-context">
                           <RagContextCard
@@ -171,7 +180,7 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
   const editorToolCards: BpmnToolCard[] = [
     {
       position: "top-right",
-      content: <ProcessModelToolCard model={model} onAnalysisStarted={handleAnalysisStarted}/>
+      content: <ProcessModelActions model={model} onAnalysisStarted={handleAnalysisStarted}/>
     } as BpmnToolCard,
     ...(bottomPanel ? [{
       position: "bottom-center" as const,

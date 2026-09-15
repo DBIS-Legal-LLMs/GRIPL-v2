@@ -1,28 +1,31 @@
 "use client"
 
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
+import {Card, CardContent} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {Download, FileText} from "lucide-react";
 import {useState} from "react";
 import {Spinner} from "@/components/ui/spinner";
-import {Separator} from "@/components/ui/separator";
 import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 import {useToast} from "@/components/ui/toast";
 import {useAnalysisSettings} from "@/hooks/use-analysis-settings";
-import AnalysisSettingsFields from "@/components/process-analysis/analysis-settings-fields";
 import analyzeProcessModels from "@/actions/analyze-process-models";
 import {ProcessModelDetail} from "@/models/dto/ProcessModel";
 
-interface ProcessModelToolCardProps {
+interface ProcessModelActionsProps {
     model: ProcessModelDetail;
     onAnalysisStarted: () => void;
 }
 
-export default function ProcessModelToolCard({model, onAnalysisStarted}: ProcessModelToolCardProps) {
+/**
+ * Slim analyze/download actions for the detail view's top-right corner.
+ * The LLM configuration itself lives in Analysis Settings on the dashboard —
+ * it applies globally, so it isn't re-shown or re-editable per model here.
+ */
+export default function ProcessModelActions({model, onAnalysisStarted}: ProcessModelActionsProps) {
 
     const settings = useAnalysisSettings()
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
-    const {backendEndpoint, isMulticlass} = useAnalysisEndpoint()
+    const {backendEndpoint} = useAnalysisEndpoint()
     const {showError} = useToast()
 
     const isAnalyzing = model.status === "QUEUED" || model.status === "RUNNING"
@@ -34,7 +37,7 @@ export default function ProcessModelToolCard({model, onAnalysisStarted}: Process
             await analyzeProcessModels({
                 ids: [model.id],
                 endpoint: backendEndpoint,
-                ...settings.buildEnqueueParams(isMulticlass),
+                ...settings.buildEnqueueParams(),
             })
             onAnalysisStarted()
         } catch (error) {
@@ -56,19 +59,8 @@ export default function ProcessModelToolCard({model, onAnalysisStarted}: Process
         downloadAnchorNode.remove();
     }
 
-    return <Card className="max-w-80">
-        <CardHeader>
-            <CardTitle className="text-lg font-semibold">GRIPL Analysis Tool</CardTitle>
-            <CardDescription>Analyze this BPMN diagram for GDPR compliance using the specified LLM. Critical elements will be highlighted in the diagram.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col space-y-2">
-            <AnalysisSettingsFields settings={settings} isMulticlass={isMulticlass}/>
-            <div className="py-2">
-                <Separator/>
-            </div>
-            <div className="text-xs text-muted-foreground break-all">
-                Selected endpoint: {backendEndpoint}
-            </div>
+    return <Card className="w-fit">
+        <CardContent className="flex flex-col gap-2 p-3">
             <Button
                 onClick={handleAnalyzeClick}
                 variant="default"
