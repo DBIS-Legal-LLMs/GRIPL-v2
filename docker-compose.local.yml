@@ -28,7 +28,7 @@ services:
     environment:
       - FRONTEND_BASE_URL=http://localhost:3000
       - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/gripldb
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/gripl_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
       - RAG_API_URL=http://gripl-rag:8081
@@ -90,7 +90,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=gripldb
+      - POSTGRES_DB=gripl_db
 
 volumes:
   playwright-browsers:
