@@ -16,12 +16,12 @@ import {useToast} from "@/components/ui/toast"
 import deleteProcessModel from "@/actions/delete-process-model"
 import {ProcessModelListItem} from "@/models/dto/ProcessModel"
 
-interface ClearAllButtonProps {
+interface DeleteSelectedButtonProps {
     models: ProcessModelListItem[]
     onCleared: (deletedIds: number[]) => void
 }
 
-export default function ClearAllButton({models, onCleared}: ClearAllButtonProps) {
+export default function DeleteSelectedButton({models, onCleared}: DeleteSelectedButtonProps) {
     const [open, setOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
     const {showError} = useToast()
@@ -50,18 +50,18 @@ export default function ClearAllButton({models, onCleared}: ClearAllButtonProps)
 
     return <Dialog open={open} onOpenChange={setOpen}>
         <Button
-            variant="outline"
+            variant="destructive"
             onClick={() => setOpen(true)}
             disabled={models.length === 0}
         >
             <Trash2 className="mr-2 h-4 w-4"/>
-            Clear All
+            Delete Selected ({models.length})
         </Button>
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Delete all {models.length} process models?</DialogTitle>
+                <DialogTitle>Delete {models.length} selected process model{models.length === 1 ? "" : "s"}?</DialogTitle>
                 <DialogDescription>
-                    This permanently deletes every uploaded process model and its analysis results. This cannot be undone.
+                    This permanently deletes the selected process model{models.length === 1 ? "" : "s"} and its analysis results. This cannot be undone.
                     {runningCount > 0 && ` ${runningCount} model${runningCount === 1 ? " is" : "s are"} currently being analyzed and will be skipped.`}
                 </DialogDescription>
             </DialogHeader>
@@ -71,7 +71,7 @@ export default function ClearAllButton({models, onCleared}: ClearAllButtonProps)
                 </Button>
                 <Button variant="destructive" onClick={handleConfirm} disabled={isDeleting}>
                     {isDeleting && <Spinner size="small" className="mr-2 h-4 w-4"/>}
-                    Delete All
+                    Delete Selected
                 </Button>
             </DialogFooter>
         </DialogContent>

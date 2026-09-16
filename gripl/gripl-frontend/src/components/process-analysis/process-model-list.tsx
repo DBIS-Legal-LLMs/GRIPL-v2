@@ -10,7 +10,7 @@ import UploadProcessModelsButton from "@/components/process-analysis/upload-proc
 import AnalysisSettingsButton from "@/components/process-analysis/analysis-settings-button"
 import AnalyzeSelectedButton from "@/components/process-analysis/analyze-selected-button"
 import DownloadListReportButton from "@/components/process-analysis/download-list-report-button"
-import ClearAllButton from "@/components/process-analysis/clear-all-button"
+import DeleteSelectedButton from "@/components/process-analysis/delete-selected-button"
 import deleteProcessModel from "@/actions/delete-process-model"
 import {useToast} from "@/components/ui/toast"
 import {ProcessModelDetail, ProcessModelListItem, ProcessModelStatus} from "@/models/dto/ProcessModel"
@@ -91,6 +91,7 @@ export default function ProcessModelList({initialModels}: ProcessModelListProps)
     }
 
     const selectableIds = models.filter(m => m.status !== "QUEUED" && m.status !== "RUNNING").map(m => m.id)
+    const selectedModels = models.filter(m => selectedIds.has(m.id))
 
     return <div className="space-y-4">
         <div className="flex flex-row flex-wrap items-center justify-between gap-2">
@@ -98,8 +99,8 @@ export default function ProcessModelList({initialModels}: ProcessModelListProps)
             <div className="flex flex-row gap-2">
                 <AnalysisSettingsButton settings={settings}/>
                 <AnalyzeSelectedButton selectedIds={Array.from(selectedIds)} settings={settings} onEnqueued={handleEnqueued}/>
-                <DownloadListReportButton models={models}/>
-                <ClearAllButton models={models} onCleared={handleCleared}/>
+                <DownloadListReportButton models={selectedModels}/>
+                <DeleteSelectedButton models={selectedModels} onCleared={handleCleared}/>
             </div>
         </div>
 
