@@ -15,24 +15,29 @@ export default function DownloadListReportButton({models}: DownloadListReportBut
     const [isDownloading, setIsDownloading] = useState(false)
     const {showError} = useToast()
 
-    const doneModels = models.filter(m => m.status === "DONE")
-
     async function handleDownloadClick() {
         setIsDownloading(true)
         try {
-            const details = await Promise.all(doneModels.map(async (model) => {
+            const details = await Promise.all(models.map(async (model) => {
                 const response = await fetch(`/api/process-models/${model.id}`)
                 if (!response.ok) throw new Error(`Failed to fetch result for '${model.name}'`)
                 return await response.json() as ProcessModelDetail
             }))
 
-            const bundle = details.map(d => ({
+            const bundle = details.map(d => d.status === "DONE" ? {
                 id: d.id,
                 name: d.name,
                 totalElements: d.totalElements,
                 criticalElementCount: d.criticalElementCount,
                 analysisResult: d.analysisResult,
-            }))
+            } : {
+                id: d.id,
+                name: d.name,
+                totalElements: null,
+                criticalElementCount: null,
+                analysisResult: null,
+                note: "No analysis has been performed for this process model yet.",
+            })
 
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bundle, null, 2))
             const downloadAnchorNode = document.createElement('a')
@@ -52,9 +57,9 @@ export default function DownloadListReportButton({models}: DownloadListReportBut
     return <Button
         variant="outline"
         onClick={handleDownloadClick}
-        disabled={doneModels.length === 0 || isDownloading}
+        disabled={models.length === 0 || isDownloading}
     >
         {isDownloading ? <Spinner size="small" className="mr-2 h-4 w-4"/> : <Download className="mr-2 h-4 w-4"/>}
-        Download Report ({doneModels.length})
+        Download Report ({models.length})
     </Button>
 }
