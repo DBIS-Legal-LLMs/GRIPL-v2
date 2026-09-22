@@ -1,3 +1,5 @@
+import {AnalysisEndpoint} from "@/models/evaluation/Config";
+
 export function cryptoRandomId(): string {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
         // @ts-ignore

@@ -21,6 +21,8 @@ export interface CriticalElement {
 export interface MulticlassAnalysisResponse {
     classifiedElements: ClassifiedElement[];
     amountOfRetries?: number | null;
+    ragContext?: Record<string, RagElementContext>;
+    ragPromptContext?: string[];
 }
 
 export interface ClassifiedElement {

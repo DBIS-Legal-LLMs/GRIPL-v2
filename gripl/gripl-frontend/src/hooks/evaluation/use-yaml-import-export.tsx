@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { dump as yamlDump, load as yamlLoad } from "js-yaml";
 import { MultiEvaluationRequest, ModelRunConfig } from "@/models/dto/MultiEvaluationRequest";
-import {ModelRowState} from "@/models/evaluation/Config";
+import {AnalysisEndpoint, ModelRowState} from "@/models/evaluation/Config";
 import {cryptoRandomId, findPreset, normalize, pruneNulls} from "@/lib/evaluation-config-utils";
 import {useToast} from "@/components/ui/toast";
 import {toErrorMessage} from "@/lib/http-error";

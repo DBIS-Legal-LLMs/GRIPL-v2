@@ -8,7 +8,7 @@ import {Label} from "@/components/ui/label";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Separator} from "@/components/ui/separator";
 import {Copy, Trash2} from "lucide-react";
-import {EndpointChoice, ModelRowState} from "@/models/evaluation/Config";
+import {AnalysisEndpoint, EndpointChoice, ModelRowState} from "@/models/evaluation/Config";
 import {emptyToNull, safeFloatOrNull, safeIntOrNull} from "@/lib/evaluation-config-utils";
 import LlmBaseUrlDatalist from "@/components/datalist/llm-base-url-datalist";
 import LlmModelNameDatalist from "@/components/datalist/llm-model-name-datalist";
