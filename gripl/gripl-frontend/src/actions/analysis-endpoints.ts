@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
+import {AnalysisEndpoint} from "@/models/evaluation/Config";
 
 export default async function fetchAnalysisEndpoints(): Promise<AnalysisEndpoint[]> {
     const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value;

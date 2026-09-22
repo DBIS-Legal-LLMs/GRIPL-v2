@@ -93,7 +93,9 @@ data class RagDocument(
 )
 data class MulticlassAnalysisResponse(
     val classifiedElements: List<ClassifiedElement>,
-    val amountOfRetries: Int? = null
+    val amountOfRetries: Int? = null,
+    val ragContext: Map<String, RagElementContext>? = null,
+    val ragPromptContext: List<String>? = null
 ) {
     data class ClassifiedElement(
         val id: String,
@@ -106,7 +108,9 @@ data class MulticlassAnalysisResponse(
         fun fromBpmnMulticlassAnalysisResult(
             result: BpmnMulticlassAnalysisResult,
             bpmnElements: Set<BpmnElement>,
-            amountOfRetries: Int
+            amountOfRetries: Int,
+            ragContext: Map<String, RagElementContext>? = null,
+            ragPromptContext: List<String>? = null
         ): MulticlassAnalysisResponse {
             val elements = result.elements.map { element ->
                 ClassifiedElement(
@@ -119,7 +123,9 @@ data class MulticlassAnalysisResponse(
 
             return MulticlassAnalysisResponse(
                 classifiedElements = elements,
-                amountOfRetries = amountOfRetries
+                amountOfRetries = amountOfRetries,
+                ragContext = ragContext,
+                ragPromptContext = ragPromptContext
             )
         }
     }

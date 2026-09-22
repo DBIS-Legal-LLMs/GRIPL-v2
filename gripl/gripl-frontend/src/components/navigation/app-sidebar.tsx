@@ -9,7 +9,7 @@ import {
     SidebarMenuItem
 } from "@/components/ui/sidebar";
 import Link from "next/link";
-import {ChartBarDecreasing, LogIn, LogOut, Tag, User, Workflow} from "lucide-react";
+import {ChartBarDecreasing, LogIn, LogOut, Sparkles, Tag, User, Workflow} from "lucide-react";
 import React, {ReactNode} from "react";
 import Image from "next/image";
 import {Label} from "@/components/ui/label";
@@ -49,8 +49,8 @@ export default function AppSidebar() {
 
     const pages = [
         {
-            href: "/",
-            label: "Sandbox",
+            href: "/process-analysis",
+            label: "Process Analysis",
             icon: <Workflow />
         },
         ...(canManageDatasets ? [
@@ -64,7 +64,16 @@ export default function AppSidebar() {
                 label: "Evaluation",
                 icon: <ChartBarDecreasing />
             }
-        ] : [])
+        ] : []),
+        // Not role-gated: CustomAnalysisEndpointController has no
+        // requireGriplRole check yet (GRIPL-v2#40 follow-up) — the nav here
+        // matches that, rather than inventing a restriction the backend
+        // doesn't actually enforce.
+        {
+            href: "/custom-endpoints",
+            label: "Custom Endpoints",
+            icon: <Sparkles />
+        }
     ] as Page[]
 
     return <Sidebar>
