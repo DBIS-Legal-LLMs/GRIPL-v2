@@ -85,7 +85,14 @@ export default function AppSidebar() {
                 { pages.map((page) => {
                     return <SidebarMenuItem key={page.href}>
                         <SidebarMenuButton asChild>
-                            <Link href={page.href}>
+                            {/* prefetch=false: the sidebar renders before auth state
+                                resolves (AuthProvider's token starts null), so an
+                                auto-prefetched Link fetched pre-login gets the
+                                middleware's "no token -> /login" redirect cached by
+                                the client router — and keeps serving that stale
+                                redirect after the user actually logs in, since
+                                nothing invalidates it. Fetch on click instead. */}
+                            <Link href={page.href} prefetch={false}>
                                 { page.icon }
                                 <p>{page.label}</p>
                             </Link>
