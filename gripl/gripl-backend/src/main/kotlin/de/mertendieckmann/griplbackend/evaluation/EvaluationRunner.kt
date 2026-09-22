@@ -28,14 +28,14 @@ class EvaluationRunner(
     private val bpmnExtractor = BpmnExtractor()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun run(request: EvaluationRequest): Flow<EvaluationReport> {
+    fun run(request: EvaluationRequest, ownerUserId: String): Flow<EvaluationReport> {
         val metricsAccumulator = MetricsAccumulator()
         val startedCounter = AtomicInteger(0)
 
         val entries = (if (request.evaluationDataIds.isNotEmpty()) {
-            evaluationDataRepository.getEvaluationDataByIds(request.evaluationDataIds)
+            evaluationDataRepository.getEvaluationDataByIdsForOwner(request.evaluationDataIds, ownerUserId)
         } else {
-            evaluationDataRepository.getEvaluationDataByDatasetIdsOrAll(request.datasets)
+            evaluationDataRepository.getEvaluationDataByDatasetIdsOrAllForOwner(request.datasets, ownerUserId)
         }).sortedBy { it.id }
         val totalCount = entries.size
         val entriesFlow = entries.asFlow()

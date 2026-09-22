@@ -21,12 +21,12 @@ class MultiEvaluationRunner(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun runAll(request: MultiEvaluationRequest): Flow<ModelReportEnvelope> = flow {
+    fun runAll(request: MultiEvaluationRequest, ownerUserId: String): Flow<ModelReportEnvelope> = flow {
         require(request.models.isNotEmpty()) { "models must not be empty" }
 
         val baseSeed = request.seed ?: (System.currentTimeMillis() * (Math.random() * 10) % Int.MAX_VALUE).toInt()
         val repetitions = request.repetitions.coerceAtLeast(1)
-        emit(ModelReportEnvelope("", createMetadata(request, baseSeed, repetitions), 1))
+        emit(ModelReportEnvelope("", createMetadata(request, baseSeed, repetitions, ownerUserId), 1))
 
         for (runNumber in 1..repetitions) {
             log.info { "Starting evaluation run $runNumber/$repetitions" }
@@ -49,7 +49,7 @@ class MultiEvaluationRunner(
                     activitiesOnly = request.activitiesOnly
                 )
 
-                singleRunner.run(singleRequest)
+                singleRunner.run(singleRequest, ownerUserId)
                     .map { event -> ModelReportEnvelope(model.label, event, runNumber) }
                     .collect { wrapped -> emit(wrapped) }
 
@@ -58,12 +58,17 @@ class MultiEvaluationRunner(
         }
     }
 
-    private fun createMetadata(request: MultiEvaluationRequest, seed: Int, repetitions: Int): EvaluationMetadataReport {
-        val datasets = datasetRepository.getDatasetsByIds(request.datasets.map { it.toLong() })
+    private fun createMetadata(
+        request: MultiEvaluationRequest,
+        seed: Int,
+        repetitions: Int,
+        ownerUserId: String
+    ): EvaluationMetadataReport {
+        val datasets = datasetRepository.getDatasetsByIdsAndOwner(request.datasets.map { it.toLong() }, ownerUserId)
         val totalTestCases = if (request.evaluationDataIds.isNotEmpty()) {
             request.evaluationDataIds.size
         } else {
-            evaluationDataRepository.countEvaluationDataForDatasets(request.datasets.map { it.toLong() })
+            evaluationDataRepository.countEvaluationDataForDatasetsAndOwner(request.datasets.map { it.toLong() }, ownerUserId)
         }
 
         return EvaluationMetadataReport(

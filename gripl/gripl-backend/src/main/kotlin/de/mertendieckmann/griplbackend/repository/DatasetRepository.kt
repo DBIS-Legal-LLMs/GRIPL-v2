@@ -26,8 +26,8 @@ class DatasetRepository(
     // ── Owner-scoped access (GRIPL-v2#33) ──────────────────────────────────
     // Datasets are private to the auth-service user (JWT `sub`) that created
     // them. Every path reachable from DatasetController / EvaluationDataController
-    // goes through one of these; the unscoped reads below are only for the
-    // evaluation-run code paths (see class note in getDatasetsByIds).
+    // goes through one of these; getDatasetsByIdsAndOwner below covers the
+    // evaluation-run path (GRIPL-v2#40).
 
     fun createDataset(request: CreateDatasetRequest, ownerUserId: String): Int {
         val sql = "INSERT INTO dataset (name, description, owner_user_id) VALUES (?, ?, ?)"
@@ -54,10 +54,23 @@ class DatasetRepository(
         return jdbc.update(sql, id, ownerUserId)
     }
 
-    // ── Unscoped reads — evaluation-run paths only ────────────────────────
-    // Used by the classification/evaluation runners (not the user-facing CRUD
-    // controllers). Endpoint-level role gating for those is GRIPL-v2#40; do not
-    // wire these into the dataset/test-case controllers.
+    // ── Evaluation-run path (GRIPL-v2#40) ──────────────────────────────────
+    // The classification/evaluation runners take dataset ids from the request
+    // body, so they must scope by owner too — otherwise any caller with a
+    // privileged GRIPL role could run an evaluation against, and read back
+    // the contents of, another user's private dataset by id.
+
+    fun getDatasetsByIdsAndOwner(ids: List<Long>, ownerUserId: String): List<Dataset> {
+        if (ids.isEmpty()) return emptyList()
+        val inSql = ids.joinToString(",")
+        val sql = "SELECT * FROM dataset WHERE id IN ($inSql) AND owner_user_id = ?"
+        return jdbc.query(sql, mapper, ownerUserId)
+    }
+
+    // ── Unscoped reads — not wired to any endpoint ─────────────────────────
+    // Kept as low-level primitives only; do not call these from a controller
+    // or from the evaluation-run path without an owner filter (that's exactly
+    // the gap GRIPL-v2#40 closed for getDatasetsByIds, above).
 
     fun getAllDatasets(): List<Dataset> {
         val sql = "SELECT * FROM dataset"
@@ -67,12 +80,5 @@ class DatasetRepository(
     fun getDatasetById(id: Long): Dataset? {
         val sql = "SELECT * FROM dataset WHERE id = ?"
         return jdbc.query(sql, mapper, id).firstOrNull()
-    }
-
-    fun getDatasetsByIds(ids: List<Long>): List<Dataset> {
-        if (ids.isEmpty()) return emptyList()
-        val inSql = ids.joinToString(",")
-        val sql = "SELECT * FROM dataset WHERE id IN ($inSql)"
-        return jdbc.query(sql, mapper)
     }
 }

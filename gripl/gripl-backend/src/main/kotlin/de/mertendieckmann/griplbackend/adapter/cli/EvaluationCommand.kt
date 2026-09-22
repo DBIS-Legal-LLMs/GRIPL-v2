@@ -48,6 +48,16 @@ class EvaluationCommand(
     )
     var outPath: String = "evaluation_report_multi.md"
 
+    @Option(
+        names = ["-u", "--owner-user-id"],
+        required = true,
+        description = [
+            "auth-service user id (JWT sub) whose datasets/test cases this run is scoped to " +
+                "(GRIPL-v2#40 — the same ownership scoping the HTTP evaluation endpoints apply)"
+        ]
+    )
+    lateinit var ownerUserId: String
+
     override fun run() = runBlocking {
         val request = loadYaml(configPath)
 
@@ -65,7 +75,7 @@ class EvaluationCommand(
             var currentLabel: String? = null
 
             multiEvaluationRunner
-                .runAll(request)
+                .runAll(request, ownerUserId)
                 .onEach { envelope ->
                     val label = envelope.modelLabel
                     val report = envelope.report

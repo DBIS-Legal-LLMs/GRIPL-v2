@@ -29,20 +29,13 @@ class EvaluationDataRepository(
         return jdbc.query("SELECT * FROM evaluation_data", mapper)
     }
 
-    fun getEvaluationDataByDatasetIdsOrAll(dataset: List<Int>): List<EvaluationData> {
-        if (dataset.isEmpty()) {
-            return getAllEvaluationData()
-        }
-        val inSql = dataset.joinToString(",")
-        return jdbc.query("SELECT * FROM evaluation_data WHERE dataset_id IN ($inSql)", mapper)
-    }
-
     // ── Owner-scoped access (GRIPL-v2#33) ──────────────────────────────────
     // A test case is accessible iff its parent dataset is owned by the caller.
     // Test cases with no dataset_id (dataset deleted, or created without one)
     // have no owner and are excluded from every scoped read below. Wired into
-    // EvaluationDataController only; the evaluation-run paths above stay
-    // unscoped (role gating for those is GRIPL-v2#40).
+    // EvaluationDataController, and into the evaluation-run path below
+    // (GRIPL-v2#40) — otherwise a caller could run an evaluation against, and
+    // read back the contents of, another user's private test cases by id.
 
     fun getEvaluationDataForOwner(ownerUserId: String, datasetId: Int? = null): List<EvaluationData> {
         val sql = buildString {
@@ -68,11 +61,45 @@ class EvaluationDataRepository(
         return jdbc.query(sql, mapper, id, ownerUserId).firstOrNull()
     }
 
-    fun getEvaluationDataByIds(ids: List<Int>): List<EvaluationData> {
+    fun getEvaluationDataByIdsForOwner(ids: List<Int>, ownerUserId: String): List<EvaluationData> {
         if (ids.isEmpty()) return emptyList()
         val inSql = ids.joinToString(",")
-        return jdbc.query("SELECT * FROM evaluation_data WHERE id IN ($inSql)", mapper)
+        val sql = """
+            SELECT ed.* FROM evaluation_data ed
+            JOIN dataset d ON ed.dataset_id = d.id
+            WHERE ed.id IN ($inSql) AND d.owner_user_id = ?
+        """.trimIndent()
+        return jdbc.query(sql, mapper, ownerUserId)
     }
+
+    fun getEvaluationDataByDatasetIdsOrAllForOwner(datasetIds: List<Int>, ownerUserId: String): List<EvaluationData> {
+        if (datasetIds.isEmpty()) {
+            return getEvaluationDataForOwner(ownerUserId)
+        }
+        val inSql = datasetIds.joinToString(",")
+        val sql = """
+            SELECT ed.* FROM evaluation_data ed
+            JOIN dataset d ON ed.dataset_id = d.id
+            WHERE ed.dataset_id IN ($inSql) AND d.owner_user_id = ?
+        """.trimIndent()
+        return jdbc.query(sql, mapper, ownerUserId)
+    }
+
+    fun countEvaluationDataForDatasetsAndOwner(datasetIds: List<Long>, ownerUserId: String): Int {
+        if (datasetIds.isEmpty()) return 0
+        val inSql = datasetIds.joinToString(",")
+        val sql = """
+            SELECT COUNT(*) FROM evaluation_data ed
+            JOIN dataset d ON ed.dataset_id = d.id
+            WHERE ed.dataset_id IN ($inSql) AND d.owner_user_id = ?
+        """.trimIndent()
+        return jdbc.queryForObject(sql, Int::class.java, ownerUserId) ?: 0
+    }
+
+    // ── Unscoped reads — not wired to any endpoint ─────────────────────────
+    // Kept as low-level primitives only; do not call these from a controller
+    // or from the evaluation-run path without an owner filter (that's exactly
+    // the gap GRIPL-v2#40 closed for the *ForOwner variants above).
 
     fun getEvaluationDataById(id: Long): EvaluationData? {
         return jdbc.query("SELECT * FROM evaluation_data WHERE id = ?", mapper, id).firstOrNull()
@@ -130,6 +157,9 @@ class EvaluationDataRepository(
         return jdbc.update(sql, id, ownerUserId)
     }
 
+    // Unscoped — not wired to any endpoint or the evaluation-run path (see
+    // countEvaluationDataForDatasetsAndOwner above), kept as a low-level
+    // primitive only.
     fun countEvaluationDataForDatasets(datasetIds: List<Long>): Int {
         if (datasetIds.isEmpty()) return 0
         val inSql = datasetIds.joinToString(",")

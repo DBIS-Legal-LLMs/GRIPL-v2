@@ -61,7 +61,7 @@ class EvaluationControllerRoleTest {
     fun `researcher is allowed through the role gate`() {
         runBlocking {
             whenever(env.resolvePlaceholders(org.mockito.kotlin.any())).thenAnswer { it.arguments[0] }
-            whenever(runner.runAll(org.mockito.kotlin.any())).thenReturn(emptyFlow())
+            whenever(runner.runAll(org.mockito.kotlin.any(), org.mockito.kotlin.any())).thenReturn(emptyFlow())
 
             // Should not throw past the role gate.
             controller.evaluateStream(request, exchangeAs("researcher"))
