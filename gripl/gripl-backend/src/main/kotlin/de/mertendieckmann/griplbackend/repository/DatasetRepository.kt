@@ -29,7 +29,7 @@ class DatasetRepository(
     }
 
     fun getAllDatasets(): List<Dataset> {
-        val sql = "SELECT * FROM dataset"
+        val sql = "SELECT * FROM dataset ORDER BY id ASC"
         return jdbc.query(sql, mapper)
     }
 
@@ -43,6 +43,11 @@ class DatasetRepository(
         val inSql = ids.joinToString(",")
         val sql = "SELECT * FROM dataset WHERE id IN ($inSql)"
         return jdbc.query(sql, mapper)
+    }
+
+    fun updateDataset(id: Long, name: String, description: String?): Int {
+        val sql = "UPDATE dataset SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        return jdbc.update(sql, name, description, id)
     }
 
     fun deleteDataset(id: Long): Int {

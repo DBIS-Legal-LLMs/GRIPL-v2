@@ -88,6 +88,16 @@ class EvaluationDataRepository(
         }
     }
 
+    fun updateEvaluationDataName(id: Long, name: String?): Int {
+        val sql = """
+            UPDATE evaluation_data
+            SET name = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """.trimIndent()
+
+        return jdbc.update(sql, name, id)
+    }
+
     fun deleteEvaluationData(id: Long): Int {
         val sql = "DELETE FROM evaluation_data WHERE id = ?"
         return jdbc.update(sql, id)

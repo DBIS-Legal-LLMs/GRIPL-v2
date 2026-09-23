@@ -8,6 +8,8 @@ import {EvaluationDataMeta} from "@/models/dto/EvaluationData";
 import TestCaseCard from "@/components/labeling/test-case-card";
 import CreateTestCaseButton from "@/components/labeling/create-test-case-button";
 import DeleteDatasetButton from "@/components/labeling/delete-dataset-button";
+import EditDatasetButton from "@/components/labeling/edit-dataset-button";
+import DatasetDescription from "@/components/labeling/dataset-description";
 import {Dataset} from "@/models/dto/Dataset";
 
 interface DatasetListProps {
@@ -23,14 +25,15 @@ export default function DatasetListItem({ dataset, evaluationMetadata, className
         <div className="w-full flex flex-row h-20 mb-4 gap-2">
             <CollapsibleTrigger className="w-full">
                 <Card className="w-full">
-                    <CardHeader className="flex-row justify-between items-center">
-                        <CardTitle>{dataset.name} ({dataset.id})</CardTitle>
-                        { dataset.description && <CardDescription>{dataset.description}</CardDescription> }
+                    <CardHeader className="flex-row justify-between items-center gap-4">
+                        <CardTitle>{dataset.name}</CardTitle>
+                        { dataset.description && <DatasetDescription description={dataset.description} /> }
                         <>{ isOpen ? <ChevronDown /> : <ChevronUp /> }</>
                     </CardHeader>
                 </Card>
             </CollapsibleTrigger>
             <CreateTestCaseButton dataset={dataset} />
+            <EditDatasetButton dataset={dataset} />
             <DeleteDatasetButton dataset={dataset} />
         </div>
         <CollapsibleContent>
