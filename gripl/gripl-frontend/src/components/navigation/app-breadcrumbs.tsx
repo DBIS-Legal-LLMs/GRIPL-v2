@@ -15,6 +15,7 @@ const nameMap = {
     labeling: "Labeling",
     thesis: "Thesis",
     "custom-endpoints": "Custom Endpoints",
+    settings: "Account Settings",
 }
 
 export default function AppBreadCrumbs() {

@@ -9,7 +9,7 @@ import {
     SidebarMenuItem
 } from "@/components/ui/sidebar";
 import Link from "next/link";
-import {ChartBarDecreasing, LogIn, LogOut, Sparkles, Tag, User, Workflow} from "lucide-react";
+import {ChartBarDecreasing, LogIn, LogOut, Settings, Sparkles, Tag, User, Workflow} from "lucide-react";
 import React, {ReactNode} from "react";
 import Image from "next/image";
 import {Label} from "@/components/ui/label";
@@ -139,6 +139,12 @@ export default function AppSidebar() {
                             <DropdownMenuContent side="top" align="start" className="w-[--radix-popper-anchor-width]">
                                 <DropdownMenuLabel className="truncate">{username ?? "Signed in"}</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                    <Link href="/settings">
+                                        <Settings />
+                                        Account Settings
+                                    </Link>
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={logout}>
                                     <LogOut />
                                     Log out
