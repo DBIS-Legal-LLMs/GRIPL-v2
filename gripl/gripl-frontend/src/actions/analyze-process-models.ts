@@ -1,9 +1,10 @@
 "use server"
 
 import {EnqueueAnalysisRequest, EnqueueAnalysisResponse} from "@/models/dto/ProcessModel";
+import {authenticatedServerFetch} from "@/lib/authenticated-server-fetch";
 
 export default async function analyzeProcessModels(request: EnqueueAnalysisRequest): Promise<EnqueueAnalysisResponse> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/process-models/analyze`, {
+    const response = await authenticatedServerFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/process-models/analyze`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

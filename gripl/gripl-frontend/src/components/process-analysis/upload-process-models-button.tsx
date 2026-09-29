@@ -7,6 +7,7 @@ import {Upload} from "lucide-react"
 import {useToast} from "@/components/ui/toast"
 import {Spinner} from "@/components/ui/spinner"
 import {ProcessModelListItem} from "@/models/dto/ProcessModel"
+import {authenticatedFetch} from "@/lib/authenticated-fetch"
 
 interface UploadProcessModelsButtonProps {
     onUploaded: (models: ProcessModelListItem[]) => void
@@ -22,7 +23,7 @@ export default function UploadProcessModelsButton({onUploaded}: UploadProcessMod
         formData.append("bpmnFile", file, file.name)
         formData.append("name", file.name)
 
-        const response = await fetch("/api/process-models", {
+        const response = await authenticatedFetch("/api/process-models", {
             method: "POST",
             body: formData,
         })

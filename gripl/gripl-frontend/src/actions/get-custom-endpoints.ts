@@ -1,9 +1,10 @@
 "use server"
 
 import {CustomAnalysisEndpoint} from "@/models/dto/CustomAnalysisEndpoint";
+import {authenticatedServerFetch} from "@/lib/authenticated-server-fetch";
 
 export default async function getCustomEndpoints(): Promise<CustomAnalysisEndpoint[]> {
-    const result = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/custom-analysis-endpoints`, {
+    const result = await authenticatedServerFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/custom-analysis-endpoints`, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",

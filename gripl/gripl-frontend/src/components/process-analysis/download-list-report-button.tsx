@@ -6,6 +6,7 @@ import {Download} from "lucide-react"
 import {Spinner} from "@/components/ui/spinner"
 import {useToast} from "@/components/ui/toast"
 import {ProcessModelDetail, ProcessModelListItem} from "@/models/dto/ProcessModel"
+import {authenticatedFetch} from "@/lib/authenticated-fetch"
 
 interface DownloadListReportButtonProps {
     models: ProcessModelListItem[]
@@ -19,7 +20,7 @@ export default function DownloadListReportButton({models}: DownloadListReportBut
         setIsDownloading(true)
         try {
             const details = await Promise.all(models.map(async (model) => {
-                const response = await fetch(`/api/process-models/${model.id}`)
+                const response = await authenticatedFetch(`/api/process-models/${model.id}`)
                 if (!response.ok) throw new Error(`Failed to fetch result for '${model.name}'`)
                 return await response.json() as ProcessModelDetail
             }))

@@ -2,6 +2,7 @@
 
 import {useEffect, useRef, useState} from "react";
 import {IN_FLIGHT_STATUSES, ProcessModelListItem} from "@/models/dto/ProcessModel";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -23,7 +24,7 @@ export function useProcessModelListPolling(initialModels: ProcessModelListItem[]
 
     useEffect(() => {
         const fetchList = () => {
-            fetch("/api/process-models")
+            authenticatedFetch("/api/process-models")
                 .then(response => {
                     if (!response.ok) throw new Error(`Failed to fetch process models: ${response.statusText}`);
                     return response.json();

@@ -1,9 +1,10 @@
 "use server"
 
 import {DefaultAnalysisPrompt} from "@/models/dto/DefaultAnalysisPrompt";
+import {authenticatedServerFetch} from "@/lib/authenticated-server-fetch";
 
 export default async function getDefaultPrompts(): Promise<DefaultAnalysisPrompt[]> {
-    const result = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/gdpr/analysis/default-prompts`, {
+    const result = await authenticatedServerFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/gdpr/analysis/default-prompts`, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",

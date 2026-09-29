@@ -2,6 +2,7 @@
 
 import React, {useEffect, useState} from "react";
 import {AlertTriangle} from "lucide-react";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 const STATUS_ENDPOINT = "/api/gdpr/rag/status";
 const POLL_INTERVAL_MS = 2 * 60 * 1000;
@@ -23,7 +24,7 @@ export function KgStatusBanner() {
         let cancelled = false;
 
         const checkStatus = () => {
-            fetch(STATUS_ENDPOINT)
+            authenticatedFetch(STATUS_ENDPOINT)
                 .then(async (response) => {
                     if (!response.ok) {
                         throw new Error("RAG status check failed");
