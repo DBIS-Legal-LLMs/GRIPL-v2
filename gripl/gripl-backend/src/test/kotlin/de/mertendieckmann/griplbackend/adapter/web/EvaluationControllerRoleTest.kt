@@ -1,5 +1,6 @@
 package de.mertendieckmann.griplbackend.adapter.web
 
+import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.evaluation.MultiEvaluationRunner
 import de.mertendieckmann.griplbackend.model.dto.MultiEvaluationRequest
 import de.mertendieckmann.griplbackend.security.AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE
@@ -9,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.core.env.Environment
@@ -26,10 +28,14 @@ class EvaluationControllerRoleTest {
 
     private val runner = mock<MultiEvaluationRunner>()
     private val env = mock<Environment>()
-    private val controller = EvaluationController(runner, env)
+    private val authServiceClient = mock<AuthServiceClient>()
+    private val controller = EvaluationController(runner, env, authServiceClient)
 
     private fun exchangeAs(griplRole: String?) =
-        MockServerWebExchange.from(MockServerHttpRequest.post("/gdpr/evaluation/stream")).apply {
+        MockServerWebExchange.from(
+            MockServerHttpRequest.post("/gdpr/evaluation/stream")
+                .header("Authorization", "Bearer test-token")
+        ).apply {
             attributes[AUTHENTICATED_USER_ID_ATTRIBUTE] = "user-1"
             if (griplRole != null) attributes[AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE] = griplRole
         }
@@ -60,11 +66,25 @@ class EvaluationControllerRoleTest {
     @Test
     fun `researcher is allowed through the role gate`() {
         runBlocking {
-            whenever(env.resolvePlaceholders(org.mockito.kotlin.any())).thenAnswer { it.arguments[0] }
-            whenever(runner.runAll(org.mockito.kotlin.any(), org.mockito.kotlin.any())).thenReturn(emptyFlow())
+            whenever(env.resolvePlaceholders(any())).thenAnswer { it.arguments[0] }
+            whenever(authServiceClient.getOpenRouterApiKey(any())).thenReturn("sk-or-v1-test")
+            whenever(runner.runAll(any(), any())).thenReturn(emptyFlow())
 
             // Should not throw past the role gate.
             controller.evaluateStream(request, exchangeAs("researcher"))
+        }
+    }
+
+    @Test
+    fun `researcher without an OpenRouter key set is rejected with a clear 400`() {
+        runBlocking {
+            whenever(env.resolvePlaceholders(any())).thenAnswer { it.arguments[0] }
+            whenever(authServiceClient.getOpenRouterApiKey(any())).thenReturn(null)
+
+            val ex = assertThrows(ResponseStatusException::class.java) {
+                runBlocking { controller.evaluateStream(request, exchangeAs("researcher")) }
+            }
+            assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
         }
     }
 }

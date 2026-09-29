@@ -1,5 +1,6 @@
 package de.mertendieckmann.griplbackend.security
 
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.server.ServerWebExchange
@@ -15,6 +16,20 @@ import org.springframework.web.server.ServerWebExchange
  */
 fun ServerWebExchange.authenticatedUserId(): String =
     getAttribute<String>(AUTHENTICATED_USER_ID_ATTRIBUTE)
+        ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated")
+
+/**
+ * The raw bearer token for the current request — [JwtAuthenticationWebFilter]
+ * has already verified it locally, but some calls (fetching the caller's own
+ * OpenRouter API key via [de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient])
+ * need to forward the same token to auth-service so it can independently
+ * re-verify it and act on the caller's behalf.
+ */
+fun ServerWebExchange.bearerToken(): String =
+    request.headers.getFirst(HttpHeaders.AUTHORIZATION)
+        ?.takeIf { it.startsWith("Bearer ") }
+        ?.removePrefix("Bearer ")
+        ?.trim()
         ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated")
 
 /**

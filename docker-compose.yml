@@ -33,14 +33,16 @@ services:
     depends_on:
       - gripl-postgres
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPEN_ROUTER_API_KEY=${OPEN_ROUTER_API_KEY}
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
       - PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
       - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
       - RAG_API_URL=${RAG_API_URL:-http://gripl-rag:8081}
       # auth-service JWKS endpoint — gripl-backend verifies RS256 JWTs against it.
       - AUTH_SERVICE_JWKS_URI=${AUTH_SERVICE_JWKS_URI:-http://host.docker.internal:8100/.well-known/jwks.json}
+      # Base URL of auth-service itself — used to fetch a caller's own
+      # OpenRouter API key (auth-service#8 follow-up: no shared server key,
+      # every analysis is billed to the calling user's own OpenRouter account).
+      - AUTH_SERVICE_INTERNAL_URL=${AUTH_SERVICE_INTERNAL_URL:-http://host.docker.internal:8100}
     extra_hosts:
       # Reach auth-service's separate compose stack on the host.
       - "host.docker.internal:host-gateway"

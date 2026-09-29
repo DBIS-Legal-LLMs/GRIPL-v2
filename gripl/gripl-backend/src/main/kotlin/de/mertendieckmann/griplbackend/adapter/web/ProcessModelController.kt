@@ -1,7 +1,9 @@
 package de.mertendieckmann.griplbackend.adapter.web
 
+import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.adapter.web.utils.ControllerUtils
 import de.mertendieckmann.griplbackend.application.ProcessModelJobRunner
+import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.ProcessModel
@@ -9,7 +11,9 @@ import de.mertendieckmann.griplbackend.model.dto.ProcessModelDetailDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelListItemDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
+import de.mertendieckmann.griplbackend.security.bearerToken
 import io.swagger.v3.oas.annotations.Operation
+import kotlinx.coroutines.reactor.mono
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -17,6 +21,7 @@ import org.springframework.http.codec.multipart.FilePart
 import org.springframework.http.codec.multipart.FormFieldPart
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import tools.jackson.databind.ObjectMapper
@@ -27,7 +32,8 @@ import tools.jackson.module.kotlin.readValue
 class ProcessModelController(
     private val repository: ProcessModelRepository,
     private val jobRunner: ProcessModelJobRunner,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val authServiceClient: AuthServiceClient
 ) {
 
     @Operation(
@@ -96,13 +102,35 @@ class ProcessModelController(
         description = "Queues the given process model ids for sequential analysis. Ids already queued or running are skipped."
     )
     @PostMapping("/analyze", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun analyzeProcessModels(@RequestBody request: EnqueueAnalysisRequest): Mono<ResponseEntity<EnqueueAnalysisResponse>> {
-        return Mono.fromCallable {
-            val enqueued = jobRunner.enqueue(request)
-            val skipped = request.ids.filter { it !in enqueued }
-            EnqueueAnalysisResponse(enqueuedIds = enqueued, skippedIds = skipped)
-        }.subscribeOn(Schedulers.boundedElastic())
-            .map { ResponseEntity.status(HttpStatus.ACCEPTED).body(it) }
+    fun analyzeProcessModels(
+        @RequestBody request: EnqueueAnalysisRequest,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<EnqueueAnalysisResponse>> {
+        val bearerToken = exchange.bearerToken()
+
+        // Note: a suspend block returning null makes `mono { }` complete
+        // *empty* (Reactor forbids onNext(null)) rather than emitting null,
+        // so a missing key has to be turned into a thrown exception here —
+        // checking for null downstream in flatMap would just never run.
+        return mono {
+            authServiceClient.getOpenRouterApiKey(bearerToken)
+                ?: throw ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Set your OpenRouter API key in account settings before running an analysis"
+                )
+        }
+            .flatMap { apiKey ->
+                val requestWithKey = request.copy(
+                    llmProps = (request.llmProps ?: LlmConfig.Companion.LlmPropsOverride()).copy(apiKey = apiKey)
+                )
+
+                Mono.fromCallable {
+                    val enqueued = jobRunner.enqueue(requestWithKey)
+                    val skipped = requestWithKey.ids.filter { it !in enqueued }
+                    EnqueueAnalysisResponse(enqueuedIds = enqueued, skippedIds = skipped)
+                }.subscribeOn(Schedulers.boundedElastic())
+                    .map { ResponseEntity.status(HttpStatus.ACCEPTED).body(it) }
+            }
     }
 
     private fun ProcessModel.toListItemDto(): ProcessModelListItemDto {

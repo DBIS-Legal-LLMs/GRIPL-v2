@@ -16,7 +16,7 @@ reasoning.
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/engine/install/) & [Docker Compose](https://docs.docker.com/compose/install/)
-- An OpenAI-compatible LLM API key (OpenRouter by default)
+- An OpenRouter API key for `gripl-rag`'s shared knowledge-graph ingestion/embeddings (the RAG corpus is shared infrastructure, billed to the project). gripl-backend itself holds no LLM key — every analysis is billed to the *calling user's own* OpenRouter account, set on their auth-service profile (see [Authentication & Roles](#authentication--roles)).
 - A running instance of [`auth-service`](https://github.com/DBIS-Legal-LLMs/auth-service) — login/register won't work without it. See that repo's README; by default GRIPL expects it at `http://localhost:8100` (or `http://host.docker.internal:8100` from inside Docker).
 
 > **Windows**: Docker Desktop → Settings → General → enable "Expose daemon on tcp://localhost:2375 without TLS"; Settings → Docker Engine → add `"min-api-version": "1.24"`.
@@ -30,7 +30,7 @@ cd GRIPL-v2
 cp .env.local.example .env.local
 ```
 
-Fill in `.env.local` — at minimum an LLM key (`OPENAI_API_KEY`/`OPEN_ROUTER_API_KEY` and the `LLM_*`/`EMBEDDING_*` block for `gripl-rag`); the `AUTH_SERVICE_JWKS_URI`/`AUTH_SERVICE_INTERNAL_URL` defaults already point at `auth-service` running in Docker on the same host (see [Authentication & Roles](#authentication--roles)).
+Fill in `.env.local` — at minimum the `LLM_*`/`EMBEDDING_*` block for `gripl-rag`'s shared knowledge graph; the `AUTH_SERVICE_JWKS_URI`/`AUTH_SERVICE_INTERNAL_URL` defaults already point at `auth-service` running in Docker on the same host (see [Authentication & Roles](#authentication--roles)). gripl-backend needs no LLM key of its own — each user sets their own OpenRouter API key on their auth-service account and every analysis they run is billed to that key.
 
 ```bash
 docker compose -f docker-compose.local.yml up --build
@@ -140,10 +140,28 @@ standalone identity service shared with RAGulate and future DBIS tools.
 
 | Variable | Used by | Example (Docker on the same host) |
 |---|---|---|
-| `AUTH_SERVICE_JWKS_URI` | `gripl-backend` | `http://host.docker.internal:8100/.well-known/jwks.json` |
-| `AUTH_SERVICE_INTERNAL_URL` | `gripl-frontend` | `http://host.docker.internal:8100` |
+| `AUTH_SERVICE_JWKS_URI` | `gripl-backend` (token verification) | `http://host.docker.internal:8100/.well-known/jwks.json` |
+| `AUTH_SERVICE_INTERNAL_URL` | `gripl-frontend` (proxies `/auth/*`) and `gripl-backend` (fetches the caller's own OpenRouter key) | `http://host.docker.internal:8100` |
 
 The same account works across GRIPL and RAGulate — both verify the same `auth-service` tokens.
+
+### OpenRouter API key
+
+`gripl-backend` holds no LLM provider key of its own — every analysis
+(Sandbox and Evaluation) is billed to the *calling user's own* OpenRouter
+account. A user sets/changes their key on their auth-service profile
+(`PUT /users/me`, see that repo's README); `gripl-backend` fetches it per
+request by forwarding the caller's own already-verified bearer token to
+`GET {AUTH_SERVICE_INTERNAL_URL}/users/me` (`adapter/auth/AuthServiceClient.kt`)
+— no service-to-service secret needed, since auth-service independently
+re-verifies that token itself. A caller with no key set gets a `400` telling
+them to set one first, rather than the request silently falling back to any
+shared key.
+
+`gripl-rag`'s shared knowledge-graph ingestion and RAG retrieval are the one
+exception — that's a shared corpus every user queries, not any one user's
+own data, so it still uses its own env-configured OpenRouter key
+(`LLM_API_KEY`/`EMBEDDING_API_KEY` in `.env.local`).
 
 ### Roles
 
