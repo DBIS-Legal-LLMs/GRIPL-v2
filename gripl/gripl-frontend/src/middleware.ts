@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
-import { decodeGriplRole, isPrivilegedGriplRole } from "@/lib/gripl-role";
+import { decodeGriplRole, isPrivilegedGriplRole, isTokenExpired } from "@/lib/gripl-role";
 
 // GRIPL-v2#40: the paths below are admin/researcher only. Listed as prefixes,
 // checked against the pathname, not the sidebar — hiding the nav entry alone
@@ -13,10 +13,12 @@ const PRIVILEGED_PATH_PREFIXES = ["/labeling", "/evaluation"];
 // requireGriplRole — GRIPL-v2#40).
 export function middleware(request: NextRequest) {
     const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-    if (!token) {
+    if (!token || isTokenExpired(token)) {
         const loginUrl = new URL("/login", request.url);
         loginUrl.searchParams.set("from", request.nextUrl.pathname);
-        return NextResponse.redirect(loginUrl);
+        const response = NextResponse.redirect(loginUrl);
+        if (token) response.cookies.delete(AUTH_COOKIE_NAME);
+        return response;
     }
 
     const path = request.nextUrl.pathname;

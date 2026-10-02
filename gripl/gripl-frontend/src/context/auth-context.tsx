@@ -4,7 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useRouter } from "next/navigation";
 import { clearClientToken, readClientToken, writeClientToken } from "@/lib/auth-cookie";
 import { extractErrorDetails } from "@/lib/http-error";
-import { decodeGriplRole } from "@/lib/gripl-role";
+import { decodeGriplRole, isTokenExpired } from "@/lib/gripl-role";
 
 // Login/register are proxied to auth-service through the /auth/* rewrite (see
 // next.config.ts) — the browser only ever talks to this origin, and
@@ -81,8 +81,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
 
     useEffect(() => {
-        setToken(readClientToken());
-        setUsername(readStoredUsername());
+        const stored = readClientToken();
+        if (stored && isTokenExpired(stored)) {
+            clearClientToken();
+            writeStoredUsername(null);
+            setToken(null);
+            setUsername(null);
+        } else {
+            setToken(stored);
+            setUsername(readStoredUsername());
+        }
         setIsLoading(false);
     }, []);
 

@@ -26,3 +26,16 @@ export function decodeGriplRole(token: string): string | null {
         return null;
     }
 }
+
+/** True if the token is malformed or its `exp` claim has passed (30s of
+ * clock-skew slack, matching gripl-backend). auth-service access tokens last
+ * ~15 min with no refresh flow yet, while the cookie holding one lives 30 days
+ * — without this the UI keeps looking logged in and every request 401s. */
+export function isTokenExpired(token: string): boolean {
+    try {
+        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+        return typeof payload.exp !== "number" || payload.exp * 1000 < Date.now() - 30_000;
+    } catch {
+        return true;
+    }
+}
