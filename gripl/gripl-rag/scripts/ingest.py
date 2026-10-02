@@ -46,7 +46,7 @@ async def main():
         print(f"ERROR: Failed to initialize LightRAG: {e}")
         print(f"\nCommon causes:")
         print(f"  - Neo4j is not running (run: docker compose up gripl-neo4j)")
-        print(f"  - GEMINI_API_KEY is invalid or not set in .env")
+        print(f"  - LLM_API_KEY / EMBEDDING_API_KEY is invalid or not set in .env.local")
         sys.exit(1)
 
     # Ingest documents

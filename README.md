@@ -50,6 +50,21 @@ Login/register go through `auth-service` — it must already be running (its own
 
 > **Reproducing the paper's dataset**: `dataset/` ships the labeled BPMN corpus as CSV exports. `python scripts/import_all_data.py` (needs `psycopg2`, reads `.env.local` for the Postgres connection) imports `dataset.csv` then `evaluation_data.csv`; `scripts/check_datasets.py` sanity-checks what's already imported against the CSVs.
 
+#### One-time: ingest the GDPR knowledge base (RAG)
+
+The frontend shows a yellow "GDPR knowledge graph is empty" warning until `gripl-rag` has ingested its corpus (the GDPR text plus ~35 EDPB guidelines, under `gripl/gripl-rag/data/`). The Docker stack does **not** do this automatically — run it once per fresh Neo4j volume, with the stack up:
+
+```bash
+docker compose -f docker-compose.local.yml exec gripl-rag python scripts/ingest.py
+```
+
+- It reads the pre-extracted `.txt` files in `gripl/gripl-rag/data/extracted/` (committed to the repo), asks the LLM to extract entities/relations from each document, embeds them, and writes the graph to Neo4j. It prints per-document progress and a summary with failures at the end.
+- **It costs money**: it uses the project's own `LLM_API_KEY`/`EMBEDDING_API_KEY` from `.env.local` (not a user's key), so check your OpenRouter balance first and watch the first document or two before leaving it running. It can take a long while — keep the terminal open (or use `docker compose ... exec -d` and follow `docker compose ... logs -f gripl-rag`).
+- Check it worked: `curl http://localhost:8081/api/status` should return `{"ingested": true, ...}`; the warning in the UI disappears within ~2 minutes (it polls).
+- The graph lives in Neo4j's `neo4j_data` volume and LightRAG's own state in `gripl/gripl-rag/rag_working_dir/`. If you ever wipe the Neo4j volume, also empty `rag_working_dir/` before re-ingesting so the two don't disagree about what's already ingested.
+- Only needed if you add new PDFs under `data/` (not for a fresh clone): run `docker compose -f docker-compose.local.yml exec gripl-rag python scripts/extract_pdfs.py` first to regenerate the `.txt` files, then ingest.
+- RAG is only used for an analysis when **Use RAG** is switched on in the Analysis Settings dialog (off by default), and it only returns anything once this ingestion has run. For production use the same command with `-f docker-compose.yml -f docker-compose.prod.yml`.
+
 ### 2. Production (server already runs Traefik + Watchtower)
 
 ```bash
