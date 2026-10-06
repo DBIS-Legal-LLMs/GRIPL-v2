@@ -65,7 +65,7 @@ class PromptBpmnAnalyzer(
                 analysisResult, bpmnElements, amountOfRetries, ragContext, pool.flatten()
             )
         } else {
-            // Path without RAG context
+            // Original path — unchanged from evaluation baseline
             val bpmnAnalysisAiServiceNoRag = PromptBpmnAnalysisAiServiceFactory.createWithoutRag(llm, memoryProvider, activitiesOnly)
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
                 bpmnAnalysisAiServiceNoRag.analyze(sessionId, bpmnElements)

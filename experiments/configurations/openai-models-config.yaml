@@ -1,4 +1,4 @@
-defaultEvaluationEndpoint: /gdpr/analysis/binary
+defaultEvaluationEndpoint: /gdpr/analysis/prompt-engineering
 seed: 24523833
 maxConcurrent: 10
 repetitions: 5

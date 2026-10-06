@@ -38,17 +38,16 @@ class AnalysisController(
     }
 
     @Operation(
-        summary = "Analyzes BPMN-XML for GDPR relevance (binary)",
-        description = "Upload a BPMN XML document (file part **bpmnFile**). The service preprocesses it into BPMN elements,"
-            + " analyzes them with an LLM, and returns a list of GDPR-relevant elements found in the BPMN model, including"
-            + " the reasoning for each element. Optional parts: **useRag**, **ragMode** and **activitiesOnly**."
+        summary = "Analyzes BPMN-XML for GDPR relevance with prompt engineering",
+        description = "Upload a BPMN XML document (file part **bpmnFile**). The service analyzes it with an LLM, and returns a list"
+            + " of GDPR-relevant elements found in the BPMN model, including the reasoning for each element."
     )
     @PostMapping(
-        "/binary",
+        "/prompt-engineering",
         consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
-    fun analyzeBpmnForGdprBinary(
+    fun analyzeBpmnForGdprPromptEngineering(
         @RequestPart("bpmnFile") file: FilePart,
         @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
         @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
@@ -67,6 +66,43 @@ class AnalysisController(
             Mono.fromCallable {
                 val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
                 val analyzer = analyzerFactory.createPromptEngineeringAnalyzer(llm)
+                analyzer.analyzeBpmnForGdpr(
+                    bpmnXml = bpmnXml,
+                    useRag = useRag,
+                    ragMode = ragMode,
+                    activitiesOnly = activitiesOnly
+                )            }.subscribeOn(Schedulers.boundedElastic())
+        }.map { ResponseEntity.ok(it) }
+    }
+
+    @Operation(
+        summary = "Analyzes BPMN-XML for GDPR relevance using baseline method",
+        description = "Upload a BPMN XML document (file part **bpmnFile**). The service analyzes it with a baseline method, and returns a list"
+            + " of GDPR-relevant elements found in the BPMN model, including the reasoning for each element."
+    )
+    @PostMapping(
+        "/baseline",
+        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun analyzeBpmnForGdprBaseline(
+        @RequestPart("bpmnFile") file: FilePart,
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("activitiesOnly", required = false) activitiesOnlyPart: org.springframework.http.codec.multipart.FormFieldPart?
+    ): Mono<ResponseEntity<AnalysisResponse>> {
+
+        val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
+        val ragMode = parseRagMode(ragModePart)
+        val activitiesOnly = activitiesOnlyPart?.value()?.toBooleanStrictOrNull() ?: false
+        val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
+        val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
+
+        return bpmnXmlMono.flatMap { bpmnXml ->
+            Mono.fromCallable {
+                val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
+                val analyzer = analyzerFactory.createBaselineAnalyzer(llm)
                 analyzer.analyzeBpmnForGdpr(
                     bpmnXml = bpmnXml,
                     useRag = useRag,
