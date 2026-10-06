@@ -17,11 +17,10 @@ interface AnalysisEndpointContextValue {
 }
 
 const STORAGE_KEY = "gripl.analysis.endpoint.selected";
-const DEFAULT_BINARY_ENDPOINT = "/gdpr/analysis/prompt-engineering";
+const DEFAULT_BINARY_ENDPOINT = "/gdpr/analysis/binary";
 const DEFAULT_MULTICLASS_ENDPOINT = "/gdpr/analysis/multiclass";
 const FALLBACK_ENDPOINTS: AnalysisEndpoint[] = [
-    { name: "Preprocessing & Prompt Engineering Analysis", endpoint: DEFAULT_BINARY_ENDPOINT },
-    { name: "Baseline Analysis", endpoint: "/gdpr/analysis/baseline" },
+    { name: "Binary Analysis", endpoint: DEFAULT_BINARY_ENDPOINT },
     { name: "Multiclass Analysis", endpoint: DEFAULT_MULTICLASS_ENDPOINT },
 ];
 

@@ -102,7 +102,7 @@ private suspend fun evaluateEntryOrFailFast(
                 errorMessage =
                     "RAG evaluation (evaluateRag=true) was requested, but endpoint " +
                         "'${evaluationRequest.evaluationEndpoint}' returned no RAG context — the endpoint " +
-                        "does not support RAG (e.g. baseline) or useRag is false. " +
+                        "does not support RAG (e.g. multiclass) or useRag is false. " +
                         "Disable 'Evaluate RAG Quality' or use a RAG-capable endpoint with useRag=true."
             )
         )
