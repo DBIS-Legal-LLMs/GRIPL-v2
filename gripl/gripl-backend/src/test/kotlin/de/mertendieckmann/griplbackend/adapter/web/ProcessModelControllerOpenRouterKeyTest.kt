@@ -8,6 +8,7 @@ import de.mertendieckmann.griplbackend.security.AUTHENTICATED_USER_ID_ATTRIBUTE
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
@@ -32,7 +33,7 @@ class ProcessModelControllerOpenRouterKeyTest {
     private val repository = mock<ProcessModelRepository>()
     private val jobRunner = mock<ProcessModelJobRunner>()
     private val authServiceClient = mock<AuthServiceClient>()
-    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient)
+    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient, mock<CustomAnalysisEndpointRepository>())
 
     private fun exchange() =
         MockServerWebExchange.from(

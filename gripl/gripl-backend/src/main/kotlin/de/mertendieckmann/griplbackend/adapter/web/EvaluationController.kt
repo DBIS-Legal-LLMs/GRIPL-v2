@@ -4,6 +4,7 @@ import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.adapter.web.utils.ControllerUtils
 import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.evaluation.MultiEvaluationRunner
+import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import de.mertendieckmann.griplbackend.model.dto.EvaluationReportStepInfo
 import de.mertendieckmann.griplbackend.model.dto.ModelReportEnvelope
 import de.mertendieckmann.griplbackend.model.dto.MultiEvaluationRequest
@@ -30,7 +31,8 @@ import org.springframework.web.server.ServerWebExchange
 class EvaluationController(
     private val multiEvaluationRunner: MultiEvaluationRunner,
     private val env: Environment,
-    private val authServiceClient: AuthServiceClient
+    private val authServiceClient: AuthServiceClient,
+    private val customAnalysisEndpointRepository: CustomAnalysisEndpointRepository
 ) {
 
     private suspend fun requireOpenRouterApiKey(exchange: ServerWebExchange): String =
@@ -39,6 +41,12 @@ class EvaluationController(
                 HttpStatus.BAD_REQUEST,
                 "Set your OpenRouter API key in account settings before running an evaluation"
             )
+
+    /** Every endpoint this request will run must be built-in or the caller's own custom one. */
+    private fun requireOwnedEndpoints(request: MultiEvaluationRequest, userId: String) {
+        val endpoints = listOf(request.defaultEvaluationEndpoint) + request.models.map { it.evaluationEndpoint }
+        endpoints.forEach { ControllerUtils.requireOwnedCustomEndpoint(it, customAnalysisEndpointRepository, userId) }
+    }
 
     private fun MultiEvaluationRequest.withApiKey(apiKey: String): MultiEvaluationRequest =
         copy(models = models.map { it.copy(llmProps = (it.llmProps ?: LlmConfig.Companion.LlmPropsOverride()).copy(apiKey = apiKey)) })
@@ -54,6 +62,7 @@ class EvaluationController(
         val resolvedRequest = ControllerUtils.resolveEnvironmentVariables(request, env)
             ?.withApiKey(apiKey)
             ?: throw IllegalArgumentException("Invalid request after resolving environment variables.")
+        requireOwnedEndpoints(resolvedRequest, userId)
 
         multiEvaluationRunner.runAll(resolvedRequest, userId).collect { envelope ->
             val (label, report) = envelope
@@ -84,6 +93,7 @@ class EvaluationController(
         val resolvedRequest = ControllerUtils.resolveEnvironmentVariables(request, env)
             ?.withApiKey(apiKey)
             ?: throw IllegalArgumentException("Invalid request after resolving environment variables.")
+        requireOwnedEndpoints(resolvedRequest, userId)
         return multiEvaluationRunner.runAll(resolvedRequest, userId)
     }
 }

@@ -25,30 +25,56 @@ class CustomAnalysisEndpointRepository(
         )
     }
 
+    // ── Owner-scoped access ────────────────────────────────────────────────
+    // Custom endpoints are private to the user that created them. Rows with a
+    // NULL owner (pre-V10) match nobody.
+
     fun create(
         name: String,
         promptText: String,
         responseType: CustomAnalysisResponseType,
         ragEnabled: Boolean,
-        ragMode: RagMode?
+        ragMode: RagMode?,
+        ownerUserId: String
     ): Long {
         val sql = """
-            INSERT INTO custom_analysis_endpoint (name, prompt_text, response_type, rag_enabled, rag_mode)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO custom_analysis_endpoint (name, prompt_text, response_type, rag_enabled, rag_mode, owner_user_id)
+            VALUES (?, ?, ?, ?, ?, ?)
             RETURNING id
         """.trimIndent()
-        return jdbc.queryForObject(sql, Long::class.java, name, promptText, responseType.value, ragEnabled, ragMode?.value)!!
+        return jdbc.queryForObject(
+            sql, Long::class.java, name, promptText, responseType.value, ragEnabled, ragMode?.value, ownerUserId
+        )!!
     }
 
-    fun listAll(): List<CustomAnalysisEndpoint> {
-        return jdbc.query("SELECT * FROM custom_analysis_endpoint ORDER BY created_at DESC", mapper)
+    fun listByOwner(ownerUserId: String): List<CustomAnalysisEndpoint> {
+        return jdbc.query(
+            "SELECT * FROM custom_analysis_endpoint WHERE owner_user_id = ? ORDER BY created_at DESC",
+            mapper, ownerUserId
+        )
     }
+
+    fun getByIdAndOwner(id: Long, ownerUserId: String): CustomAnalysisEndpoint? {
+        return jdbc.query(
+            "SELECT * FROM custom_analysis_endpoint WHERE id = ? AND owner_user_id = ?",
+            mapper, id, ownerUserId
+        ).firstOrNull()
+    }
+
+    fun deleteByOwner(id: Long, ownerUserId: String): Boolean {
+        return jdbc.update(
+            "DELETE FROM custom_analysis_endpoint WHERE id = ? AND owner_user_id = ?", id, ownerUserId
+        ) > 0
+    }
+
+    // ── Internal lookups only ──────────────────────────────────────────────
+    // For code that runs without a request/user context (the process-model job
+    // runner, the evaluator's endpoint-type check). Whoever hands such code an
+    // endpoint id must already have checked ownership at the request boundary
+    // (see ControllerUtils.requireOwnedCustomEndpoint). Never call from a
+    // controller path that serves user-supplied ids.
 
     fun getById(id: Long): CustomAnalysisEndpoint? {
         return jdbc.query("SELECT * FROM custom_analysis_endpoint WHERE id = ?", mapper, id).firstOrNull()
-    }
-
-    fun delete(id: Long): Boolean {
-        return jdbc.update("DELETE FROM custom_analysis_endpoint WHERE id = ?", id) > 0
     }
 }

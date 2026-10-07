@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
@@ -29,7 +30,7 @@ class EvaluationControllerRoleTest {
     private val runner = mock<MultiEvaluationRunner>()
     private val env = mock<Environment>()
     private val authServiceClient = mock<AuthServiceClient>()
-    private val controller = EvaluationController(runner, env, authServiceClient)
+    private val controller = EvaluationController(runner, env, authServiceClient, mock<CustomAnalysisEndpointRepository>())
 
     private fun exchangeAs(griplRole: String?) =
         MockServerWebExchange.from(

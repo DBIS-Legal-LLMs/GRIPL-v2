@@ -10,6 +10,7 @@ import de.mertendieckmann.griplbackend.security.AUTHENTICATED_USER_ID_ATTRIBUTE
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
@@ -31,7 +32,8 @@ class ProcessModelControllerOwnershipTest {
     private val repository = mock<ProcessModelRepository>()
     private val jobRunner = mock<ProcessModelJobRunner>()
     private val authServiceClient = mock<AuthServiceClient>()
-    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient)
+    private val customEndpoints = mock<CustomAnalysisEndpointRepository>()
+    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient, customEndpoints)
 
     private fun exchangeAs(userId: String?) =
         MockServerWebExchange.from(
@@ -91,5 +93,21 @@ class ProcessModelControllerOwnershipTest {
     fun `a request with no authenticated user is rejected with 401`() {
         val ex = assertThrows(ResponseStatusException::class.java) { controller.listProcessModels(exchangeAs(null)) }
         assertEquals(HttpStatus.UNAUTHORIZED, ex.statusCode)
+    }
+
+    @Test
+    fun `analyze with someone else's custom endpoint is a 404 and enqueues nothing`() {
+        runBlocking { whenever(authServiceClient.getOpenRouterApiKey(any())).thenReturn("sk-or-v1-key") }
+        whenever(customEndpoints.getByIdAndOwner(7, "attacker")).thenReturn(null)
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.analyzeProcessModels(
+                EnqueueAnalysisRequest(ids = listOf(1L), endpoint = "/gdpr/analysis/custom/7"),
+                exchangeAs("attacker")
+            ).block()
+        }
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+        verify(jobRunner, never()).enqueue(any())
     }
 }

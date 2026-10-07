@@ -10,6 +10,7 @@ import de.mertendieckmann.griplbackend.model.dto.ProcessModel
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelDetailDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelListItemDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
+import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
 import de.mertendieckmann.griplbackend.security.authenticatedUserId
 import de.mertendieckmann.griplbackend.security.bearerToken
@@ -34,7 +35,8 @@ class ProcessModelController(
     private val repository: ProcessModelRepository,
     private val jobRunner: ProcessModelJobRunner,
     private val objectMapper: ObjectMapper,
-    private val authServiceClient: AuthServiceClient
+    private val authServiceClient: AuthServiceClient,
+    private val customAnalysisEndpointRepository: CustomAnalysisEndpointRepository
 ) {
 
     @Operation(
@@ -129,6 +131,11 @@ class ProcessModelController(
                 )
 
                 Mono.fromCallable {
+                    // The job runner later resolves this endpoint with no user
+                    // context, so it has to be the caller's own right here.
+                    ControllerUtils.requireOwnedCustomEndpoint(
+                        requestWithKey.endpoint, customAnalysisEndpointRepository, userId
+                    )
                     // Ids that aren't the caller's own are skipped exactly like
                     // ones that don't exist — never enqueued, never revealed.
                     val owned = repository.filterOwnedIds(requestWithKey.ids, userId)
