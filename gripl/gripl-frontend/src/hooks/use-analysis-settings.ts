@@ -10,11 +10,11 @@ import {useAuth} from "@/context/auth-context";
 const LEGACY_STORAGE_KEY = "gripl.analysis.settings";
 
 interface StoredAnalysisSettings {
-    llmBaseUrl: string | null;
-    modelName: string | null;
+    llmBaseUrl: string;
+    modelName: string;
     seed: number | null;
-    temperature: number | null;
-    topP: number | null;
+    temperature: number;
+    topP: number;
     useRag: boolean;
     ragMode: string;
     configured: boolean;
@@ -38,6 +38,19 @@ export function useAnalysisSettings() {
     const [searchMode, setSearchMode] = useState<string>("hybrid")
     const [isConfigured, setIsConfigured] = useState<boolean>(false)
     const [isLoaded, setIsLoaded] = useState<boolean>(false)
+
+    // The backend fills in defaults (base URL, model, temperature, top-p) for
+    // anything left empty, so always show back what it actually stored.
+    function applyStored(stored: StoredAnalysisSettings) {
+        setLlmBaseUrl(stored.llmBaseUrl)
+        setModelName(stored.modelName)
+        setSeed(stored.seed ?? null)
+        setTemperature(stored.temperature)
+        setTopP(stored.topP)
+        setUseRag(stored.useRag)
+        setSearchMode(stored.ragMode)
+        setIsConfigured(stored.configured)
+    }
 
     useEffect(() => {
         try {
@@ -70,14 +83,7 @@ export function useAnalysisSettings() {
             })
             .then((stored) => {
                 if (cancelled) return
-                setLlmBaseUrl(stored.llmBaseUrl ?? "")
-                setModelName(stored.modelName ?? "")
-                setSeed(stored.seed ?? null)
-                setTemperature(stored.temperature ?? null)
-                setTopP(stored.topP ?? null)
-                setUseRag(stored.useRag)
-                setSearchMode(stored.ragMode)
-                setIsConfigured(stored.configured)
+                applyStored(stored)
             })
             .catch((error) => {
                 console.error("Error loading analysis settings:", error)
@@ -107,7 +113,7 @@ export function useAnalysisSettings() {
         if (!response.ok) {
             throw new Error(`Failed to save analysis settings: ${response.statusText || response.status}`)
         }
-        setIsConfigured(true)
+        applyStored(await response.json() as StoredAnalysisSettings)
     }
 
     function buildEnqueueParams() {
@@ -117,8 +123,8 @@ export function useAnalysisSettings() {
             baseUrl: llmBaseUrl || null,
             modelName: modelName || null,
             seed: seed || null,
-            temperature: temperature || null,
-            topP: topP || null
+            temperature: temperature ?? null,
+            topP: topP ?? null
         } as LlmPropsOverride;
 
         return {

@@ -1,5 +1,6 @@
 package de.mertendieckmann.griplbackend.adapter.web
 
+import de.mertendieckmann.griplbackend.model.dto.SaveUserAnalysisSettingsRequest
 import de.mertendieckmann.griplbackend.model.dto.UserAnalysisSettings
 import de.mertendieckmann.griplbackend.repository.UserAnalysisSettingsRepository
 import de.mertendieckmann.griplbackend.security.authenticatedUserId
@@ -22,10 +23,14 @@ class UserAnalysisSettingsController(
     fun get(exchange: ServerWebExchange): UserAnalysisSettings =
         repository.findByOwner(exchange.authenticatedUserId()) ?: UserAnalysisSettings()
 
-    @Operation(summary = "Save the caller's Process Analysis settings")
+    @Operation(
+        summary = "Save the caller's Process Analysis settings",
+        description = "Empty values are replaced by the defaults before storing; the stored settings are returned."
+    )
     @PutMapping("", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun save(@RequestBody settings: UserAnalysisSettings, exchange: ServerWebExchange): UserAnalysisSettings {
+    fun save(@RequestBody request: SaveUserAnalysisSettingsRequest, exchange: ServerWebExchange): UserAnalysisSettings {
         val userId = exchange.authenticatedUserId()
+        val settings = request.withDefaults()
         repository.upsert(userId, settings)
         return repository.findByOwner(userId) ?: settings.copy(configured = true)
     }

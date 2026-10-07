@@ -36,7 +36,7 @@ export default function AnalysisSettingsFields({settings, idPrefix = ""}: Analys
             <Input
                 type="text"
                 className="w-full"
-                placeholder="https://api.openai.com/v1"
+                placeholder="https://openrouter.ai/api/v1"
                 value={llmBaseUrl}
                 onChange={(e) => setLlmBaseUrl(e.target.value)}
                 list={`${idPrefix}llm-base-urls`}
@@ -48,7 +48,7 @@ export default function AnalysisSettingsFields({settings, idPrefix = ""}: Analys
             <Input
                 type="text"
                 className="w-full"
-                placeholder="gpt-3.5-turbo-0125"
+                placeholder="openai/gpt-oss-20b"
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
                 list={`${idPrefix}llm-model-names`}

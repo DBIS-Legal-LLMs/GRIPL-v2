@@ -16,8 +16,8 @@ class UserAnalysisSettingsRepository(
             llmBaseUrl = rs.getString("llm_base_url"),
             modelName = rs.getString("model_name"),
             seed = rs.getObject("seed") as Int?,
-            temperature = rs.getObject("temperature") as Double?,
-            topP = rs.getObject("top_p") as Double?,
+            temperature = rs.getDouble("temperature"),
+            topP = rs.getDouble("top_p"),
             useRag = rs.getBoolean("use_rag"),
             ragMode = RagMode.fromString(rs.getString("rag_mode")),
             configured = true
@@ -45,8 +45,8 @@ class UserAnalysisSettingsRepository(
                 updated_at   = now()
             """.trimIndent(),
             ownerUserId,
-            settings.llmBaseUrl?.takeIf { it.isNotBlank() },
-            settings.modelName?.takeIf { it.isNotBlank() },
+            settings.llmBaseUrl,
+            settings.modelName,
             settings.seed,
             settings.temperature,
             settings.topP,
