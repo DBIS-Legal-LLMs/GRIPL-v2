@@ -2,97 +2,120 @@
 
 import {useEffect, useState} from "react";
 import {LlmPropsOverride} from "@/models/dto/MultiEvaluationRequest";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
+import {useAuth} from "@/context/auth-context";
 
-const STORAGE_KEY = "gripl.analysis.settings";
+// Settings used to live in localStorage under this key — shared by every user
+// of the browser, and it held a plaintext API key. Cleared on first load now.
+const LEGACY_STORAGE_KEY = "gripl.analysis.settings";
 
 interface StoredAnalysisSettings {
-    llmBaseUrl: string;
-    modelName: string;
-    apiKey: string;
+    llmBaseUrl: string | null;
+    modelName: string | null;
     seed: number | null;
     temperature: number | null;
     topP: number | null;
     useRag: boolean;
-    searchMode: string;
+    ragMode: string;
     configured: boolean;
 }
-
-const DEFAULT_SETTINGS: StoredAnalysisSettings = {
-    llmBaseUrl: "",
-    modelName: "",
-    apiKey: "",
-    seed: null,
-    temperature: null,
-    topP: null,
-    useRag: false,
-    searchMode: "hybrid",
-    configured: false,
-};
 
 /**
  * Holds the LLM override + RAG settings used across the dashboard (settings
  * dialog, batch "Analyze Selected") and the single-model detail view.
- * Persisted to localStorage so the settings are configured once, up front,
- * rather than re-entered every time an analysis is started — `configured`
- * only flips to true once the user has explicitly saved the settings dialog.
+ * Stored per user in the GRIPL backend and loaded once the user is logged in,
+ * so they follow the account rather than the browser. Edits stay local until
+ * `save()` — `configured` is true once the user has saved at least once.
  */
 export function useAnalysisSettings() {
-    const [llmBaseUrl, setLlmBaseUrl] = useState<string>(DEFAULT_SETTINGS.llmBaseUrl)
-    const [modelName, setModelName] = useState<string>(DEFAULT_SETTINGS.modelName)
-    const [apiKey, setApiKey] = useState<string>(DEFAULT_SETTINGS.apiKey)
-    const [seed, setSeed] = useState<number | null>(DEFAULT_SETTINGS.seed)
-    const [temperature, setTemperature] = useState<number | null>(DEFAULT_SETTINGS.temperature)
-    const [topP, setTopP] = useState<number | null>(DEFAULT_SETTINGS.topP)
-    const [useRag, setUseRag] = useState<boolean>(DEFAULT_SETTINGS.useRag)
-    const [searchMode, setSearchMode] = useState<string>(DEFAULT_SETTINGS.searchMode)
-    const [isConfigured, setIsConfigured] = useState<boolean>(DEFAULT_SETTINGS.configured)
+    const {token, isLoading: isAuthLoading} = useAuth()
+    const [llmBaseUrl, setLlmBaseUrl] = useState<string>("")
+    const [modelName, setModelName] = useState<string>("")
+    const [seed, setSeed] = useState<number | null>(null)
+    const [temperature, setTemperature] = useState<number | null>(null)
+    const [topP, setTopP] = useState<number | null>(null)
+    const [useRag, setUseRag] = useState<boolean>(false)
+    const [searchMode, setSearchMode] = useState<string>("hybrid")
+    const [isConfigured, setIsConfigured] = useState<boolean>(false)
     const [isLoaded, setIsLoaded] = useState<boolean>(false)
 
     useEffect(() => {
         try {
-            const raw = window.localStorage.getItem(STORAGE_KEY)
-            if (raw) {
-                const stored = JSON.parse(raw) as Partial<StoredAnalysisSettings>
-                if (stored.llmBaseUrl !== undefined) setLlmBaseUrl(stored.llmBaseUrl)
-                if (stored.modelName !== undefined) setModelName(stored.modelName)
-                if (stored.apiKey !== undefined) setApiKey(stored.apiKey)
-                if (stored.seed !== undefined) setSeed(stored.seed)
-                if (stored.temperature !== undefined) setTemperature(stored.temperature)
-                if (stored.topP !== undefined) setTopP(stored.topP)
-                if (stored.useRag !== undefined) setUseRag(stored.useRag)
-                if (stored.searchMode !== undefined) setSearchMode(stored.searchMode)
-                if (stored.configured !== undefined) setIsConfigured(stored.configured)
-            }
-        } catch (error) {
-            console.error("Error reading analysis settings from local storage:", error)
-        } finally {
-            setIsLoaded(true)
+            window.localStorage.removeItem(LEGACY_STORAGE_KEY)
+        } catch {
+            // storage unavailable — nothing to clear
         }
     }, [])
 
-    function persist(next: Partial<StoredAnalysisSettings>) {
-        try {
-            const current: StoredAnalysisSettings = {
-                llmBaseUrl, modelName, apiKey, seed, temperature, topP, useRag, searchMode,
-                configured: isConfigured,
-                ...next,
-            }
-            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(current))
-        } catch (error) {
-            console.error("Error saving analysis settings to local storage:", error)
-        }
-    }
+    useEffect(() => {
+        if (isAuthLoading) return
+        // Logged out (or a different user logging in): never show the previous
+        // user's values.
+        setIsLoaded(false)
+        setLlmBaseUrl("")
+        setModelName("")
+        setSeed(null)
+        setTemperature(null)
+        setTopP(null)
+        setUseRag(false)
+        setSearchMode("hybrid")
+        setIsConfigured(false)
+        if (!token) return
 
-    function save() {
+        let cancelled = false
+        authenticatedFetch("/api/analysis-settings")
+            .then(async (response) => {
+                if (!response.ok) throw new Error(`Failed to load analysis settings: ${response.status}`)
+                return await response.json() as StoredAnalysisSettings
+            })
+            .then((stored) => {
+                if (cancelled) return
+                setLlmBaseUrl(stored.llmBaseUrl ?? "")
+                setModelName(stored.modelName ?? "")
+                setSeed(stored.seed ?? null)
+                setTemperature(stored.temperature ?? null)
+                setTopP(stored.topP ?? null)
+                setUseRag(stored.useRag)
+                setSearchMode(stored.ragMode)
+                setIsConfigured(stored.configured)
+            })
+            .catch((error) => {
+                console.error("Error loading analysis settings:", error)
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoaded(true)
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [token, isAuthLoading])
+
+    async function save() {
+        const response = await authenticatedFetch("/api/analysis-settings", {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                llmBaseUrl: llmBaseUrl || null,
+                modelName: modelName || null,
+                seed,
+                temperature,
+                topP,
+                useRag,
+                ragMode: searchMode,
+            }),
+        })
+        if (!response.ok) {
+            throw new Error(`Failed to save analysis settings: ${response.statusText || response.status}`)
+        }
         setIsConfigured(true)
-        persist({configured: true})
     }
 
     function buildEnqueueParams() {
+        // The OpenRouter key is not sent from here: the backend fetches the
+        // caller's own key from auth-service (Account Settings).
         const llmProps = {
             baseUrl: llmBaseUrl || null,
             modelName: modelName || null,
-            apiKey: apiKey || null,
             seed: seed || null,
             temperature: temperature || null,
             topP: topP || null
@@ -106,14 +129,13 @@ export function useAnalysisSettings() {
     }
 
     return {
-        llmBaseUrl, setLlmBaseUrl: (v: string) => { setLlmBaseUrl(v); persist({llmBaseUrl: v}) },
-        modelName, setModelName: (v: string) => { setModelName(v); persist({modelName: v}) },
-        apiKey, setApiKey: (v: string) => { setApiKey(v); persist({apiKey: v}) },
-        seed, setSeed: (v: number | null) => { setSeed(v); persist({seed: v}) },
-        temperature, setTemperature: (v: number | null) => { setTemperature(v); persist({temperature: v}) },
-        topP, setTopP: (v: number | null) => { setTopP(v); persist({topP: v}) },
-        useRag, setUseRag: (v: boolean) => { setUseRag(v); persist({useRag: v}) },
-        searchMode, setSearchMode: (v: string) => { setSearchMode(v); persist({searchMode: v}) },
+        llmBaseUrl, setLlmBaseUrl,
+        modelName, setModelName,
+        seed, setSeed,
+        temperature, setTemperature,
+        topP, setTopP,
+        useRag, setUseRag,
+        searchMode, setSearchMode,
         isConfigured,
         isLoaded,
         save,

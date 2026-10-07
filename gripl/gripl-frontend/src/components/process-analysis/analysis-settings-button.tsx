@@ -14,6 +14,7 @@ import {AlertTriangle, Settings} from "lucide-react"
 import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider"
 import AnalysisSettingsFields from "@/components/process-analysis/analysis-settings-fields"
 import {AnalysisSettings} from "@/hooks/use-analysis-settings"
+import {useToast} from "@/components/ui/toast"
 
 interface AnalysisSettingsButtonProps {
     settings: AnalysisSettings;
@@ -22,10 +23,16 @@ interface AnalysisSettingsButtonProps {
 export default function AnalysisSettingsButton({settings}: AnalysisSettingsButtonProps) {
     const [open, setOpen] = useState(false)
     const {backendEndpoint} = useAnalysisEndpoint()
+    const {showError} = useToast()
 
-    function handleSave() {
-        settings.save()
-        setOpen(false)
+    async function handleSave() {
+        try {
+            await settings.save()
+            setOpen(false)
+        } catch (error) {
+            console.error("Error saving analysis settings:", error)
+            showError("Failed to save analysis settings", error instanceof Error ? error.message : undefined)
+        }
     }
 
     return <Dialog open={open} onOpenChange={setOpen}>
