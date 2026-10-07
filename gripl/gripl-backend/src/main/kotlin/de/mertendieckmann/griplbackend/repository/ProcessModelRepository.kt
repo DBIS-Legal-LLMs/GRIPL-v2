@@ -45,28 +45,54 @@ class ProcessModelRepository(
         )
     }
 
-    fun create(name: String, bpmnXml: String): Long {
-        val sql = "INSERT INTO process_model (name, bpmn_xml) VALUES (?, ?) RETURNING id"
-        return jdbc.queryForObject(sql, Long::class.java, name, bpmnXml)!!
+    // ── Owner-scoped access ────────────────────────────────────────────────
+    // Process models are private to the auth-service user (JWT `sub`) that
+    // uploaded them; every path reachable from ProcessModelController goes
+    // through one of these. Rows with a NULL owner (pre-V9) match nobody.
+
+    fun create(name: String, bpmnXml: String, ownerUserId: String): Long {
+        val sql = "INSERT INTO process_model (name, bpmn_xml, owner_user_id) VALUES (?, ?, ?) RETURNING id"
+        return jdbc.queryForObject(sql, Long::class.java, name, bpmnXml, ownerUserId)!!
     }
 
-    fun listAll(): List<ProcessModelListItemDto> {
+    fun listByOwner(ownerUserId: String): List<ProcessModelListItemDto> {
         val sql = """
             SELECT id, name, status, analysis_endpoint, total_elements, critical_element_count, error_message, created_at, updated_at
             FROM process_model
+            WHERE owner_user_id = ?
             ORDER BY created_at DESC
         """.trimIndent()
-        return jdbc.query(sql, listItemMapper)
+        return jdbc.query(sql, listItemMapper, ownerUserId)
     }
+
+    fun getByIdAndOwner(id: Long, ownerUserId: String): ProcessModel? {
+        val sql = "SELECT * FROM process_model WHERE id = ? AND owner_user_id = ?"
+        return jdbc.query(sql, fullMapper, id, ownerUserId).firstOrNull()
+    }
+
+    /** The subset of [ids] that exist and belong to [ownerUserId]. */
+    fun filterOwnedIds(ids: List<Long>, ownerUserId: String): List<Long> {
+        if (ids.isEmpty()) return emptyList()
+        val inSql = ids.joinToString(",")
+        val sql = "SELECT id FROM process_model WHERE id IN ($inSql) AND owner_user_id = ?"
+        val owned = jdbc.query(sql, { rs, _ -> rs.getLong("id") }, ownerUserId).toSet()
+        return ids.filter { it in owned }
+    }
+
+    fun deleteIfNotRunning(id: Long, ownerUserId: String): Boolean {
+        val sql = "DELETE FROM process_model WHERE id = ? AND owner_user_id = ? AND status <> 'RUNNING'"
+        return jdbc.update(sql, id, ownerUserId) > 0
+    }
+
+    // ── Background job runner only ─────────────────────────────────────────
+    // ProcessModelJobRunner is a detached worker with no request/user context;
+    // the ids it receives were already filtered to the caller's own models at
+    // enqueue time (ProcessModelController.analyzeProcessModels), and queued
+    // ids are resumed after a restart. Never call this from a controller.
 
     fun getById(id: Long): ProcessModel? {
         val sql = "SELECT * FROM process_model WHERE id = ?"
         return jdbc.query(sql, fullMapper, id).firstOrNull()
-    }
-
-    fun deleteIfNotRunning(id: Long): Boolean {
-        val sql = "DELETE FROM process_model WHERE id = ? AND status <> 'RUNNING'"
-        return jdbc.update(sql, id) > 0
     }
 
     fun markQueued(id: Long, endpoint: String, optionsJson: String) {

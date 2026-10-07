@@ -11,6 +11,7 @@ import de.mertendieckmann.griplbackend.model.dto.ProcessModelDetailDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelListItemDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
+import de.mertendieckmann.griplbackend.security.authenticatedUserId
 import de.mertendieckmann.griplbackend.security.bearerToken
 import io.swagger.v3.oas.annotations.Operation
 import kotlinx.coroutines.reactor.mono
@@ -43,14 +44,16 @@ class ProcessModelController(
     @PostMapping("", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
     fun uploadProcessModel(
         @RequestPart("bpmnFile") file: FilePart,
-        @RequestPart("name", required = false) namePart: FormFieldPart?
+        @RequestPart("name", required = false) namePart: FormFieldPart?,
+        exchange: ServerWebExchange
     ): Mono<ResponseEntity<ProcessModelListItemDto>> {
+        val userId = exchange.authenticatedUserId()
         val name = namePart?.value()?.takeIf { it.isNotBlank() } ?: file.filename()
 
         return ControllerUtils.getBpmnXmlMono(file).flatMap { bpmnXml ->
             Mono.fromCallable {
-                val id = repository.create(name, bpmnXml)
-                repository.getById(id)!!.toListItemDto()
+                val id = repository.create(name, bpmnXml, userId)
+                repository.getByIdAndOwner(id, userId)!!.toListItemDto()
             }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.status(HttpStatus.CREATED).body(it) }
     }
@@ -60,8 +63,9 @@ class ProcessModelController(
         description = "Returns every uploaded process model (without its BPMN XML or full result, for cheap polling)."
     )
     @GetMapping("", produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun listProcessModels(): Mono<List<ProcessModelListItemDto>> {
-        return Mono.fromCallable { repository.listAll() }.subscribeOn(Schedulers.boundedElastic())
+    fun listProcessModels(exchange: ServerWebExchange): Mono<List<ProcessModelListItemDto>> {
+        val userId = exchange.authenticatedUserId()
+        return Mono.fromCallable { repository.listByOwner(userId) }.subscribeOn(Schedulers.boundedElastic())
     }
 
     @Operation(
@@ -69,16 +73,14 @@ class ProcessModelController(
         description = "Returns the full process model, including its BPMN XML and analysis result if available."
     )
     @GetMapping("/{id}", produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun getProcessModel(@PathVariable id: Long): Mono<ResponseEntity<ProcessModelDetailDto>> {
-        return Mono.fromCallable { repository.getById(id) }
+    fun getProcessModel(@PathVariable id: Long, exchange: ServerWebExchange): Mono<ResponseEntity<ProcessModelDetailDto>> {
+        val userId = exchange.authenticatedUserId()
+        // fromCallable returning null completes *empty*, not with a null value —
+        // so "not found" has to be the defaultIfEmpty fallback, not a null check.
+        return Mono.fromCallable { repository.getByIdAndOwner(id, userId) }
             .subscribeOn(Schedulers.boundedElastic())
-            .map { model ->
-                if (model == null) {
-                    ResponseEntity.notFound().build()
-                } else {
-                    ResponseEntity.ok(model.toDetailDto())
-                }
-            }
+            .map { model -> ResponseEntity.ok(model.toDetailDto()) }
+            .defaultIfEmpty(ResponseEntity.notFound().build())
     }
 
     @Operation(
@@ -86,14 +88,15 @@ class ProcessModelController(
         description = "Deletes a process model, unless it is currently being analyzed."
     )
     @DeleteMapping("/{id}")
-    fun deleteProcessModel(@PathVariable id: Long): Mono<ResponseEntity<Void>> {
+    fun deleteProcessModel(@PathVariable id: Long, exchange: ServerWebExchange): Mono<ResponseEntity<Void>> {
+        val userId = exchange.authenticatedUserId()
         return Mono.fromCallable {
-            val model = repository.getById(id)
+            val model = repository.getByIdAndOwner(id, userId)
                 ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No process model found for id $id")
             if (model.status == ProcessModelStatus.RUNNING) {
                 throw ResponseStatusException(HttpStatus.CONFLICT, "Process model $id is currently being analyzed")
             }
-            repository.deleteIfNotRunning(id)
+            repository.deleteIfNotRunning(id, userId)
         }.subscribeOn(Schedulers.boundedElastic()).map { ResponseEntity.noContent().build<Void>() }
     }
 
@@ -106,6 +109,7 @@ class ProcessModelController(
         @RequestBody request: EnqueueAnalysisRequest,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<EnqueueAnalysisResponse>> {
+        val userId = exchange.authenticatedUserId()
         val bearerToken = exchange.bearerToken()
 
         // Note: a suspend block returning null makes `mono { }` complete
@@ -125,7 +129,10 @@ class ProcessModelController(
                 )
 
                 Mono.fromCallable {
-                    val enqueued = jobRunner.enqueue(requestWithKey)
+                    // Ids that aren't the caller's own are skipped exactly like
+                    // ones that don't exist — never enqueued, never revealed.
+                    val owned = repository.filterOwnedIds(requestWithKey.ids, userId)
+                    val enqueued = jobRunner.enqueue(requestWithKey.copy(ids = owned))
                     val skipped = requestWithKey.ids.filter { it !in enqueued }
                     EnqueueAnalysisResponse(enqueuedIds = enqueued, skippedIds = skipped)
                 }.subscribeOn(Schedulers.boundedElastic())

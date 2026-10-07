@@ -4,6 +4,7 @@ import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.application.ProcessModelJobRunner
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
+import de.mertendieckmann.griplbackend.security.AUTHENTICATED_USER_ID_ATTRIBUTE
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -36,7 +37,7 @@ class ProcessModelControllerOpenRouterKeyTest {
     private fun exchange() =
         MockServerWebExchange.from(
             MockServerHttpRequest.post("/process-models/analyze").header("Authorization", "Bearer test-token")
-        )
+        ).apply { attributes[AUTHENTICATED_USER_ID_ATTRIBUTE] = "user-1" }
 
     private val request = EnqueueAnalysisRequest(ids = listOf(1L), endpoint = "/gdpr/analysis/prompt-engineering")
 
@@ -60,6 +61,7 @@ class ProcessModelControllerOpenRouterKeyTest {
     @Test
     fun `with a stored key it is injected into llmProps before enqueueing`() {
         runBlocking { whenever(authServiceClient.getOpenRouterApiKey(any())).thenReturn("sk-or-v1-caller-key") }
+        whenever(repository.filterOwnedIds(any(), any())).thenReturn(listOf(1L))
         whenever(jobRunner.enqueue(any())).thenReturn(listOf(1L))
 
         val response = controller.analyzeProcessModels(request, exchange()).block()
