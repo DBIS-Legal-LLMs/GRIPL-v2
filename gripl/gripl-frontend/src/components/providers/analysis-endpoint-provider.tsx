@@ -3,6 +3,7 @@
 import React, {createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState} from "react";
 import {AnalysisEndpoint} from "@/models/evaluation/Config";
 import {authenticatedFetch} from "@/lib/authenticated-fetch";
+import {useAuth} from "@/context/auth-context";
 
 type AnalysisEndpointMode = "binary" | "multiclass";
 
@@ -83,9 +84,19 @@ export function AnalysisEndpointProvider({children}: { children: ReactNode }) {
             });
     }, []);
 
+    // Custom endpoints are per user, and this provider lives in the root layout
+    // so it never remounts on login/logout — refetch whenever the logged-in
+    // user changes, otherwise the previous session's list (or the pre-login
+    // fallback) sticks around until a full page reload.
+    const {token, isLoading: isAuthLoading} = useAuth();
     useEffect(() => {
+        if (isAuthLoading) return;
+        if (!token) {
+            setAvailableEndpoints(FALLBACK_ENDPOINTS);
+            return;
+        }
         refreshEndpoints();
-    }, [refreshEndpoints]);
+    }, [token, isAuthLoading, refreshEndpoints]);
 
     useEffect(() => {
         const storedEndpoint = window.localStorage.getItem(STORAGE_KEY);
