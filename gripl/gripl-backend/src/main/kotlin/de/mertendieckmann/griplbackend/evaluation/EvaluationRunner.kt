@@ -42,6 +42,13 @@ class EvaluationRunner(
 
         log.info { "Starting evaluation with endpoint=${request.evaluationEndpoint}; maxConcurrent=${request.maxConcurrent}; evaluateRag=${request.evaluateRag}" }
 
+        // Labels without classes (binary / legacy labels) yield no expected classes in a multiclass evaluation
+        if (request.evaluationEndpoint.contains("multiclass", ignoreCase = true)) {
+            entries.filter { it.unclassifiedLabelCount > 0 }.forEach { entry ->
+                log.warn { "Test case ${entry.id} (${entry.name}) has ${entry.unclassifiedLabelCount} label(s) without class; multiclass metrics will be distorted" }
+            }
+        }
+
         return entriesFlow
             .flatMapMerge(concurrency = request.maxConcurrent.coerceAtLeast(1)) { entry ->
                 flow {

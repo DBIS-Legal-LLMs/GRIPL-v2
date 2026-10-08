@@ -1,5 +1,6 @@
 package de.mertendieckmann.griplbackend.adapter.web.error
 
+import de.mertendieckmann.griplbackend.application.dataset.DatasetImportException
 import dev.langchain4j.service.output.OutputParsingException
 import org.camunda.bpm.model.xml.ModelParseException
 import org.camunda.bpm.model.xml.ModelValidationException
@@ -46,6 +47,12 @@ class GlobalExceptionHandler {
             .status(HttpStatus.INTERNAL_SERVER_ERROR)
             .body(ApiError(code = "INTERRUPTED", message = ex.message))
             .also { print(ex) }
+
+    @ExceptionHandler(DatasetImportException::class)
+    fun handleDatasetImportException(ex: DatasetImportException): ResponseEntity<ApiError> =
+        ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(ApiError(code = "DATASET_IMPORT_ERROR", message = ex.message))
 
     @ExceptionHandler(RuntimeException::class)
     fun handleRuntimeException(ex: RuntimeException): ResponseEntity<ApiError> =

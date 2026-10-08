@@ -1,18 +1,28 @@
 package de.mertendieckmann.griplbackend.adapter.web
 
+import de.mertendieckmann.griplbackend.application.dataset.DatasetTransferService
+import de.mertendieckmann.griplbackend.application.dataset.ImportedDataset
 import de.mertendieckmann.griplbackend.model.dto.CreateDatasetRequest
 import de.mertendieckmann.griplbackend.model.dto.Dataset
 import de.mertendieckmann.griplbackend.repository.DatasetRepository
 import io.swagger.v3.oas.annotations.Operation
+import org.springframework.core.io.buffer.DataBufferUtils
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.http.codec.multipart.FilePart
 import org.springframework.web.bind.annotation.*
+import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
+import java.time.LocalDate
 
 @RestController
 @RequestMapping("/dataset")
 class DatasetController(
-    private val datasetRepository: DatasetRepository
+    private val datasetRepository: DatasetRepository,
+    private val datasetTransferService: DatasetTransferService
 ) {
     @Operation(
         summary = "Create a new Dataset",
@@ -55,4 +65,61 @@ class DatasetController(
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete dataset")
         }
     }
+
+    @Operation(
+        summary = "Export all Datasets",
+        description = "Exports all datasets incl. test cases and labels as ZIP with dataset.csv and evaluation_data.csv " +
+            "in the format of the original Postgres CSV export."
+    )
+    @GetMapping("/export", produces = ["application/zip"])
+    fun exportAllDatasets(): Mono<ResponseEntity<ByteArray>> =
+        Mono.fromCallable { zipResponse(datasetTransferService.exportAsZip(null), "gripl-datasets-${LocalDate.now()}.zip") }
+            .subscribeOn(Schedulers.boundedElastic())
+
+    @Operation(
+        summary = "Export a single Dataset",
+        description = "Exports one dataset incl. test cases and labels as ZIP with dataset.csv and evaluation_data.csv."
+    )
+    @GetMapping("/{datasetId}/export", produces = ["application/zip"])
+    fun exportDataset(@PathVariable("datasetId") datasetId: Long): Mono<ResponseEntity<ByteArray>> =
+        Mono.fromCallable {
+            val dataset = datasetRepository.getDatasetById(datasetId)
+                ?: return@fromCallable ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+            val safeName = dataset.name.replace(Regex("[^A-Za-z0-9._-]+"), "_").trim('_').ifEmpty { "dataset" }
+            zipResponse(datasetTransferService.exportAsZip(listOf(datasetId)), "gripl-dataset-${safeName}-${LocalDate.now()}.zip")
+        }.subscribeOn(Schedulers.boundedElastic())
+
+    @Operation(
+        summary = "Import Datasets",
+        description = "Imports datasets incl. test cases and labels, either as ZIP (part file) or as the two CSV files " +
+            "(parts datasetCsv and evaluationDataCsv). Always creates new datasets. Files from the version before " +
+            "multiclass labels are supported; their labels are imported without classes."
+    )
+    @PostMapping("/import", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun importDatasets(
+        @RequestPart("file", required = false) file: FilePart?,
+        @RequestPart("datasetCsv", required = false) datasetCsv: FilePart?,
+        @RequestPart("evaluationDataCsv", required = false) evaluationDataCsv: FilePart?
+    ): Mono<ResponseEntity<List<ImportedDataset>>> {
+        val imported: Mono<List<ImportedDataset>> = when {
+            file != null -> readBytes(file).publishOn(Schedulers.boundedElastic()).map { datasetTransferService.importZip(it) }
+            datasetCsv != null && evaluationDataCsv != null ->
+                readBytes(datasetCsv).zipWith(readBytes(evaluationDataCsv)).publishOn(Schedulers.boundedElastic()).map { files ->
+                    datasetTransferService.importCsv(files.t1.toString(Charsets.UTF_8), files.t2.toString(Charsets.UTF_8))
+                }
+            else -> return Mono.just(ResponseEntity.badRequest().build())
+        }
+        return imported.map { ResponseEntity.status(HttpStatus.CREATED).body(it) }
+    }
+
+    private fun readBytes(part: FilePart): Mono<ByteArray> =
+        DataBufferUtils.join(part.content()).map { buffer ->
+            buffer.asInputStream().use { it.readBytes() }.also { DataBufferUtils.release(buffer) }
+        }
+
+    private fun zipResponse(bytes: ByteArray, fileName: String): ResponseEntity<ByteArray> =
+        ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(fileName).build().toString())
+            .contentType(MediaType.parseMediaType("application/zip"))
+            .body(bytes)
 }
