@@ -17,5 +17,8 @@ export interface ExpectedValues {
 export interface EvaluationDataMeta {
     id: number,
     name?: string,
-    datasetId?: number
+    datasetId?: number,
+    labelCount?: number,
+    /** Labels without a GDPR class (binary / legacy labels) */
+    unclassifiedLabelCount?: number
 }

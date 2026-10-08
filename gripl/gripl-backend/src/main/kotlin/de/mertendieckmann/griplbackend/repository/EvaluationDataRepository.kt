@@ -67,6 +67,40 @@ class EvaluationDataRepository(
         )!!
     }
 
+    /** Inserts a test case and keeps the given timestamps (Postgres text format) if present. */
+    fun insertImportedEvaluationData(data: EvaluationDataWithOptionalId, createdAt: String?, updatedAt: String?): Long {
+        val sql = """
+            INSERT INTO evaluation_data (name, bpmn_xml, expected_values, dataset_id, created_at, updated_at)
+            VALUES (?, ?, ?::jsonb, ?, COALESCE(?::timestamptz, now()), COALESCE(?::timestamptz, now()))
+            RETURNING id
+        """.trimIndent()
+
+        val value = PGobject().apply { type = "jsonb"; this.value = objectMapper.writeValueAsString(data.expectedValues) }
+
+        return jdbc.queryForObject(
+            sql, Long::class.java,
+            data.name, data.bpmnXml, value, data.datasetId, createdAt, updatedAt
+        )!!
+    }
+
+    /**
+     * Rows in the column layout of the original Postgres CSV export of the evaluation_data table.
+     * expected_values is rendered by Postgres itself, so the JSON looks exactly like in the original export.
+     */
+    fun getEvaluationDataExportRows(datasetIds: List<Long>?): List<List<String?>> {
+        if (datasetIds != null && datasetIds.isEmpty()) return emptyList()
+        val where = if (datasetIds != null) "WHERE dataset_id IN (${datasetIds.joinToString(",")})" else ""
+        val sql = """
+            SELECT id::text, bpmn_xml, expected_values::text,
+                   (created_at AT TIME ZONE 'UTC')::text || '+00',
+                   (updated_at AT TIME ZONE 'UTC')::text || '+00',
+                   name, dataset_id::text
+            FROM evaluation_data $where ORDER BY id
+        """.trimIndent()
+        val rowMapper = RowMapper { rs, _ -> (1..7).map { rs.getString(it) } }
+        return jdbc.query(sql, rowMapper)
+    }
+
     fun updateEvaluationData(data: EvaluationData): Int {
         val sql = """
             UPDATE evaluation_data

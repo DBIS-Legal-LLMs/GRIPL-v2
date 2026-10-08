@@ -9,12 +9,12 @@ interface DatasetListProps {
 }
 
 export default function DatasetList({ datasets, evaluationMetadata, className }: DatasetListProps) {
-    return <div className={`h-full flex flex-col justify-start ${className}`}>
+    return <div className={`h-full flex flex-col justify-start gap-4 pb-4 ${className}`}>
         { datasets.map(dataset =>
             <DatasetListItem
                 dataset={dataset}
                 evaluationMetadata={evaluationMetadata.filter(meta => meta.datasetId == dataset.id)}
-                key={`${dataset.id}-dataset-list-item`} className="mb-4"
+                key={`${dataset.id}-dataset-list-item`}
             />
         )}
     </div>

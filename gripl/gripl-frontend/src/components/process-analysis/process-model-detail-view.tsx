@@ -196,6 +196,8 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
               highlightedActivityIds={highlightedActivityIds}
               highlightedActivityCategories={highlightedActivityCategories}
               onDiagramChanged={setDiagram}
+              exportFileName={model.name}
+              askForExportFileName
               cards={editorToolCards}
               onEvent={onEvent}
           />

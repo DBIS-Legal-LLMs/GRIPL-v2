@@ -34,7 +34,9 @@ class EvaluationDataController(
     @GetMapping("", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun getAllBpmnDatasetMeta(@RequestParam(required = false) datasetId: Int? = null): List<EvaluationDataMeta> {
         val datasets = evaluationDataRepository.getEvaluationDataByDatasetIdsOrAll(listOfNotNull(datasetId))
-        return datasets.map { EvaluationDataMeta(it.id, it.name, it.datasetId) }
+        return datasets.map {
+            EvaluationDataMeta(it.id, it.name, it.datasetId, it.expectedValues.size, it.unclassifiedLabelCount)
+        }
     }
 
     @Operation(
@@ -52,6 +54,9 @@ class EvaluationDataController(
         @RequestPart("expectedValues") expectedValues: List<ExpectedValue>,
         @RequestPart("datasetId") datasetId: String? = null
     ): Mono<ResponseEntity<Int>> {
+        // Every test case must belong to a dataset
+        val parsedDatasetId = datasetId?.toLongOrNull()
+            ?: return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(-1))
 
         val bpmnXmlMono: Mono<String> = DataBufferUtils
             .join(bpmnFile.content())
@@ -64,7 +69,7 @@ class EvaluationDataController(
                 name = name,
                 bpmnXml = bpmnXml,
                 expectedValues = expectedValues,
-                datasetId = datasetId?.toLong()
+                datasetId = parsedDatasetId
             )
 
             val idOfCreatedEntry = evaluationDataRepository.insertEvaluationData(evaluationData)
