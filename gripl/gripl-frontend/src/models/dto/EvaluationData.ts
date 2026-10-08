@@ -11,7 +11,8 @@ import {GdprCategory} from "@/models/GdprCategory";
 export interface ExpectedValues {
     value: string
     classification: GdprCategory[]
-    reason?: string
+    /** Free-text gold-standard explanation authored by a researcher during labeling. */
+    explanation?: string
 }
 
 export interface EvaluationDataMeta {

@@ -58,7 +58,7 @@ export default function TestCaseReportCardReasoning({ report }: TestCaseReportCa
                                     </div>
                                 )}
                             </td>
-                            <td className="text-sm p-2 text-foreground">{result.reason || "No reasoning provided"}</td>
+                            <td className="text-sm p-2 text-foreground">{result.explanation || "No reasoning provided"}</td>
                         </tr>
                     })}
                 </tbody>

@@ -14,7 +14,7 @@ export interface LabelingEditorLabelCardProps {
     elementId: string;
     criticalActivities: ExpectedValues[];
     allowMulticlass: boolean;
-    onLabelingChange: (elementId: string, classification: GdprCategory[], reason?: string) => void;
+    onLabelingChange: (elementId: string, classification: GdprCategory[], explanation?: string) => void;
 }
 
 export default function LabelingEditorLabelCard({ className, elementName, elementId, criticalActivities, allowMulticlass, onLabelingChange }: LabelingEditorLabelCardProps) {
@@ -31,12 +31,12 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
 
     const existing = criticalActivities.find(c => c.value === elementId);
     const [selectedCategories, setSelectedCategories] = useState<GdprCategory[]>(existing?.classification ?? []);
-    const [reason, setReason] = useState<string>(existing?.reason ?? "");
+    const [explanation, setExplanation] = useState<string>(existing?.explanation ?? "");
 
     useEffect(() => {
         const found = criticalActivities.find(c => c.value === elementId);
         setSelectedCategories(found?.classification ?? []);
-        setReason(found?.reason ?? "");
+        setExplanation(found?.explanation ?? "");
     }, [elementId, criticalActivities]);
 
     function toggleCategory(cat: GdprCategory) {
@@ -49,17 +49,17 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
             next = selectedCategories.includes(cat) ? [] : [cat];
         }
         setSelectedCategories(next);
-        onLabelingChange(elementId, next, reason);
+        onLabelingChange(elementId, next, explanation);
     }
 
     function toggleBinaryCritical() {
         const next = selectedCategories.length > 0 ? [] : [selectedCategories[0] ?? BINARY_FALLBACK_CATEGORY];
         setSelectedCategories(next);
-        onLabelingChange(elementId, next, reason);
+        onLabelingChange(elementId, next, explanation);
     }
 
-    function handleReasonChange(value: string) {
-        setReason(value);
+    function handleExplanationChange(value: string) {
+        setExplanation(value);
         onLabelingChange(elementId, selectedCategories, value);
     }
 
@@ -122,14 +122,17 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
                 </div>
             )}</>
             <div className="flex flex-col space-y-1">
-                <Label htmlFor="reason" className="text-xs">Notes (optional)</Label>
+                <Label htmlFor="explanation" className="text-xs">Gold Standard Explanation</Label>
+                <p className="text-[11px] text-muted-foreground">
+                    Human-curated reference explanation used to benchmark LLM-generated explanations.
+                </p>
                 <Textarea
-                    id="reason"
+                    id="explanation"
                     className="p-2 border rounded text-xs"
-                    placeholder="Additional notes..."
-                    rows={3}
-                    value={reason}
-                    onChange={(e) => handleReasonChange(e.target.value)}
+                    placeholder="Why is this element GDPR-relevant? (used as ground truth for evaluation)"
+                    rows={4}
+                    value={explanation}
+                    onChange={(e) => handleExplanationChange(e.target.value)}
                 />
             </div>
         </CardContent>
