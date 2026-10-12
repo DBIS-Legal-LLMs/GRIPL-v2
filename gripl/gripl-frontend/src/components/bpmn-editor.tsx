@@ -2,6 +2,8 @@
 
 import React, {useEffect, useRef, useState} from "react"
 import {Download, PlusCircle, RotateCcw, RotateCw, ZoomIn, ZoomOut} from "lucide-react"
+import {downloadBpmnXml} from "@/lib/download-bpmn"
+import ExportFileNameDialog from "@/components/export-file-name-dialog"
 import {Button} from "@/components/ui/button";
 import BpmnUploadButton from "@/components/bpmn-upload-button";
 import {BpmnToolCard} from "@/models/BpmnToolCard";
@@ -41,15 +43,21 @@ interface BpmnEditorProps {
   disableEditing?: boolean
   onEvent?: (type: BpmnEditorEvent, event: any) => void
   onModelerChanged?: (modeler: any) => void
+  /** File name used for export, defaults to the title */
+  exportFileName?: string
+  /** If true, a dialog asks for the file name (prefilled with exportFileName) before exporting */
+  askForExportFileName?: boolean
 }
 
 export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = [], onNew, onDiagramChanged, cards = [],
-                                     highlightedActivityCategories = {}, editorClassName, disableEditing, onEvent, onModelerChanged }: BpmnEditorProps) {
+                                     highlightedActivityCategories = {}, editorClassName, disableEditing, onEvent, onModelerChanged,
+                                     exportFileName, askForExportFileName }: BpmnEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const modelerRef = useRef<any>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const styleElementRef = useRef<HTMLStyleElement | null>(null)
   const disableEditingRef = useRef(disableEditing)
 
@@ -319,20 +327,20 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
     }
   }
 
-  async function handleExport() {
+  function handleExportClick() {
+    if (askForExportFileName) {
+      setIsExportDialogOpen(true)
+    } else {
+      handleExport(exportFileName ?? title).then()
+    }
+  }
+
+  async function handleExport(fileName?: string) {
     if (!modelerRef.current || !isLoaded) return
 
     try {
       const { xml } = await modelerRef.current.saveXML({ format: true })
-      const blob = new Blob([xml], { type: "application/xml" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = "diagram.bpmn"
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadBpmnXml(xml, fileName)
     } catch (err) {
       console.error("Error while exporting BPMN diagram", err)
     }
@@ -405,7 +413,7 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
             <Button
                 variant="outline"
                 size="sm"
-                onClick={handleExport}
+                onClick={handleExportClick}
                 title="Exportieren"
             >
               <Download className="h-4 w-4 mr-1" />
@@ -442,6 +450,15 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
             </div>
           ))}
         </div>
+        {askForExportFileName && <ExportFileNameDialog
+            isOpen={isExportDialogOpen}
+            defaultName={exportFileName ?? title}
+            onClose={() => setIsExportDialogOpen(false)}
+            onConfirm={(fileName) => {
+              setIsExportDialogOpen(false)
+              handleExport(fileName).then()
+            }}
+        />}
       </div>
   )
 }

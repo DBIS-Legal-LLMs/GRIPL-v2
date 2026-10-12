@@ -45,6 +45,33 @@ class DatasetRepository(
         return jdbc.query(sql, mapper)
     }
 
+    /** Inserts a dataset and keeps the given timestamps (Postgres text format) if present. */
+    fun insertDatasetReturningId(name: String, description: String?, createdAt: String?, updatedAt: String?): Long {
+        val sql = """
+            INSERT INTO dataset (name, description, created_at, updated_at)
+            VALUES (?, ?, COALESCE(?::timestamptz, now()), COALESCE(?::timestamptz, now()))
+            RETURNING id
+        """.trimIndent()
+        return jdbc.queryForObject(sql, Long::class.java, name, description, createdAt, updatedAt)!!
+    }
+
+    /**
+     * Rows in the column layout of the original Postgres CSV export of the dataset table.
+     * Timestamps are rendered in UTC like "2026-02-11 18:40:58.465728+00".
+     */
+    fun getDatasetExportRows(datasetIds: List<Long>?): List<List<String?>> {
+        if (datasetIds != null && datasetIds.isEmpty()) return emptyList()
+        val where = if (datasetIds != null) "WHERE id IN (${datasetIds.joinToString(",")})" else ""
+        val sql = """
+            SELECT id::text, name, description,
+                   (created_at AT TIME ZONE 'UTC')::text || '+00',
+                   (updated_at AT TIME ZONE 'UTC')::text || '+00'
+            FROM dataset $where ORDER BY id
+        """.trimIndent()
+        val rowMapper = RowMapper { rs, _ -> (1..5).map { rs.getString(it) } }
+        return jdbc.query(sql, rowMapper)
+    }
+
     fun deleteDataset(id: Long): Int {
         val sql = "DELETE FROM dataset WHERE id = ?"
         return jdbc.update(sql, id)

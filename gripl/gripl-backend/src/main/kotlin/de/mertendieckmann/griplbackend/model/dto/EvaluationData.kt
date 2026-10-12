@@ -12,6 +12,10 @@ data class EvaluationData(
     val expectedValues: List<ExpectedValue>,
     val datasetId: Long? = null
 ) {
+    /** Number of labels without a GDPR class (binary / legacy labels) */
+    val unclassifiedLabelCount: Int
+        get() = expectedValues.count { it.classification.isEmpty() }
+
     companion object {
         private val mapper = jacksonObjectMapper()
 
@@ -37,7 +41,9 @@ data class ExpectedValue(
 data class EvaluationDataMeta(
     val id: Long,
     val name: String?,
-    val datasetId: Long?
+    val datasetId: Long?,
+    val labelCount: Int = 0,
+    val unclassifiedLabelCount: Int = 0
 )
 
 data class EvaluationDataWithOptionalId(
