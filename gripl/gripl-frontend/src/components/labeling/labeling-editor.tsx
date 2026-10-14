@@ -100,13 +100,13 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
         setHasUnsavedChanges(true)
     }
 
-    function handleElementLabelingChange(elementId: string, classification: GdprCategory[] | null, reason?: string) {
+    function handleElementLabelingChange(elementId: string, classification: GdprCategory[] | null, explanation?: string) {
         if (classification !== null) {
             if (!criticalActivities.some(critical => critical.value === elementId)) {
-                setCriticalActivities([...criticalActivities, { value: elementId, classification, reason }]);
+                setCriticalActivities([...criticalActivities, { value: elementId, classification, explanation }]);
             } else {
                 setCriticalActivities(criticalActivities.map(critical =>
-                    critical.value === elementId ? { ...critical, classification, reason } : critical
+                    critical.value === elementId ? { ...critical, classification, explanation } : critical
                 ));
             }
         } else {
@@ -298,10 +298,13 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                                                 </Badge>
                                             )}</>
                                         </div>
-                                        {critical.reason && (
-                                            <p className="mt-2 text-[11px] text-muted-foreground break-words">
-                                                {critical.reason}
-                                            </p>
+                                        {critical.explanation && (
+                                            <div className="mt-2">
+                                                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Gold Standard Explanation</p>
+                                                <p className="text-[11px] text-muted-foreground break-words">
+                                                    {critical.explanation}
+                                                </p>
+                                            </div>
                                         )}
                                     </div>
                                 );
