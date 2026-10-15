@@ -81,4 +81,35 @@ class DatasetRepository(
         val sql = "SELECT * FROM dataset WHERE id = ?"
         return jdbc.query(sql, mapper, id).firstOrNull()
     }
+
+    /** Inserts a dataset owned by [ownerUserId] and keeps the given timestamps (Postgres text format) if present. */
+    fun insertDatasetReturningId(
+        name: String, description: String?, createdAt: String?, updatedAt: String?, ownerUserId: String
+    ): Long {
+        val sql = """
+            INSERT INTO dataset (name, description, created_at, updated_at, owner_user_id)
+            VALUES (?, ?, COALESCE(?::timestamptz, now()), COALESCE(?::timestamptz, now()), ?)
+            RETURNING id
+        """.trimIndent()
+        return jdbc.queryForObject(sql, Long::class.java, name, description, createdAt, updatedAt, ownerUserId)!!
+    }
+
+    /**
+     * Rows in the column layout of the original Postgres CSV export of the dataset table.
+     * Timestamps are rendered in UTC like "2026-02-11 18:40:58.465728+00".
+     * Only datasets owned by [ownerUserId] are returned.
+     */
+    fun getDatasetExportRows(datasetIds: List<Long>, ownerUserId: String): List<List<String?>> {
+        if (datasetIds.isEmpty()) return emptyList()
+        val sql = """
+            SELECT id::text, name, description,
+                   (created_at AT TIME ZONE 'UTC')::text || '+00',
+                   (updated_at AT TIME ZONE 'UTC')::text || '+00'
+            FROM dataset
+            WHERE id IN (${datasetIds.joinToString(",")}) AND owner_user_id = ?
+            ORDER BY id
+        """.trimIndent()
+        val rowMapper = RowMapper { rs, _ -> (1..5).map { rs.getString(it) } }
+        return jdbc.query(sql, rowMapper, ownerUserId)
+    }
 }

@@ -51,7 +51,7 @@ class EvaluationDataController(
         val userId = exchange.authenticatedUserId()
         exchange.requirePrivilegedGriplRole()
         val datasets = evaluationDataRepository.getEvaluationDataForOwner(userId, datasetId)
-        return datasets.map { EvaluationDataMeta(it.id, it.name, it.datasetId) }
+        return datasets.map { EvaluationDataMeta(it.id, it.name, it.datasetId, it.expectedValues.size, it.unclassifiedLabelCount) }
     }
 
     @Operation(

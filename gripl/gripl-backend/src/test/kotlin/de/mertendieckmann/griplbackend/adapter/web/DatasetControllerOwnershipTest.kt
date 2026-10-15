@@ -1,5 +1,6 @@
 package de.mertendieckmann.griplbackend.adapter.web
 
+import de.mertendieckmann.griplbackend.application.dataset.DatasetTransferService
 import de.mertendieckmann.griplbackend.model.dto.CreateDatasetRequest
 import de.mertendieckmann.griplbackend.model.dto.Dataset
 import de.mertendieckmann.griplbackend.repository.DatasetRepository
@@ -32,7 +33,8 @@ import org.springframework.web.server.ResponseStatusException
 class DatasetControllerOwnershipTest {
 
     private val repo = mock<DatasetRepository>()
-    private val controller = DatasetController(repo)
+    private val transferService = mock<DatasetTransferService>()
+    private val controller = DatasetController(repo, transferService)
 
     private fun exchangeAs(userId: String?, griplRole: String? = "admin"): MockServerWebExchange =
         MockServerWebExchange.from(MockServerHttpRequest.get("/dataset")).apply {
@@ -129,5 +131,50 @@ class DatasetControllerOwnershipTest {
             controller.getAllDatasets(exchangeAs("user-1", griplRole = null))
         }
         assertEquals(HttpStatus.FORBIDDEN, ex.statusCode)
+    }
+
+    // ----- import / export (dataset-export feature x GRIPL-v2#33/#40) -----
+
+    @Test
+    fun `export of a dataset the caller does not own is a 404 and exports nothing`() {
+        whenever(repo.getDatasetByIdAndOwner(99, "user-1")).thenReturn(null)
+
+        val response = controller.exportDataset(99, exchangeAs("user-1")).block()!!
+
+        assertEquals(HttpStatus.NOT_FOUND, response.statusCode)
+        verify(transferService, never()).exportAsZip(any(), any())
+    }
+
+    @Test
+    fun `export of an owned dataset is scoped to the caller`() {
+        whenever(repo.getDatasetByIdAndOwner(5, "user-1")).thenReturn(dataset(5, "mine"))
+        whenever(transferService.exportAsZip("user-1", listOf(5L))).thenReturn(byteArrayOf(1))
+
+        val response = controller.exportDataset(5, exchangeAs("user-1")).block()!!
+
+        assertEquals(HttpStatus.OK, response.statusCode)
+        verify(transferService).exportAsZip("user-1", listOf(5L))
+    }
+
+    @Test
+    fun `export all only asks for the caller's datasets`() {
+        whenever(transferService.exportAsZip("user-1", null)).thenReturn(byteArrayOf(1))
+
+        controller.exportAllDatasets(exchangeAs("user-1")).block()
+
+        verify(transferService).exportAsZip("user-1", null)
+    }
+
+    @Test
+    fun `dpo is forbidden from exporting and importing`() {
+        val exportEx = assertThrows(ResponseStatusException::class.java) {
+            controller.exportAllDatasets(exchangeAs("user-1", griplRole = "dpo"))
+        }
+        assertEquals(HttpStatus.FORBIDDEN, exportEx.statusCode)
+        val importEx = assertThrows(ResponseStatusException::class.java) {
+            controller.importDatasets(null, null, null, exchangeAs("user-1", griplRole = "dpo"))
+        }
+        assertEquals(HttpStatus.FORBIDDEN, importEx.statusCode)
+        verify(transferService, never()).exportAsZip(any(), any())
     }
 }

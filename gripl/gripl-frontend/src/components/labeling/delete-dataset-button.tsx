@@ -17,9 +17,10 @@ import {Dataset} from "@/models/dto/Dataset";
 
 interface DeleteDatasetButtonProps {
     dataset: Dataset;
+    testCaseCount: number;
 }
 
-export default function DeleteDatasetButton({ dataset }: DeleteDatasetButtonProps) {
+export default function DeleteDatasetButton({ dataset, testCaseCount }: DeleteDatasetButtonProps) {
 
     const router = useRouter()
     const [showDeleteDatasetDialog, setShowDeleteDatasetDialog] = React.useState(false)
@@ -36,7 +37,11 @@ export default function DeleteDatasetButton({ dataset }: DeleteDatasetButtonProp
         <DialogContent>
             <DialogHeader>
                 <DialogTitle>Delete Dataset {dataset.name}</DialogTitle>
-                <DialogDescription>Delete the dataset. All associated test cases will still exist in the database, but will no longer be associated with this dataset and will not be accessible through the UI.</DialogDescription>
+                <DialogDescription>
+                    Are you sure you want to delete the dataset &apos;{dataset.name}&apos; and
+                    all <strong>{testCaseCount}</strong> test case{testCaseCount === 1 ? "" : "s"} incl. their labels?
+                    This action cannot be undone. Export the dataset first if you want to keep a copy.
+                </DialogDescription>
             </DialogHeader>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setShowDeleteDatasetDialog(false)}>

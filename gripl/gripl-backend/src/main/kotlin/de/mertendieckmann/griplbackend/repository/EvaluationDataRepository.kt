@@ -125,6 +125,43 @@ class EvaluationDataRepository(
         )!!
     }
 
+    /** Inserts a test case and keeps the given timestamps (Postgres text format) if present. */
+    fun insertImportedEvaluationData(data: EvaluationDataWithOptionalId, createdAt: String?, updatedAt: String?): Long {
+        val sql = """
+            INSERT INTO evaluation_data (name, bpmn_xml, expected_values, dataset_id, created_at, updated_at)
+            VALUES (?, ?, ?::jsonb, ?, COALESCE(?::timestamptz, now()), COALESCE(?::timestamptz, now()))
+            RETURNING id
+        """.trimIndent()
+
+        val value = PGobject().apply { type = "jsonb"; this.value = objectMapper.writeValueAsString(data.expectedValues) }
+
+        return jdbc.queryForObject(
+            sql, Long::class.java,
+            data.name, data.bpmnXml, value, data.datasetId, createdAt, updatedAt
+        )!!
+    }
+
+    /**
+     * Rows in the column layout of the original Postgres CSV export of the evaluation_data table.
+     * expected_values is rendered by Postgres itself, so the JSON looks exactly like in the original export.
+     * Only test cases of datasets owned by [ownerUserId] are returned.
+     */
+    fun getEvaluationDataExportRows(datasetIds: List<Long>, ownerUserId: String): List<List<String?>> {
+        if (datasetIds.isEmpty()) return emptyList()
+        val sql = """
+            SELECT ed.id::text, ed.bpmn_xml, ed.expected_values::text,
+                   (ed.created_at AT TIME ZONE 'UTC')::text || '+00',
+                   (ed.updated_at AT TIME ZONE 'UTC')::text || '+00',
+                   ed.name, ed.dataset_id::text
+            FROM evaluation_data ed
+            JOIN dataset d ON ed.dataset_id = d.id
+            WHERE ed.dataset_id IN (${datasetIds.joinToString(",")}) AND d.owner_user_id = ?
+            ORDER BY ed.id
+        """.trimIndent()
+        val rowMapper = RowMapper { rs, _ -> (1..7).map { rs.getString(it) } }
+        return jdbc.query(sql, rowMapper, ownerUserId)
+    }
+
     fun updateEvaluationData(data: EvaluationData, ownerUserId: String): Int {
         val sql = """
             UPDATE evaluation_data

@@ -27,7 +27,7 @@ class CustomAnalysisEndpointRepository(
 
     // ── Owner-scoped access ────────────────────────────────────────────────
     // Custom endpoints are private to the user that created them. Rows with a
-    // NULL owner (pre-V10) match nobody.
+    // NULL owner (pre-V11) match nobody.
 
     fun create(
         name: String,

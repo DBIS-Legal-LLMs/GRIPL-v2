@@ -48,7 +48,7 @@ class ProcessModelRepository(
     // ── Owner-scoped access ────────────────────────────────────────────────
     // Process models are private to the auth-service user (JWT `sub`) that
     // uploaded them; every path reachable from ProcessModelController goes
-    // through one of these. Rows with a NULL owner (pre-V9) match nobody.
+    // through one of these. Rows with a NULL owner (pre-V10) match nobody.
 
     fun create(name: String, bpmnXml: String, ownerUserId: String): Long {
         val sql = "INSERT INTO process_model (name, bpmn_xml, owner_user_id) VALUES (?, ?, ?) RETURNING id"

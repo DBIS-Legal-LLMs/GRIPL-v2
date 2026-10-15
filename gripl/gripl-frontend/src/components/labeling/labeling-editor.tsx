@@ -6,7 +6,7 @@ import {BpmnToolCard} from "@/models/BpmnToolCard";
 import {Card, CardContent, CardHeader} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {ChevronLeft, ChevronRight, Save, Trash2} from "lucide-react";
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import {Switch} from "@/components/ui/switch";
 import {Label} from "@/components/ui/label";
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
@@ -43,33 +43,6 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
     const [elementNames, setElementNames] = useState<Record<string, string>>({});
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const {isMulticlass, backendEndpoint} = useAnalysisEndpoint();
-
-    useEffect(() => {
-        if (isMulticlass) {
-            return;
-        }
-
-        setCriticalActivities((prev) => {
-            let changed = false;
-            const normalized = prev.map((value) => {
-                if ((value.classification?.length ?? 0) <= 1) {
-                    return value;
-                }
-                changed = true;
-                return {
-                    ...value,
-                    classification: value.classification.slice(0, 1),
-                };
-            });
-
-            if (changed) {
-                setHasUnsavedChanges(true);
-                return normalized;
-            }
-
-            return prev;
-        });
-    }, [isMulticlass]);
 
     const categoryBadgeClass: Record<GdprCategory, string> = {
         Collection: "bg-emerald-600 text-white border-transparent",
@@ -128,13 +101,13 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
         setHasUnsavedChanges(true)
     }
 
-    function handleElementLabelingChange(elementId: string, classification: GdprCategory[], reason?: string) {
-        if (classification.length > 0) {
+    function handleElementLabelingChange(elementId: string, classification: GdprCategory[] | null, explanation?: string) {
+        if (classification !== null) {
             if (!criticalActivities.some(critical => critical.value === elementId)) {
-                setCriticalActivities([...criticalActivities, { value: elementId, classification, reason }]);
+                setCriticalActivities([...criticalActivities, { value: elementId, classification, explanation }]);
             } else {
                 setCriticalActivities(criticalActivities.map(critical =>
-                    critical.value === elementId ? { ...critical, classification, reason } : critical
+                    critical.value === elementId ? { ...critical, classification, explanation } : critical
                 ));
             }
         } else {
@@ -171,7 +144,8 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
         setHasUnsavedChanges(true);
     }
 
-    const selectedElementName = selectedElement?.businessObject?.name || "No Name";
+    const unclassifiedCount = criticalActivities.filter(critical => (critical.classification ?? []).length === 0).length;
+    const selectedElementName =selectedElement?.businessObject?.name || "No Name";
     const highlightedActivityCategoryMap = criticalActivities.reduce((acc, critical) => {
         acc[critical.value] = critical.classification || [];
         return acc;
@@ -257,7 +231,12 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                             </Button>
                         </div>
                         <div className="px-3 py-2 border-b">
-                            <p className="text-xs text-muted-foreground">{criticalActivities.length} labeled</p>
+                            <p className="text-xs text-muted-foreground">
+                                {criticalActivities.length} labeled
+                                {isMulticlass && unclassifiedCount > 0 && (
+                                    <span className="text-amber-600"> · {unclassifiedCount} without class</span>
+                                )}
+                            </p>
                         </div>
                         <div className="flex-1 overflow-y-auto p-3 space-y-2">
                             {criticalActivities.length === 0 && (
@@ -298,6 +277,11 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                                         <div className="mt-2 flex flex-wrap gap-1">
                                             <>{isMulticlass ? (
                                                 <>
+                                                    {(critical.classification ?? []).length === 0 && (
+                                                        <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">
+                                                            No class
+                                                        </Badge>
+                                                    )}
                                                     {isMultiCategory && (
                                                         <Badge variant="outline" className="text-[10px] bg-fuchsia-600 text-white border-fuchsia-600">
                                                             Multiple
@@ -315,10 +299,13 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                                                 </Badge>
                                             )}</>
                                         </div>
-                                        {critical.reason && (
-                                            <p className="mt-2 text-[11px] text-muted-foreground break-words">
-                                                {critical.reason}
-                                            </p>
+                                        {critical.explanation && (
+                                            <div className="mt-2">
+                                                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Gold Standard Explanation</p>
+                                                <p className="text-[11px] text-muted-foreground break-words">
+                                                    {critical.explanation}
+                                                </p>
+                                            </div>
                                         )}
                                     </div>
                                 );

@@ -141,14 +141,14 @@ class HttpEvaluator(
     }
 
     private fun binaryResult(response: AnalysisResponse) = EvaluationCallResult(
-        expectedValues = response.criticalElements.map { ExpectedValue(value = it.id, reason = it.reason) },
+        expectedValues = response.criticalElements.map { ExpectedValue(value = it.id, explanation = it.reason) },
         amountOfRetries = response.amountOfRetries,
         analysisResponse = response
     )
 
     private fun multiclassResult(response: MulticlassAnalysisResponse) = EvaluationCallResult(
         expectedValues = response.classifiedElements.map {
-            ExpectedValue(value = it.id, reason = it.reason, classification = it.classification)
+            ExpectedValue(value = it.id, explanation = it.reason, classification = it.classification)
         },
         amountOfRetries = response.amountOfRetries,
         // Shaped like a binary response so downstream scoring needs only one form.
