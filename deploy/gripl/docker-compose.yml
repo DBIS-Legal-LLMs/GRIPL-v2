@@ -1,0 +1,191 @@
+# GRIPL on the server — one stack per environment (prod / dev).
+#
+# The same file runs both. Everything environment-specific comes from the .env
+# next to it (ENVIRONMENT, GRIPL_HOST, IMAGE_TAG, secrets). See deploy/README.md.
+#
+# Images are NOT built here: CI builds them and pushes them to GHCR
+# (:prod from main, :dev from dev); the updater on the server pulls them.
+#
+# The service names below (gripl-frontend, gripl-backend, gripl-rag, auth-service)
+# are baked into the frontend image as proxy targets (see "Frontend build args"
+# in deploy/README.md), so they must stay as they are.
+#
+# The server is reachable from the internet. What is public: the frontend, on
+# https://${GRIPL_HOST}, limited to ALLOWED_CIDRS. Hidden on purpose even behind it:
+#   /rag/*   the RAG service has no login and spends the project's LLM budget
+#   API docs (Swagger) are switched off unless API_DOCS_ENABLED=true
+# Login and registration are rate limited per client IP.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  gripl-frontend:
+    image: ${IMAGE_REGISTRY:-ghcr.io/dbis-legal-llms}/gripl-frontend:${IMAGE_TAG:?set IMAGE_TAG in .env}
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      gripl-backend:
+        condition: service_healthy
+    mem_limit: ${MEM_FRONTEND:-768m}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dbis-${ENVIRONMENT:?set ENVIRONMENT in .env}
+      - traefik.http.services.gripl-${ENVIRONMENT}.loadbalancer.server.port=3000
+      # Who may reach this environment at all (comma-separated CIDRs). prod: usually
+      # 0.0.0.0/0,::/0 (public); dev: only the university network.
+      - traefik.http.middlewares.gripl-${ENVIRONMENT}-allow.ipallowlist.sourcerange=${ALLOWED_CIDRS:?set ALLOWED_CIDRS in .env}
+
+      # the site itself
+      - traefik.http.routers.gripl-${ENVIRONMENT}.rule=Host(`${GRIPL_HOST:?set GRIPL_HOST in .env}`)
+      - traefik.http.routers.gripl-${ENVIRONMENT}.entrypoints=websecure
+      - traefik.http.routers.gripl-${ENVIRONMENT}.tls=true
+      - traefik.http.routers.gripl-${ENVIRONMENT}.service=gripl-${ENVIRONMENT}
+      - traefik.http.routers.gripl-${ENVIRONMENT}.middlewares=gripl-${ENVIRONMENT}-allow,secure-headers@file
+
+      # login and registration: slowed down per client IP (auth-service has no lockout yet)
+      - traefik.http.routers.gripl-${ENVIRONMENT}-login.rule=Host(`${GRIPL_HOST}`) && Path(`/auth/login`)
+      - traefik.http.routers.gripl-${ENVIRONMENT}-login.priority=100
+      - traefik.http.routers.gripl-${ENVIRONMENT}-login.entrypoints=websecure
+      - traefik.http.routers.gripl-${ENVIRONMENT}-login.tls=true
+      - traefik.http.routers.gripl-${ENVIRONMENT}-login.service=gripl-${ENVIRONMENT}
+      - traefik.http.routers.gripl-${ENVIRONMENT}-login.middlewares=gripl-${ENVIRONMENT}-allow,login-ratelimit@file,secure-headers@file
+      - traefik.http.routers.gripl-${ENVIRONMENT}-register.rule=Host(`${GRIPL_HOST}`) && Path(`/auth/register`)
+      - traefik.http.routers.gripl-${ENVIRONMENT}-register.priority=100
+      - traefik.http.routers.gripl-${ENVIRONMENT}-register.entrypoints=websecure
+      - traefik.http.routers.gripl-${ENVIRONMENT}-register.tls=true
+      - traefik.http.routers.gripl-${ENVIRONMENT}-register.service=gripl-${ENVIRONMENT}
+      - traefik.http.routers.gripl-${ENVIRONMENT}-register.middlewares=gripl-${ENVIRONMENT}-allow,register-ratelimit@file,secure-headers@file
+
+      # The frontend would proxy /rag/* to the RAG service, which has no authentication
+      # and runs on the project's own LLM key. The browser never needs it: answer 403.
+      - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.rule=Host(`${GRIPL_HOST}`) && PathPrefix(`/rag`)
+      - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.priority=1000
+      - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.entrypoints=websecure
+      - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.tls=true
+      - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.service=gripl-${ENVIRONMENT}
+      - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.middlewares=deny-all@file
+    networks:
+      - default
+      - env
+
+  gripl-backend:
+    image: ${IMAGE_REGISTRY:-ghcr.io/dbis-legal-llms}/gripl-backend:${IMAGE_TAG}
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      gripl-postgres:
+        condition: service_healthy
+    mem_limit: ${MEM_BACKEND:-2g}
+    environment:
+      - SPRING_PROFILES_ACTIVE=${ENVIRONMENT}
+      # interactive API docs are only for dev (they skip the login in the backend)
+      - SPRINGDOC_API_DOCS_ENABLED=${API_DOCS_ENABLED:-false}
+      - SPRINGDOC_SWAGGER_UI_ENABLED=${API_DOCS_ENABLED:-false}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/${POSTGRES_DB:-gripl_db}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-postgres}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      - FRONTEND_BASE_URL=${PUBLIC_SCHEME:-https}://${GRIPL_HOST}
+      - RAG_API_URL=http://gripl-rag:8081
+      # auth-service of the SAME environment, reached over the shared env network
+      - AUTH_SERVICE_JWKS_URI=http://auth-service:8000/.well-known/jwks.json
+      - AUTH_SERVICE_INTERNAL_URL=http://auth-service:8000
+    volumes:
+      - playwright-browsers:/root/.cache/ms-playwright
+    healthcheck:
+      # plain TCP check: the image has no curl and the app serves /actuator/health
+      # only behind its auth filter allow-list, so "port open" is the cheap signal
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - default
+      - env
+
+  gripl-rag:
+    image: ${IMAGE_REGISTRY:-ghcr.io/dbis-legal-llms}/gripl-rag:${IMAGE_TAG}
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      gripl-neo4j:
+        condition: service_healthy
+    mem_limit: ${MEM_RAG:-3g}
+    env_file:
+      - rag.env
+    environment:
+      # always the compose service name, whatever rag.env says
+      - NEO4J_URI=neo4j://gripl-neo4j:7687
+      - NEO4J_USERNAME=neo4j
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:?set NEO4J_PASSWORD in .env}
+    volumes:
+      - rag-working-dir:/app/rag_working_dir
+      - huggingface-cache:/root/.cache/huggingface
+    networks:
+      - default
+
+  gripl-neo4j:
+    image: neo4j:5.26.30-community   # pinned: upgrade deliberately
+    restart: unless-stopped
+    logging: *default-logging
+    mem_limit: ${MEM_NEO4J:-2g}
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
+      # keep two environments side by side from eating the whole machine
+      - NEO4J_server_memory_heap_initial__size=${NEO4J_HEAP:-512m}
+      - NEO4J_server_memory_heap_max__size=${NEO4J_HEAP:-512m}
+      - NEO4J_server_memory_pagecache_size=${NEO4J_PAGECACHE:-512m}
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#neo4j/}\" 'RETURN 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+    networks:
+      - default
+
+  gripl-postgres:
+    image: postgres:15.18   # pinned: upgrade deliberately, not whenever the registry changes
+    restart: unless-stopped
+    logging: *default-logging
+    mem_limit: ${MEM_POSTGRES:-1g}
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-gripl_db}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-gripl_db}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks:
+      - default
+
+volumes:
+  playwright-browsers:
+  postgres-data:
+  neo4j-data:
+  rag-working-dir:
+  huggingface-cache:
+
+networks:
+  # private to this stack: databases and the RAG service live here only
+  default:
+  # shared with the other stacks of the same environment (auth-service) and Traefik;
+  # created by deploy/traefik
+  env:
+    external: true
+    name: dbis-${ENVIRONMENT}

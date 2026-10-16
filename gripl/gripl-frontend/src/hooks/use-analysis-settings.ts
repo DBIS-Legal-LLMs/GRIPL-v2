@@ -34,7 +34,7 @@ export function useAnalysisSettings() {
     const [seed, setSeed] = useState<number | null>(null)
     const [temperature, setTemperature] = useState<number | null>(null)
     const [topP, setTopP] = useState<number | null>(null)
-    const [useRag, setUseRag] = useState<boolean>(false)
+    const [useRag, setUseRag] = useState<boolean>(true)
     const [searchMode, setSearchMode] = useState<string>("hybrid")
     const [isConfigured, setIsConfigured] = useState<boolean>(false)
     const [isLoaded, setIsLoaded] = useState<boolean>(false)
@@ -70,7 +70,7 @@ export function useAnalysisSettings() {
         setSeed(null)
         setTemperature(null)
         setTopP(null)
-        setUseRag(false)
+        setUseRag(true)
         setSearchMode("hybrid")
         setIsConfigured(false)
         if (!token) return

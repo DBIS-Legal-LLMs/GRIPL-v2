@@ -37,6 +37,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY app/ ./app/
 COPY scripts/ ./scripts/
+# Pre-extracted GDPR/EDPB corpus read by scripts/ingest.py. The local compose files
+# still bind-mount ./data over this; the server stacks rely on the baked-in copy.
+COPY data/extracted/ ./data/extracted/
 
 # Expose the port uvicorn will listen on
 EXPOSE 8081

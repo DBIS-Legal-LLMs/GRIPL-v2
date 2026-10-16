@@ -1,0 +1,15 @@
+# Loaded by Traefik's file provider (see docker-compose.yml).
+#
+# The certificate Traefik presents when no Let's Encrypt certificate applies.
+# Generate it with make-selfsigned-cert.sh (writes ./certs/tls.crt and tls.key).
+# Browsers show a warning for a self-signed certificate until the CA
+# (certs/ca.crt) is installed on the client; the connection is encrypted either way.
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/tls.crt
+        keyFile: /certs/tls.key
+  options:
+    default:
+      minVersion: VersionTLS12
