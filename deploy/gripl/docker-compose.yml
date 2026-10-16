@@ -103,6 +103,11 @@ services:
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-postgres}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       - FRONTEND_BASE_URL=${PUBLIC_SCHEME:-https}://${GRIPL_HOST}
+      # Every write from the browser (upload, saving settings, delete, ...) carries an Origin
+      # header, which the frontend's /api proxy forwards unchanged. The backend rejects any
+      # origin that is not in this list (403, empty body); its built-in default only knows
+      # localhost addresses. So list exactly the public address of this environment.
+      - APP_CORS_ALLOWED_ORIGINS=${PUBLIC_SCHEME:-https}://${GRIPL_HOST}
       - RAG_API_URL=http://gripl-rag:8081
       # auth-service of the SAME environment, reached over the shared env network
       - AUTH_SERVICE_JWKS_URI=http://auth-service:8000/.well-known/jwks.json

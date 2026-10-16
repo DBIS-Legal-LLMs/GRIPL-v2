@@ -308,6 +308,10 @@ Known gaps (application level, not solved by this folder):
 
 * **Memory.** Prod and dev together should idle at roughly 4–6 GB. Each container has
   an upper limit (`MEM_*` in `.env`) so one environment cannot starve the other.
+* **CORS.** The browser sends an `Origin` header with every write (upload, saving settings, delete), and the
+  backend answers 403 with an empty body unless the origin is in `APP_CORS_ALLOWED_ORIGINS` (set from
+  `PUBLIC_SCHEME` and `GRIPL_HOST` in the compose file). Symptom when it is wrong: all reads work, every write
+  fails with 403 and nothing shows up in the logs. Change the host name of a stack and this follows by itself.
 * **Database versions are pinned** (`postgres:15.18`, `neo4j:5.26.30-community`,
   `mongo:7.0.25`). A floating tag such as `postgres:15` would make the updater upgrade
   and restart a database whenever the registry publishes a new patch release. Bump the
