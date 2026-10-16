@@ -1,9 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
-import {PasswordInput} from "@/components/ui/input-password";
 import {Label} from "@/components/ui/label";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {Separator} from "@/components/ui/separator";
@@ -12,7 +12,6 @@ import {AnalysisEndpoint, EndpointChoice, ModelRowState} from "@/models/evaluati
 import {emptyToNull, safeFloatOrNull, safeIntOrNull} from "@/lib/evaluation-config-utils";
 import LlmBaseUrlDatalist from "@/components/datalist/llm-base-url-datalist";
 import LlmModelNameDatalist from "@/components/datalist/llm-model-name-datalist";
-import LlmApiKeyPlaceholderDatalist from "@/components/datalist/llm-api-key-placeholder-datalist";
 
 interface EvaluationConfigModelRowProps {
     model: ModelRowState;
@@ -138,16 +137,10 @@ export default function EvaluationConfigModelRow({model, index, canRemove, effec
                 </div>
 
                 <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label>API Key</Label>
-                        <PasswordInput
-                            placeholder="Enter API key"
-                            value={model.apiKey || ""}
-                            onChange={(e) => updateModel(model.id, "apiKey", emptyToNull(e.target.value))}
-                            list="llm-api-key-placeholder-datalist"
-                        />
-                        <LlmApiKeyPlaceholderDatalist id="llm-api-key-placeholder-datalist"/>
-                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        Evaluations are billed to your own OpenRouter account — set or
+                        change your key in <Link href="/settings" className="underline">Account Settings</Link>.
+                    </p>
 
                     <div className="space-y-2">
                         <Label>Temperature</Label>

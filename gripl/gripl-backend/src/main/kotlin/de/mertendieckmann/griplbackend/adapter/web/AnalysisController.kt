@@ -12,6 +12,7 @@ import de.mertendieckmann.griplbackend.model.dto.DefaultAnalysisPrompt
 import de.mertendieckmann.griplbackend.model.dto.RagMode
 import de.mertendieckmann.griplbackend.model.dto.MulticlassAnalysisResponse
 import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
+import de.mertendieckmann.griplbackend.security.authenticatedUserId
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.HttpStatus
@@ -21,6 +22,7 @@ import org.springframework.http.codec.multipart.FilePart
 import org.springframework.http.codec.multipart.FormFieldPart
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 
@@ -34,12 +36,13 @@ class AnalysisController(
 
     @Operation(
         summary = "Get all available analysis endpoints",
-        description = "Returns the built-in analysis endpoints plus every user-uploaded custom endpoint."
+        description = "Returns the built-in analysis endpoints plus the custom endpoints uploaded by the authenticated user."
     )
     @GetMapping("/endpoints", produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun getAnalysisEndpoints(): Mono<ResponseEntity<List<AnalysisEndpoint>>> {
+    fun getAnalysisEndpoints(exchange: ServerWebExchange): Mono<ResponseEntity<List<AnalysisEndpoint>>> {
+        val userId = exchange.authenticatedUserId()
         return Mono.fromCallable {
-            val customEndpoints = customAnalysisEndpointRepository.listAll().map {
+            val customEndpoints = customAnalysisEndpointRepository.listByOwner(userId).map {
                 AnalysisEndpoint(
                     name = it.name,
                     endpoint = "/gdpr/analysis/custom/${it.id}",
@@ -159,16 +162,18 @@ class AnalysisController(
         @PathVariable id: Long,
         @RequestPart("bpmnFile") file: FilePart,
         @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
-        @RequestPart("activitiesOnly", required = false) activitiesOnlyPart: FormFieldPart?
+        @RequestPart("activitiesOnly", required = false) activitiesOnlyPart: FormFieldPart?,
+        exchange: ServerWebExchange
     ): Mono<ResponseEntity<Any>> {
 
+        val userId = exchange.authenticatedUserId()
         val activitiesOnly = activitiesOnlyPart?.value()?.toBooleanStrictOrNull() ?: false
 
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
 
         return bpmnXmlMono.flatMap { bpmnXml ->
             Mono.fromCallable {
-                val endpoint = customAnalysisEndpointRepository.getById(id)
+                val endpoint = customAnalysisEndpointRepository.getByIdAndOwner(id, userId)
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No custom analysis endpoint found for id $id")
 
                 // RAG usage is a fixed property of the endpoint itself (like responseType),

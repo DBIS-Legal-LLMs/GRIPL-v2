@@ -7,6 +7,7 @@ import {Trash2} from "lucide-react";
 import {useRouter} from "next/navigation";
 import {useToast} from "@/components/ui/toast";
 import {toErrorMessage} from "@/lib/http-error";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 export interface DeleteTestCaseButtonProps {
     testCaseId: number
@@ -27,7 +28,7 @@ export default function DeleteTestCaseButton({ testCaseId, testCaseName }: Delet
     const handleDeleteConfirm = async () => {
         if (testCaseId) {
             try {
-                const response = await fetch(`/api/dataset/testcase/${testCaseId}`, {
+                const response = await authenticatedFetch(`/api/dataset/testcase/${testCaseId}`, {
                     method: "DELETE",
                 });
 

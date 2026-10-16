@@ -8,6 +8,7 @@ import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 import {EvaluationData} from "@/models/dto/EvaluationData";
 import {downloadBpmnXml} from "@/lib/download-bpmn";
 import {Spinner} from "@/components/ui/spinner";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 export interface DownloadTestCaseButtonProps {
     testCaseId: number
@@ -27,7 +28,7 @@ export default function DownloadTestCaseButton({ testCaseId, testCaseName }: Dow
         e.preventDefault()
         setIsLoading(true);
         try {
-            const response = await fetch(`/api/dataset/testcase/${testCaseId}`);
+            const response = await authenticatedFetch(`/api/dataset/testcase/${testCaseId}`);
             if (!response.ok) {
                 throw new Error(await extractErrorDetails(response));
             }

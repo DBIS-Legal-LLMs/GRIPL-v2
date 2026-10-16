@@ -1,6 +1,7 @@
 "use server"
 
 import {CustomAnalysisEndpoint, CustomAnalysisResponseType} from "@/models/dto/CustomAnalysisEndpoint";
+import {authenticatedServerFetch} from "@/lib/authenticated-server-fetch";
 
 export default async function createCustomEndpoint(
     name: string,
@@ -9,7 +10,7 @@ export default async function createCustomEndpoint(
     ragEnabled: boolean,
     ragMode?: string
 ): Promise<CustomAnalysisEndpoint> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/custom-analysis-endpoints`, {
+    const response = await authenticatedServerFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/custom-analysis-endpoints`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

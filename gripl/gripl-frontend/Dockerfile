@@ -7,6 +7,15 @@ WORKDIR /app
 ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 
+# next.config.ts's rewrites() destinations (RAG_INTERNAL_URL, AUTH_SERVICE_INTERNAL_URL)
+# are resolved by `next build`, not at container runtime — `next start` serves
+# the frozen routes-manifest.json from this build. A docker-compose
+# `environment:` entry alone does nothing for these; they must be build args.
+ARG RAG_INTERNAL_URL
+ENV RAG_INTERNAL_URL=$RAG_INTERNAL_URL
+ARG AUTH_SERVICE_INTERNAL_URL
+ENV AUTH_SERVICE_INTERNAL_URL=$AUTH_SERVICE_INTERNAL_URL
+
 COPY package*.json ./
 RUN npm i --force
 

@@ -14,6 +14,7 @@ import DeleteSelectedButton from "@/components/process-analysis/delete-selected-
 import deleteProcessModel from "@/actions/delete-process-model"
 import {useToast} from "@/components/ui/toast"
 import {ProcessModelDetail, ProcessModelListItem, ProcessModelStatus} from "@/models/dto/ProcessModel"
+import {authenticatedFetch} from "@/lib/authenticated-fetch"
 
 interface ProcessModelListProps {
     initialModels: ProcessModelListItem[]
@@ -73,7 +74,7 @@ export default function ProcessModelList({initialModels}: ProcessModelListProps)
 
     async function handleDownload(id: number) {
         try {
-            const response = await fetch(`/api/process-models/${id}`)
+            const response = await authenticatedFetch(`/api/process-models/${id}`)
             if (!response.ok) throw new Error(`Failed to fetch result: ${response.statusText}`)
             const detail = await response.json() as ProcessModelDetail
 

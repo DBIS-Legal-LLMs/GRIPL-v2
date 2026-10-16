@@ -17,6 +17,7 @@ import {Upload} from "lucide-react";
 import {useToast} from "@/components/ui/toast";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 import {Spinner} from "@/components/ui/spinner";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 interface ImportedDataset {
     originalId: string;
@@ -70,7 +71,7 @@ export default function ImportDatasetsButton() {
 
         setIsLoading(true)
         try {
-            const response = await fetch("/api/dataset/import", {method: "POST", body: formData})
+            const response = await authenticatedFetch("/api/dataset/import", {method: "POST", body: formData})
             if (!response.ok) {
                 throw new Error(await extractErrorDetails(response))
             }

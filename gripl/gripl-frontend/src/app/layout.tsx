@@ -14,6 +14,7 @@ import {AnalysisEndpointProvider} from "@/components/providers/analysis-endpoint
 import {EvaluationJobProvider} from "@/components/providers/evaluation-job-provider";
 import {KgStatusBanner} from "@/components/providers/kg-status-banner";
 import {ToastProvider} from "@/components/ui/toast";
+import {AuthProvider} from "@/context/auth-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,6 +49,7 @@ export default function RootLayout({
       >
         <KgStatusBanner />
         <ToastProvider>
+          <AuthProvider>
           <AnalysisEndpointProvider>
             <EvaluationJobProvider>
               <SidebarProvider className="h-full w-full">
@@ -65,6 +67,7 @@ export default function RootLayout({
               </SidebarProvider>
             </EvaluationJobProvider>
           </AnalysisEndpointProvider>
+          </AuthProvider>
         </ToastProvider>
       </ThemeProvider>
     </body>

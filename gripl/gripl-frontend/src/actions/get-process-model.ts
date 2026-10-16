@@ -1,9 +1,10 @@
 "use server"
 
 import {ProcessModelDetail} from "@/models/dto/ProcessModel";
+import {authenticatedServerFetch} from "@/lib/authenticated-server-fetch";
 
 export default async function getProcessModel(id: number): Promise<ProcessModelDetail | null> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/process-models/${id}`, {
+    const response = await authenticatedServerFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/process-models/${id}`, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",

@@ -1,8 +1,10 @@
 "use server"
 
+import {authenticatedServerFetch} from "@/lib/authenticated-server-fetch";
+
 export default async function deleteCustomEndpoint(id: number) {
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/custom-analysis-endpoints/${id}`, {
+    const response = await authenticatedServerFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/custom-analysis-endpoints/${id}`, {
         method: "DELETE",
     });
 

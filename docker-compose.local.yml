@@ -5,13 +5,26 @@ services:
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_API_BASE_URL=http://gripl-backend:8080
+        # next.config.ts's rewrites() are frozen into the build by `next
+        # build` — a runtime `environment:` entry alone does NOT change
+        # where /auth/* proxies to. Must be passed here too.
+        - AUTH_SERVICE_INTERNAL_URL=${AUTH_SERVICE_INTERNAL_URL:-http://host.docker.internal:8100}
     image: gripl-f:latest
     container_name: gripl-frontend
     restart: unless-stopped
+    environment:
+      # Harmless to also set at runtime (covers `npm run dev`, which re-evaluates
+      # rewrites() per request) — but the build arg above is what actually
+      # matters for this Docker image.
+      - AUTH_SERVICE_INTERNAL_URL=${AUTH_SERVICE_INTERNAL_URL:-http://host.docker.internal:8100}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - app
     ports:
-      - "3000:3000"
+      # Host-side only — 3000 is taken by RAGulate's frontend on this
+      # machine. The container still listens on its normal 3000 internally.
+      - "3001:3000"
 
   gripl-backend:
     build:
@@ -21,23 +34,33 @@ services:
     container_name: gripl-backend
     restart: unless-stopped
     depends_on:
-      - gripl-postgres
-      - gripl-neo4j
+      gripl-postgres:
+        condition: service_healthy
+      gripl-neo4j:
+        condition: service_started
     env_file:
       - .env.local
     environment:
-      - FRONTEND_BASE_URL=http://localhost:3000
+      - FRONTEND_BASE_URL=http://localhost:3001
       - SPRING_PROFILES_ACTIVE=dev
       - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/gripl_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
       - RAG_API_URL=http://gripl-rag:8081
+      - AUTH_SERVICE_JWKS_URI=${AUTH_SERVICE_JWKS_URI:-http://host.docker.internal:8100/.well-known/jwks.json}
+      # Base URL of auth-service itself — used to fetch a caller's own
+      # OpenRouter API key (auth-service#8 follow-up: no shared server key).
+      - AUTH_SERVICE_INTERNAL_URL=${AUTH_SERVICE_INTERNAL_URL:-http://host.docker.internal:8100}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - playwright-browsers:/root/.cache/ms-playwright
     networks:
       - app
     ports:
-      - "8000:8080"
+      # Host-side only — 8000 is taken by RAGulate's backend on this
+      # machine. The container still listens on its normal 8080 internally.
+      - "8001:8080"
 
   gripl-rag:
     build:
@@ -47,7 +70,8 @@ services:
     container_name: gripl-rag
     restart: unless-stopped
     depends_on:
-      - gripl-neo4j
+      gripl-neo4j:
+        condition: service_healthy
     env_file:
       - .env.local
     environment:
@@ -76,6 +100,15 @@ services:
     ports:
       - "7474:7474"
       - "7687:7687"
+    healthcheck:
+      # cypher-shell needs a real, authenticated connection — a much more
+      # reliable readiness signal than "the container process is running"
+      # (Neo4j can take a while past that point on first start).
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p gripl-rag-2026 'RETURN 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
 
   gripl-postgres:
     image: postgres:15
@@ -91,6 +124,20 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=gripl_db
+    healthcheck:
+      # depends_on's plain form only waits for the container to *start*, not
+      # for Postgres to actually accept connections — on a fresh volume,
+      # gripl-backend's Flyway migration can (and does, intermittently) lose
+      # that race and crash with "Connection refused". This makes
+      # gripl-backend's depends_on actually wait for readiness.
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # auth-service is not bundled here — run it from its own repo's
+  # docker-compose (it listens on :8100). gripl-backend verifies its JWTs via
+  # AUTH_SERVICE_JWKS_URI; gripl-frontend proxies /auth/* to it.
 
 volumes:
   playwright-browsers:

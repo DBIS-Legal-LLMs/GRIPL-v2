@@ -48,12 +48,19 @@ class DatasetTransferService(
             listOf("id", "bpmn_xml", "expected_values", "created_at", "updated_at", "name", "dataset_id")
     }
 
-    /** @param datasetIds null exports all datasets */
-    fun exportAsZip(datasetIds: List<Long>?): ByteArray {
-        val datasetCsv = PostgresCsv.write(DATASET_COLUMNS, datasetRepository.getDatasetExportRows(datasetIds))
+    /**
+     * Only datasets owned by [ownerUserId] are ever exported: ids that belong to someone else are silently dropped.
+     * @param datasetIds null exports all of the user's datasets
+     */
+    fun exportAsZip(ownerUserId: String, datasetIds: List<Long>?): ByteArray {
+        val ownedIds = datasetRepository.getDatasetsByOwner(ownerUserId).map { it.id }
+        val idsToExport = if (datasetIds == null) ownedIds else datasetIds.filter { it in ownedIds }
+        val datasetCsv = PostgresCsv.write(
+            DATASET_COLUMNS, datasetRepository.getDatasetExportRows(idsToExport, ownerUserId)
+        )
         val evaluationDataCsv = PostgresCsv.write(
             EVALUATION_DATA_COLUMNS,
-            evaluationDataRepository.getEvaluationDataExportRows(datasetIds)
+            evaluationDataRepository.getEvaluationDataExportRows(idsToExport, ownerUserId)
         )
 
         val bytes = ByteArrayOutputStream()
@@ -69,7 +76,7 @@ class DatasetTransferService(
     }
 
     /** Reads dataset.csv and evaluation_data.csv from a ZIP (file names may be inside folders). */
-    fun importZip(zipBytes: ByteArray): List<ImportedDataset> {
+    fun importZip(zipBytes: ByteArray, ownerUserId: String): List<ImportedDataset> {
         val files = mutableMapOf<String, String>()
         ZipInputStream(ByteArrayInputStream(zipBytes)).use { zip ->
             generateSequence { zip.nextEntry }.filterNot { it.isDirectory }.forEach { entry ->
@@ -83,14 +90,14 @@ class DatasetTransferService(
             ?: throw DatasetImportException("ZIP does not contain $DATASET_FILE")
         val evaluationDataCsv = files[EVALUATION_DATA_FILE]
             ?: throw DatasetImportException("ZIP does not contain $EVALUATION_DATA_FILE")
-        return importCsv(datasetCsv, evaluationDataCsv)
+        return importCsv(datasetCsv, evaluationDataCsv, ownerUserId)
     }
 
     /**
-     * Always creates new datasets and test cases (new ids); dataset_id references are remapped.
+     * Always creates new datasets and test cases (new ids) owned by [ownerUserId]; dataset_id references are remapped.
      * Runs in a single transaction: either everything is imported or nothing.
      */
-    fun importCsv(datasetCsv: String, evaluationDataCsv: String): List<ImportedDataset> {
+    fun importCsv(datasetCsv: String, evaluationDataCsv: String, ownerUserId: String): List<ImportedDataset> {
         val datasetRows = PostgresCsv.read(datasetCsv)
         val evaluationRows = PostgresCsv.read(evaluationDataCsv)
 
@@ -131,8 +138,8 @@ class DatasetTransferService(
         }
 
         return transactionTemplate.execute {
-            // Names already in use (case-insensitive), incl. datasets created earlier in this import
-            val takenNames = datasetRepository.getAllDatasets().map { it.name.trim().lowercase() }.toMutableSet()
+            // Names already in use by this user (case-insensitive), incl. datasets created earlier in this import
+            val takenNames = datasetRepository.getDatasetsByOwner(ownerUserId).map { it.name.trim().lowercase() }.toMutableSet()
 
             datasetRows.zip(datasetIdsInFile).mapIndexed { index, (row, originalId) ->
                 val originalName = row["name"]?.trim()?.takeIf { it.isNotEmpty() }
@@ -143,7 +150,8 @@ class DatasetTransferService(
                     name = name,
                     description = row["description"],
                     createdAt = row["created_at"]?.takeIf { it.isNotBlank() },
-                    updatedAt = row["updated_at"]?.takeIf { it.isNotBlank() }
+                    updatedAt = row["updated_at"]?.takeIf { it.isNotBlank() },
+                    ownerUserId = ownerUserId
                 )
                 val testCasesOfDataset = testCases.filter { it.originalDatasetId == originalId }
                 testCasesOfDataset.forEach { testCase ->

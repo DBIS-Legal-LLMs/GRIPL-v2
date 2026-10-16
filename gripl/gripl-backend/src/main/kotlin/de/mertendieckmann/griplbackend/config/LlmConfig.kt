@@ -50,7 +50,12 @@ class LlmConfig(private val defaultProps: LlmProps) {
         @ConfigurationProperties(prefix = "llm")
         data class LlmProps(
             var modelName: String? = "gpt-3.5-turbo",
-            var baseUrl: String? = "https://api.openai.com/v1",
+            // Every analysis is billed to the calling user's own OpenRouter
+            // account (auth-service#8 follow-up) — gripl-backend holds no
+            // provider key of its own, so `apiKey` below has no global
+            // default and must come from a per-request override populated
+            // from the caller's auth-service profile.
+            var baseUrl: String? = "https://openrouter.ai/api/v1",
             var apiKey: String? = null,
             var timeoutSeconds: Long = 240L,
             var temperature: Double? = null,

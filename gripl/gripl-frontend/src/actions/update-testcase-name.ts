@@ -2,9 +2,10 @@
 
 import {EvaluationDataMeta} from "@/models/dto/EvaluationData";
 import {extractErrorDetails} from "@/lib/http-error";
+import {authenticatedServerFetch} from "@/lib/authenticated-server-fetch";
 
 export default async function updateTestcaseName(testcaseId: number, name: string): Promise<EvaluationDataMeta> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/dataset/testcase/${testcaseId}/name`, {
+    const response = await authenticatedServerFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/dataset/testcase/${testcaseId}/name`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

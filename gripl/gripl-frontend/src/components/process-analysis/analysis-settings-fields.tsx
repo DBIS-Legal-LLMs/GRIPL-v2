@@ -1,11 +1,10 @@
 "use client"
 
+import Link from "next/link";
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
-import {PasswordInput} from "@/components/ui/input-password";
 import LlmBaseUrlDatalist from "@/components/datalist/llm-base-url-datalist";
 import LlmModelNameDatalist from "@/components/datalist/llm-model-name-datalist";
-import LlmApiKeyPlaceholderDatalist from "@/components/datalist/llm-api-key-placeholder-datalist";
 import {GenerateRandomInput} from "@/components/ui/input-generate-random";
 import {safeFloatOrNull} from "@/lib/evaluation-config-utils";
 import {Switch} from "@/components/ui/switch";
@@ -22,7 +21,6 @@ export default function AnalysisSettingsFields({settings, idPrefix = ""}: Analys
     const {
         llmBaseUrl, setLlmBaseUrl,
         modelName, setModelName,
-        apiKey, setApiKey,
         seed, setSeed,
         temperature, setTemperature,
         topP, setTopP,
@@ -38,7 +36,7 @@ export default function AnalysisSettingsFields({settings, idPrefix = ""}: Analys
             <Input
                 type="text"
                 className="w-full"
-                placeholder="https://api.openai.com/v1"
+                placeholder="https://openrouter.ai/api/v1"
                 value={llmBaseUrl}
                 onChange={(e) => setLlmBaseUrl(e.target.value)}
                 list={`${idPrefix}llm-base-urls`}
@@ -50,24 +48,17 @@ export default function AnalysisSettingsFields({settings, idPrefix = ""}: Analys
             <Input
                 type="text"
                 className="w-full"
-                placeholder="gpt-3.5-turbo-0125"
+                placeholder="openai/gpt-oss-20b"
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
                 list={`${idPrefix}llm-model-names`}
             />
             <LlmModelNameDatalist id={`${idPrefix}llm-model-names`}/>
         </div>
-        <div className="space-y-1">
-            <Label>API Key</Label>
-            <PasswordInput
-                className="w-full"
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                list={`${idPrefix}llm-api-key-placeholders`}
-            />
-            <LlmApiKeyPlaceholderDatalist id={`${idPrefix}llm-api-key-placeholders`}/>
-        </div>
+        <p className="text-xs text-muted-foreground">
+            Analyses are billed to your own OpenRouter account — set or change
+            your key in <Link href="/settings" className="underline">Account Settings</Link>.
+        </p>
         <div className="space-y-1">
             <Label>Seed</Label>
             <GenerateRandomInput id={`${idPrefix}seed`} placeholder="Seed for reproducibility"

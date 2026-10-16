@@ -7,6 +7,7 @@ import {Dataset} from "@/models/dto/Dataset";
 import {useToast} from "@/components/ui/toast";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 import {Spinner} from "@/components/ui/spinner";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
 
 interface ExportDatasetsButtonProps {
     /** Exports only this dataset; without a dataset all datasets are exported */
@@ -25,7 +26,7 @@ export default function ExportDatasetsButton({ dataset }: ExportDatasetsButtonPr
         setIsLoading(true);
         try {
             const url = dataset ? `/api/dataset/${dataset.id}/export` : "/api/dataset/export";
-            const response = await fetch(url);
+            const response = await authenticatedFetch(url);
             if (!response.ok) {
                 throw new Error(await extractErrorDetails(response));
             }
