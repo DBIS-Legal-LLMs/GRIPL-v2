@@ -55,7 +55,8 @@ services:
     volumes:
       - acme:/acme
     healthcheck:
-      test: ["CMD", "traefik", "healthcheck", "--ping", "--ping.entrypoint=ping"]
+      # the check command does not see the flags above, so it needs the address itself
+      test: ["CMD", "traefik", "healthcheck", "--ping", "--ping.entrypoint=ping", "--entrypoints.ping.address=:8082"]
       interval: 15s
       timeout: 5s
       retries: 5
