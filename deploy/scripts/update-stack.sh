@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pull the newest images for one stack and apply them.
 #
-#   update-stack.sh /srv/dbis-universe/gripl/prod
+#   update-stack.sh /srv/gripl/prod/gripl
 #
 # Meant to run every few minutes from a systemd timer (deploy/systemd) or cron
 # as the `deploy` user. It is idempotent: when nothing changed, `compose pull` and

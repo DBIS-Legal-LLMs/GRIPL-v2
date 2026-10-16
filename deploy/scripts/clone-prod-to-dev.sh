@@ -10,12 +10,12 @@
 #               prod's gripl-rag and gripl-neo4j (a minute or so) to get a clean copy.
 #
 # Prod is only ever READ. Everything in dev that is copied is overwritten.
-# Environment: DBIS_ROOT (default /srv/dbis-universe) — the folder holding gripl/{prod,dev}.
+# Environment: DBIS_ROOT (default /srv/gripl) — the folder holding {prod,dev}/gripl.
 set -euo pipefail
 
-root=${DBIS_ROOT:-/srv/dbis-universe}
-prod="$root/gripl/prod"
-dev="$root/gripl/dev"
+root=${DBIS_ROOT:-/srv/gripl}
+prod="$root/prod/gripl"
+dev="$root/dev/gripl"
 with_rag=0 assume_yes=0
 for arg in "$@"; do
   case "$arg" in

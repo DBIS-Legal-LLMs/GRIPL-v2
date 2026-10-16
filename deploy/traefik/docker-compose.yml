@@ -1,13 +1,25 @@
-# Shared reverse proxy for every DBIS-universe stack on the server.
+# Shared reverse proxy for every stack on the server.
 #
 # One Traefik answers on :80/:443 and routes by Host header to the right
 # container in the right environment (prod / dev). Nothing else on the server
 # publishes a port. It also owns the two per-environment Docker networks that
 # the app stacks attach to — see deploy/README.md.
 #
-# HTTP only by default. For HTTPS add the overlay (needs the DNS-01 settings in
-# .env):  docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+# The server is reachable from the internet, so:
+#   * port 80 only redirects to HTTPS; every router lives on :443
+#   * HTTPS uses the self-signed certificate from make-selfsigned-cert.sh until a real
+#     domain exists (then add docker-compose.https.yml for Let's Encrypt)
+#   * shared protections (rate limits, headers, deny rules) are in dynamic/*.yml
+#
+# Always run docker compose from the stack directory (where compose.yaml and .env
+# live), not from inside the repo checkout.
 name: traefik
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
 
 services:
   # Traefik must read container labels from the Docker API. Handing it the raw
@@ -20,6 +32,7 @@ services:
       CONTAINERS: 1   # everything else (POST, exec, images, ...) stays denied
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    logging: *default-logging
     networks:
       - socket
 
@@ -32,8 +45,13 @@ services:
       - --providers.docker.endpoint=tcp://socket-proxy:2375
       - --providers.docker.exposedbydefault=false
       - --providers.docker.watch=true
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
+      # everything on :80 is redirected to HTTPS
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
       # GRIPL analyses and bulk uploads can run for many minutes (the Next.js
       # proxy allows 30 min), so don't let the proxy cut requests short.
       - --entrypoints.web.transport.respondingtimeouts.readtimeout=0s
@@ -50,9 +68,13 @@ services:
     env_file:
       - .env
     ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
+      # IPv4 only on purpose: Docker's IPv6 port proxy hides the client address, which
+      # would break the per-IP rate limits and allow-lists.
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTP_PORT:-80}:80"
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTPS_PORT:-443}:443"
     volumes:
+      - ./repo/deploy/traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./certs:/certs:ro
       - acme:/acme
     healthcheck:
       # the check command does not see the flags above, so it needs the address itself
@@ -60,6 +82,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    logging: *default-logging
     networks:
       - socket
       - dbis-prod

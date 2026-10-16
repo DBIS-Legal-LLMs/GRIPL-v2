@@ -1,25 +1,28 @@
 # Server deployment
 
-How GRIPL and auth-service run on the shared DBIS server (`project-gripl`,
-reachable only from the university network / VPN). The same layout takes
-RAGulate later.
+How auth-service and GRIPL (and later RAGulate) run on the shared server
+`project-gripl` (`134.60.71.167`), in two environments: **prod** (branch `main`)
+and **dev** (branch `dev`).
 
+> **The server is reachable from the internet on ports 80 and 443.** Everything
+> published there must be protected; see [Security](#security).
+>
 > Status: the files in this folder are tested locally with real containers
-> (routing, prod/dev isolation, updater, dev copy). They have **not** been run on
-> the server yet; the server still needs Docker and a few one-time steps (below).
+> (routing, prod/dev isolation, protections, updater, dev copy). They have **not**
+> been run on the server yet; the server still needs Docker and the one-time steps
+> below.
 
 ## The idea in one picture
 
 ```
-                         university network / VPN
-                                   │  :80 / :443
-                            ┌──────▼──────┐
-                            │   Traefik   │  one reverse proxy for everything,
-                            └──┬───────┬──┘  routes by host name
-        gripl.<domain>  ───────┘       └───────  gripl-dev.<domain>
-        auth.<domain>                            auth-dev.<domain>
-              │                                        │
-   ┌──────────▼───────────┐               ┌───────────▼──────────┐
+                    internet / university network
+                                 │ :80 (only redirects) / :443
+                          ┌──────▼──────┐
+                          │   Traefik   │  one reverse proxy for everything,
+                          └──┬───────┬──┘  routes by host name, applies the protections
+   gripl.<base>  ────────────┘       └────────────  gripl-dev.<base>
+                │                                        │
+   ┌────────────▼─────────┐               ┌─────────────▼────────┐
    │ network  dbis-prod   │               │ network  dbis-dev    │
    │ gripl-frontend       │               │ gripl-frontend       │
    │ gripl-backend        │               │ gripl-backend        │
@@ -28,15 +31,20 @@ RAGulate later.
      postgres, neo4j, rag, mongo            postgres, neo4j, rag, mongo
 ```
 
-* **Environments.** `prod` runs what is on `main`, `dev` runs what is on `dev`.
-  Each environment has its own Docker network (`dbis-prod`, `dbis-dev`), so a prod
-  container can never talk to a dev one.
-* **Only Traefik publishes ports** (80/443). Databases and the RAG service sit on
-  a private network of their own stack and are not reachable from outside. To look
-  into a database, use an SSH tunnel.
+* **Environments.** Each has its own Docker network (`dbis-prod`, `dbis-dev`), so a
+  prod container can never talk to a dev one.
+* **Only Traefik publishes ports.** Databases and the RAG service sit on a private
+  network of their own stack. To look into a database use `docker compose exec` as
+  the `deploy` user.
 * **Only the frontend is routed publicly.** The browser talks to the Next.js
-  frontend, which proxies `/api`, `/rag` and `/auth` to the backend, RAG service
-  and auth-service inside the environment network.
+  frontend, which proxies `/api` to the backend and `/auth` to auth-service inside
+  the environment network. auth-service has no public address of its own unless
+  `AUTH_EXPOSE=true`.
+* **Host names.** There is no domain yet, so the names come from
+  [nip.io](https://nip.io): `gripl.134.60.71.167.nip.io` resolves to the server's IP
+  (as does any other name in front of `.134.60.71.167.nip.io`). One IP can only serve
+  several sites by host name, which is why plain `https://134.60.71.167/` is not
+  enough. With a real domain later, only `GRIPL_HOST` / `BASE_DOMAIN` change.
 * **The service names are part of the contract.** The frontend image has the proxy
   targets baked in at build time (`http://gripl-backend:8080`, `http://gripl-rag:8081`,
   `http://auth-service:8000`). Because each environment has its own network, the
@@ -46,7 +54,7 @@ RAGulate later.
 
 | Path | What |
 |---|---|
-| `traefik/` | the shared reverse proxy (+ read-only Docker socket proxy), HTTPS overlay |
+| `traefik/` | the shared reverse proxy, its security rules (`dynamic/`), the self-signed certificate script, and an optional Let's Encrypt overlay |
 | `gripl/` | the GRIPL stack: `docker-compose.yml`, `env.example`, `rag.env.example` |
 | `scripts/init-stack.sh` | creates a stack directory on the server |
 | `scripts/update-stack.sh` | pulls new images and applies them (run by a timer) |
@@ -60,19 +68,22 @@ a dedicated infrastructure repository.
 ## Server layout
 
 ```
-/srv/dbis-universe/
+/srv/gripl/
   bin/                  -> symlink to traefik/repo/deploy/scripts
-  traefik/              compose.yaml, .env, repo/
-  gripl/prod/           compose.yaml, .env, rag.env, repo/   (branch main)
-  gripl/dev/            compose.yaml, .env, rag.env, repo/   (branch dev)
-  auth/prod/            compose.yaml, .env, repo/            (branch main)
-  auth/dev/             compose.yaml, .env, repo/            (branch dev)
+  traefik/              compose.yaml, .env, certs/, repo/
+  prod/auth/            compose.yaml, .env, repo/            (branch main)
+  prod/gripl/           compose.yaml, .env, rag.env, repo/   (branch main)
+  prod/ragulate/        later
+  dev/auth/             ... same, branch dev
+  dev/gripl/
+  dev/ragulate/
 ```
 
 Each stack directory holds the stack's **own configuration and secrets** (`.env`,
-`rag.env` — never committed) plus a `repo/` checkout of the app repository on the
+`rag.env`; never committed) plus a `repo/` checkout of the app repository on the
 matching branch. `compose.yaml` is a symlink into that checkout, so a merge into
-`dev` or `main` updates the compose definition as well as the images.
+`dev` or `main` updates the compose definition as well as the images. Always run
+`docker compose` from the stack directory.
 
 ## One-time setup (needs root)
 
@@ -91,11 +102,11 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plug
 sudo useradd --create-home --shell /bin/bash deploy
 sudo usermod -aG docker deploy
 
-# 3. the base directory. /srv/gripl already exists (group project-gripl, setgid,
-#    group-writable); rename it to /srv/dbis-universe if agreed. `project-gripl` is a
-#    central (sssd) group, so `deploy` cannot be added with usermod; use an ACL:
-sudo setfacl -R  -m u:deploy:rwx /srv/dbis-universe
-sudo setfacl -Rd -m u:deploy:rwx /srv/dbis-universe
+# 3. /srv/gripl already exists (group project-gripl, setgid, group-writable).
+#    `project-gripl` is a central (sssd) group, so `deploy` cannot be added with
+#    usermod; give it access with an ACL instead:
+sudo setfacl -R  -m u:deploy:rwx /srv/gripl
+sudo setfacl -Rd -m u:deploy:rwx /srv/gripl
 
 # 4. optional but recommended: swap, because prod + dev share 11 GB of RAM
 sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
@@ -105,7 +116,7 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 Then, as `deploy` (`sudo -iu deploy`):
 
 ```bash
-cd /srv/dbis-universe
+cd /srv/gripl
 G=https://github.com/DBIS-Legal-LLMs/GRIPL-v2.git
 A=https://github.com/DBIS-Legal-LLMs/auth-service.git
 
@@ -117,16 +128,26 @@ git clone --depth 1 --branch main "$G" /tmp/gripl-bootstrap
 ln -sfn traefik/repo/deploy/scripts bin
 rm -rf /tmp/gripl-bootstrap
 
-bin/init-stack.sh gripl/prod $G main deploy/gripl/docker-compose.yml
-bin/init-stack.sh gripl/dev  $G dev  deploy/gripl/docker-compose.yml
-bin/init-stack.sh auth/prod  $A main deploy/docker-compose.yml
-bin/init-stack.sh auth/dev   $A dev  deploy/docker-compose.yml
+bin/init-stack.sh prod/auth  "$A" main deploy/docker-compose.yml
+bin/init-stack.sh dev/auth   "$A" dev  deploy/docker-compose.yml
+bin/init-stack.sh prod/gripl "$G" main deploy/gripl/docker-compose.yml
+bin/init-stack.sh dev/gripl  "$G" dev  deploy/gripl/docker-compose.yml
+
+# the self-signed certificate Traefik serves (see "HTTPS" below)
+cd traefik && repo/deploy/traefik/make-selfsigned-cert.sh 134.60.71.167.nip.io 134.60.71.167 && cd ..
 ```
 
 Fill in the `.env` / `rag.env` files (the init script created them from the
-examples; secrets are generated with `openssl rand -base64 24 | tr -d '/+='`), then
-start in this order: `traefik`, `auth/prod`, `auth/dev`, `gripl/prod`, `gripl/dev`
-with `cd <stack> && docker compose up -d --wait`.
+examples; secrets: `openssl rand -base64 24 | tr -d '/+='`). Set `ENVIRONMENT`,
+`COMPOSE_PROJECT_NAME`, `IMAGE_TAG`, the host names, and:
+
+* prod: `ALLOWED_CIDRS=0.0.0.0/0,::/0` (public) or the university ranges if prod
+  should not be public either; `API_DOCS_ENABLED=false`
+* dev: `ALLOWED_CIDRS=<university network ranges>` (dev holds a copy of prod's
+  data and must not be public), `API_DOCS_ENABLED=true` if wanted
+
+Start in this order, each with `cd <stack> && docker compose up -d --wait`:
+`traefik`, `prod/auth`, `dev/auth`, `prod/gripl`, `dev/gripl`.
 
 First-start chores per environment:
 
@@ -145,7 +166,7 @@ merge into dev/main ──► CI builds the images ──► ghcr.io/dbis-legal-
            git fetch (compose definition) → docker compose pull → docker compose up -d --wait
 ```
 
-* Nothing connects *into* the server, so it works behind the university firewall.
+* Nothing connects *into* the server for deployments.
 * A registry outage or a failing pull leaves the running containers untouched.
 * `up -d` only recreates containers whose image or configuration changed.
 * A container that never becomes healthy makes the run fail (visible with
@@ -156,10 +177,10 @@ merge into dev/main ──► CI builds the images ──► ghcr.io/dbis-legal-
 Enable the timers (root, once per stack):
 
 ```bash
-sudo cp /srv/dbis-universe/traefik/repo/deploy/systemd/dbis-update@.* /etc/systemd/system/
+sudo cp /srv/gripl/traefik/repo/deploy/systemd/dbis-update@.* /etc/systemd/system/
 sudo systemctl daemon-reload
-for s in gripl/prod gripl/dev auth/prod auth/dev; do
-  sudo systemctl enable --now "dbis-update@$(systemd-escape --path /srv/dbis-universe/$s).timer"
+for s in prod/auth dev/auth prod/gripl dev/gripl; do
+  sudo systemctl enable --now "dbis-update@$(systemd-escape --path /srv/gripl/$s).timer"
 done
 ```
 
@@ -171,7 +192,7 @@ Docker socket beyond the `deploy` user, and it honours compose's health checks.
 ### What CI has to produce
 
 Per repository and branch, images named exactly like this (public GHCR packages, so
-the server needs no login — which also means **never bake secrets into an image**):
+the server needs no login, which also means **never bake secrets into an image**):
 
 | Image | `main` → tag | `dev` → tag |
 |---|---|---|
@@ -191,31 +212,69 @@ AUTH_SERVICE_INTERNAL_URL=http://auth-service:8000
 
 ## HTTPS
 
-HTTP works out of the box. Let's Encrypt's usual check (HTTP-01) needs the server to be
-reachable from the internet, which it is not, so HTTPS uses the **DNS-01** challenge:
-Traefik proves control of the domain by creating a `_acme-challenge` TXT record, which
-only needs the *DNS server* to be reachable. One wildcard certificate (`*.<base domain>`)
-then covers every stack.
+Port 80 only redirects to HTTPS; every site lives on 443. Until the project has a
+domain, Traefik serves a **self-signed certificate**
+(`traefik/make-selfsigned-cert.sh`), valid for `*.134.60.71.167.nip.io` and the IP.
+The connection is encrypted, but browsers warn on every new visit. Two ways around
+the warning for the people who work with it regularly: install `traefik/certs/ca.crt`
+as a trusted CA on their machine (it is a small private CA created by the script;
+keep `ca.key` on the server), or accept the warning.
 
-1. Fill `BASE_DOMAIN`, `ACME_EMAIL` and the `RFC2136_*` values in `traefik/.env`
-   (needs a DNS server that accepts RFC2136 updates with a TSIG key restricted to
-   `_acme-challenge`; other lego providers work by changing `ACME_DNS_PROVIDER`).
-2. `docker compose -f docker-compose.yml -f docker-compose.https.yml up -d` in `traefik/`.
-   It uses the Let's Encrypt **staging** CA first; check that a certificate is issued,
-   then set `ACME_CA_SERVER=https://acme-v02.api.letsencrypt.org/directory`.
-3. Set `PUBLIC_SCHEME=https` in the GRIPL `.env` files and re-run `docker compose up -d`.
+Rotating the certificate (before it expires after 13 months): run the script again.
+It keeps the CA, so installed copies stay valid.
 
-Port 80 then redirects to HTTPS for every host. Until real DNS names exist, the
-`<name>.134.60.71.167.nip.io` fallback names work for HTTP (a certificate for them is
-not possible).
+### A real certificate later
+
+Once there is a domain, the overlay `traefik/docker-compose.https.yml` obtains a
+Let's Encrypt wildcard certificate with the DNS-01 challenge (Traefik creates a
+`_acme-challenge` TXT record; this needs a DNS server that accepts RFC2136 updates with
+a TSIG key restricted to `_acme-challenge`, or another lego DNS provider). Steps:
+fill `BASE_DOMAIN`, `ACME_EMAIL` and `RFC2136_*` in `traefik/.env`, start with
+`docker compose -f compose.yaml -f repo/deploy/traefik/docker-compose.https.yml up -d`
+(it begins against the Let's Encrypt staging CA, switch `ACME_CA_SERVER` to production
+once that works), then change `GRIPL_HOST` in the stacks' `.env` files. Add HSTS to
+`traefik/dynamic/middlewares.yml` at that point, not before. Certificates for
+`*.nip.io` names are not an option: Let's Encrypt's limits are shared by everyone using
+nip.io.
+
+## Security
+
+What is in place:
+
+* **Only 80/443 are open**; Traefik is the only container with published ports (and
+  binds IPv4 only, so the client address stays visible for rate limiting and
+  allow-lists). Databases, RAG service and backend are not reachable from outside.
+* **Traefik reads the Docker API through a read-only socket proxy**, not the raw socket.
+* **Per-environment allow-list** (`ALLOWED_CIDRS`): dev should only be reachable from
+  the university network because it holds a copy of prod's users and data.
+* **Rate limits per client IP** on `/auth/login` (20/min) and `/auth/register`
+  (5/min), see `traefik/dynamic/middlewares.yml`.
+* **`/rag/*` is blocked** (403). The RAG service has no authentication and runs on the
+  project's own LLM key; the browser never needs it.
+* **API docs are off** (`API_DOCS_ENABLED=false`): the backend serves Swagger without a
+  login, and auth-service's `/docs`/`/redoc` are blocked.
+* Security headers (no sniffing, no framing, referrer policy); logs are rotated
+  (10 MB × 5 per container); database images are pinned; MongoDB requires a password.
+* Dev has its own token signing key and secrets key, so a dev token is useless on prod.
+
+Known gaps (application level, not solved by this folder):
+
+* **auth-service has no lockout or brute-force protection**; the rate limit only slows
+  guessing down. Registration is open to everyone on the internet.
+* A registered user with the default role can run analyses with RAG, which uses the
+  project's LLM key. Decide whether registration should stay open on prod, and set a
+  spending limit on the OpenRouter key either way.
+* The login cookie (`gripl_token`) is readable by JavaScript and has no `Secure` flag.
+* Rate limits count per client IP, so many users behind one university NAT address
+  share a budget.
 
 ## Dev as a copy of prod
 
 ```bash
 # auth-service: users and roles (not the signing key, not the stored OpenRouter keys)
-/srv/dbis-universe/auth/prod/repo/deploy/scripts/clone-prod-to-dev.sh
+/srv/gripl/prod/auth/repo/deploy/scripts/clone-prod-to-dev.sh
 # GRIPL: Postgres; add --with-rag to also copy the knowledge graph
-/srv/dbis-universe/bin/clone-prod-to-dev.sh [--with-rag]
+/srv/gripl/bin/clone-prod-to-dev.sh [--with-rag]
 ```
 
 * Prod is only read. `--with-rag` stops prod's RAG service and Neo4j for roughly a
@@ -228,14 +287,13 @@ not possible).
 ## Notes and gotchas
 
 * **Memory.** Prod and dev together should idle at roughly 4–6 GB. Each container has
-  an upper limit (`MEM_*` in `.env`) so one environment cannot starve the other or the
-  other users of the server.
-* **Database versions are pinned** (`postgres:15.18`, `neo4j:5.26.30-community`, `mongo:7.0.25`). A floating tag such as `postgres:15` would make the updater upgrade and restart a database whenever the registry publishes a new patch release. Bump the pin deliberately, preferably in dev first.
-* **MongoDB** requires a password (`MONGO_ROOT_PASSWORD`) even though it is only
-  reachable inside its own stack.
-* **Looking into a database:** `ssh -L 5432:localhost:5432 ...` does not work because
-  nothing is published; use `docker compose exec gripl-postgres psql -U postgres gripl_db`
-  as `deploy`.
+  an upper limit (`MEM_*` in `.env`) so one environment cannot starve the other.
+* **Database versions are pinned** (`postgres:15.18`, `neo4j:5.26.30-community`,
+  `mongo:7.0.25`). A floating tag such as `postgres:15` would make the updater upgrade
+  and restart a database whenever the registry publishes a new patch release. Bump the
+  pin deliberately, preferably in dev first.
+* **Looking into a database:** nothing is published, so use
+  `docker compose exec gripl-postgres psql -U postgres gripl_db` as `deploy`.
 * **VPN and Docker subnets (your laptop, not the server).** Some university VPN clients
   claim `172.17.0.0/16` and `172.20.0.0/16`, which are Docker's default bridge ranges;
   containers on those subnets become unreachable from the host while the VPN is up. If

@@ -4,8 +4,8 @@
 #   init-stack.sh <stack-dir> <git-url> <branch> <compose-path-inside-repo>
 #
 # e.g.
-#   init-stack.sh /srv/dbis-universe/gripl/prod https://github.com/DBIS-Legal-LLMs/GRIPL-v2.git main deploy/gripl/docker-compose.yml
-#   init-stack.sh /srv/dbis-universe/gripl/dev  https://github.com/DBIS-Legal-LLMs/GRIPL-v2.git dev  deploy/gripl/docker-compose.yml
+#   init-stack.sh /srv/gripl/prod/gripl https://github.com/DBIS-Legal-LLMs/GRIPL-v2.git main deploy/gripl/docker-compose.yml
+#   init-stack.sh /srv/gripl/dev/gripl  https://github.com/DBIS-Legal-LLMs/GRIPL-v2.git dev  deploy/gripl/docker-compose.yml
 #
 # Clones the repo (just the branch tip) into <stack-dir>/repo, links the compose
 # file as compose.yaml and copies every *.example next to it (env.example -> .env,
