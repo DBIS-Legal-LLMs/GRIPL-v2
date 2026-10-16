@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
@@ -176,5 +177,36 @@ class DatasetControllerOwnershipTest {
         }
         assertEquals(HttpStatus.FORBIDDEN, importEx.statusCode)
         verify(transferService, never()).exportAsZip(any(), any())
+    }
+
+    // ----- edit metadata (#9) -----
+
+    @Test
+    fun `updating a dataset the caller does not own is a 404 and does not update`() {
+        whenever(repo.getDatasetByIdAndOwner(99, "user-1")).thenReturn(null)
+
+        val response = controller.updateDataset(99, CreateDatasetRequest("n", "d"), exchangeAs("user-1"))
+
+        assertEquals(HttpStatus.NOT_FOUND, response.statusCode)
+        verify(repo, never()).updateDataset(any(), any(), anyOrNull(), any())
+    }
+
+    @Test
+    fun `updating an owned dataset passes the owner to the update`() {
+        whenever(repo.getDatasetByIdAndOwner(5, "user-1")).thenReturn(dataset(5, "mine"))
+        whenever(repo.updateDataset(5, "n", "d", "user-1")).thenReturn(1)
+
+        val response = controller.updateDataset(5, CreateDatasetRequest("n", "d"), exchangeAs("user-1"))
+
+        assertEquals(HttpStatus.OK, response.statusCode)
+        verify(repo).updateDataset(5, "n", "d", "user-1")
+    }
+
+    @Test
+    fun `end-user is forbidden from updating a dataset`() {
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.updateDataset(5, CreateDatasetRequest("n", "d"), exchangeAs("user-1", griplRole = "end-user"))
+        }
+        assertEquals(HttpStatus.FORBIDDEN, ex.statusCode)
     }
 }

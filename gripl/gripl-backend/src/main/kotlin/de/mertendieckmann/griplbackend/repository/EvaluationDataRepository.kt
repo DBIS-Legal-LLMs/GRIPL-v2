@@ -185,6 +185,18 @@ class EvaluationDataRepository(
         }
     }
 
+    /** Renames a test case; only matches if its parent dataset is owned by [ownerUserId] (0 rows otherwise). */
+    fun updateEvaluationDataName(id: Long, name: String?, ownerUserId: String): Int {
+        val sql = """
+            UPDATE evaluation_data
+            SET name = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND dataset_id IN (SELECT id FROM dataset WHERE owner_user_id = ?)
+        """.trimIndent()
+
+        return jdbc.update(sql, name, id, ownerUserId)
+    }
+
     fun deleteEvaluationData(id: Long, ownerUserId: String): Int {
         val sql = """
             DELETE FROM evaluation_data

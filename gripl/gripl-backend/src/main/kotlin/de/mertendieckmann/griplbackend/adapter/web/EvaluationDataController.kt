@@ -119,6 +119,38 @@ class EvaluationDataController(
     }
 
     @Operation(
+        summary = "Update Testcase name by Id",
+        description = "Updates only the name of an existing testcase entry."
+    )
+    @PostMapping(
+        "/{id}/name",
+        produces = [MediaType.APPLICATION_JSON_VALUE]
+    )
+    fun updateBpmnDatasetName(
+        @PathVariable("id") id: Long,
+        @RequestBody request: UpdateTestcaseNameRequest,
+        exchange: ServerWebExchange
+    ): ResponseEntity<EvaluationDataMeta> {
+        val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
+        if (evaluationDataRepository.getEvaluationDataByIdForOwner(id, userId) == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        }
+        val affectedRows = evaluationDataRepository.updateEvaluationDataName(id, request.name, userId)
+        return if (affectedRows > 0) {
+            val updated = evaluationDataRepository.getEvaluationDataByIdForOwner(id, userId)!!
+            ResponseEntity.ok(
+                EvaluationDataMeta(
+                    updated.id, updated.name, updated.datasetId,
+                    updated.expectedValues.size, updated.unclassifiedLabelCount
+                )
+            )
+        } else {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
+        }
+    }
+
+    @Operation(
         summary = "Update Testcase by Id",
         description = "Updates an existing test case, if the caller owns its parent dataset."
     )

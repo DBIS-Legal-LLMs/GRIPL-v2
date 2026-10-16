@@ -73,13 +73,19 @@ class DatasetRepository(
     // the gap GRIPL-v2#40 closed for getDatasetsByIds, above).
 
     fun getAllDatasets(): List<Dataset> {
-        val sql = "SELECT * FROM dataset"
+        val sql = "SELECT * FROM dataset ORDER BY id ASC"
         return jdbc.query(sql, mapper)
     }
 
     fun getDatasetById(id: Long): Dataset? {
         val sql = "SELECT * FROM dataset WHERE id = ?"
         return jdbc.query(sql, mapper, id).firstOrNull()
+    }
+
+    /** Renames/re-describes a dataset; only matches if it is owned by [ownerUserId] (0 rows otherwise). */
+    fun updateDataset(id: Long, name: String, description: String?, ownerUserId: String): Int {
+        val sql = "UPDATE dataset SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ?"
+        return jdbc.update(sql, name, description, id, ownerUserId)
     }
 
     /** Inserts a dataset owned by [ownerUserId] and keeps the given timestamps (Postgres text format) if present. */

@@ -8,7 +8,9 @@ import {EvaluationDataMeta} from "@/models/dto/EvaluationData";
 import TestCaseCard from "@/components/labeling/test-case-card";
 import CreateTestCaseButton from "@/components/labeling/create-test-case-button";
 import DeleteDatasetButton from "@/components/labeling/delete-dataset-button";
+import EditDatasetButton from "@/components/labeling/edit-dataset-button";
 import ExportDatasetsButton from "@/components/labeling/export-datasets-button";
+import DatasetDescription from "@/components/labeling/dataset-description";
 import {Dataset} from "@/models/dto/Dataset";
 
 interface DatasetListProps {
@@ -28,18 +30,19 @@ export default function DatasetListItem({ dataset, evaluationMetadata, className
                     <CardHeader className="h-full flex-row items-center justify-between gap-4 space-y-0 py-4">
                         <div className="flex flex-col space-y-1.5 min-w-0">
                             <CardTitle>
-                                {dataset.name} ({dataset.id})
+                                {dataset.name}
                                 <span className="ml-2 text-sm font-normal text-muted-foreground">
                                     · {evaluationMetadata.length} model{evaluationMetadata.length === 1 ? "" : "s"}
                                 </span>
                             </CardTitle>
-                            { dataset.description && <CardDescription>{dataset.description}</CardDescription> }
+                            { dataset.description && <DatasetDescription description={dataset.description} /> }
                         </div>
                         <>{ isOpen ? <ChevronDown className="shrink-0" /> : <ChevronUp className="shrink-0" /> }</>
                     </CardHeader>
                 </Card>
             </CollapsibleTrigger>
             <CreateTestCaseButton dataset={dataset} />
+            <EditDatasetButton dataset={dataset} />
             <ExportDatasetsButton dataset={dataset} />
             <DeleteDatasetButton dataset={dataset} testCaseCount={evaluationMetadata.length} />
         </div>

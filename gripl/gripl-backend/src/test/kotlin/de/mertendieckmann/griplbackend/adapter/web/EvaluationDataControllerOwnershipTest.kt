@@ -2,6 +2,7 @@ package de.mertendieckmann.griplbackend.adapter.web
 
 import de.mertendieckmann.griplbackend.application.PreviewGenerator
 import de.mertendieckmann.griplbackend.model.dto.EvaluationData
+import de.mertendieckmann.griplbackend.model.dto.UpdateTestcaseNameRequest
 import de.mertendieckmann.griplbackend.repository.DatasetRepository
 import de.mertendieckmann.griplbackend.repository.EvaluationDataRepository
 import de.mertendieckmann.griplbackend.repository.PreviewCacheRepository
@@ -156,5 +157,38 @@ class EvaluationDataControllerOwnershipTest {
         }
         assertEquals(HttpStatus.FORBIDDEN, ex.statusCode)
         verify(evalRepo, never()).deleteEvaluationData(any(), any())
+    }
+
+    // ----- rename (editable metadata, #9) -----
+
+    @Test
+    fun `renaming a test case the caller does not own is a 404 and does not update`() {
+        whenever(evalRepo.getEvaluationDataByIdForOwner(7, "user-1")).thenReturn(null)
+
+        val response = controller.updateBpmnDatasetName(7, UpdateTestcaseNameRequest("new"), exchangeAs("user-1"))
+
+        assertEquals(HttpStatus.NOT_FOUND, response.statusCode)
+        verify(evalRepo, never()).updateEvaluationDataName(any(), anyOrNull(), any())
+    }
+
+    @Test
+    fun `renaming an owned test case passes the owner to the update`() {
+        val owned = evalData(7, 1)
+        whenever(evalRepo.getEvaluationDataByIdForOwner(7, "user-1")).thenReturn(owned)
+        whenever(evalRepo.updateEvaluationDataName(7, "new", "user-1")).thenReturn(1)
+
+        val response = controller.updateBpmnDatasetName(7, UpdateTestcaseNameRequest("new"), exchangeAs("user-1"))
+
+        assertEquals(HttpStatus.OK, response.statusCode)
+        verify(evalRepo).updateEvaluationDataName(7, "new", "user-1")
+    }
+
+    @Test
+    fun `dpo is forbidden from renaming a test case`() {
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.updateBpmnDatasetName(7, UpdateTestcaseNameRequest("new"), exchangeAs("user-1", griplRole = "dpo"))
+        }
+        assertEquals(HttpStatus.FORBIDDEN, ex.statusCode)
+        verify(evalRepo, never()).updateEvaluationDataName(any(), anyOrNull(), any())
     }
 }

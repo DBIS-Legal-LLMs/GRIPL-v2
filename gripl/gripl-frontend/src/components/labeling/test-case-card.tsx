@@ -4,6 +4,7 @@ import {Card} from "@/components/ui/card";
 import Link from "next/link";
 import DeleteTestCaseButton from "@/components/labeling/delete-test-case-button";
 import DownloadTestCaseButton from "@/components/labeling/download-test-case-button";
+import EditTestcaseButton from "@/components/labeling/edit-testcase-button";
 import {EvaluationDataMeta} from "@/models/dto/EvaluationData";
 import {Skeleton} from "@/components/ui/skeleton";
 import useLoadPreviewImage from "@/hooks/use-load-preview-image";
@@ -24,7 +25,7 @@ export default function TestCaseCard({ metadata } : TestCaseCardProps) {
         <Card className="flex-1 relative hover:bg-card/40">
             <Link href={`/labeling/${metadata.id}`} className="block h-full">
                 <div className="p-4">
-                    <h2 className="text-lg font-bold mr-24">{metadata.name || "Test Case"} ({metadata.id})</h2>
+                    <h2 className="text-lg font-bold mr-24">{metadata.name || "Test Case"}</h2>
                     <p className="text-xs text-muted-foreground mb-4 h-4">
                         {metadata.labelCount ?? 0} labeled
                         {(metadata.unclassifiedLabelCount ?? 0) > 0 && (
@@ -36,6 +37,7 @@ export default function TestCaseCard({ metadata } : TestCaseCardProps) {
                 </div>
             </Link>
             <div className="absolute right-4 top-4 flex space-x-2">
+                <EditTestcaseButton testcase={metadata} />
                 <DownloadTestCaseButton testCaseId={metadata.id} testCaseName={metadata.name}/>
                 <DeleteTestCaseButton testCaseId={metadata.id} testCaseName={metadata.name}/>
             </div>

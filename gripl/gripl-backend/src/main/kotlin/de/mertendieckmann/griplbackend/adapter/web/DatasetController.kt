@@ -59,6 +59,29 @@ class DatasetController(
     }
 
     @Operation(
+        summary = "Update a Dataset",
+        description = "Updates the metadata (name and description) of an existing dataset and returns the updated dataset."
+    )
+    @PostMapping("/{datasetId}", produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun updateDataset(
+        @PathVariable("datasetId") datasetId: Long,
+        @RequestBody request: CreateDatasetRequest,
+        exchange: ServerWebExchange
+    ): ResponseEntity<Dataset> {
+        val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
+        if (datasetRepository.getDatasetByIdAndOwner(datasetId, userId) == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        }
+        val affectedRows = datasetRepository.updateDataset(datasetId, request.name, request.description, userId)
+        return if (affectedRows > 0) {
+            ResponseEntity.ok(datasetRepository.getDatasetByIdAndOwner(datasetId, userId))
+        } else {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
+        }
+    }
+
+    @Operation(
         summary = "Delete Dataset",
         description = "Deletes a dataset owned by the authenticated user and detaches its test cases. " +
             "Returns 404 if the dataset does not exist or is not owned by the caller."
