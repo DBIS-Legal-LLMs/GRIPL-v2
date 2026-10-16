@@ -45,9 +45,6 @@
 .swagger-ui #operations-analysis-controller-analyzeBpmnForGdprPromptEngineering .try-out__btn {
     display: inline-block !important;
 }
-.swagger-ui #operations-analysis-controller-analyzeBpmnForGdprBaseline .try-out__btn {
-    display: inline-block !important;
-}
 .swagger-ui #operations-evaluation-controller-evaluateStream .try-out__btn {
     display: inline-block !important;
 }

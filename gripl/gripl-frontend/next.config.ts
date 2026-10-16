@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
     },
     async rewrites() {
         const ragBase = process.env.RAG_INTERNAL_URL ?? "http://gripl-rag:8081";
+        // auth-service (login/register/JWT issuance). Proxied server-side so the
+        // browser only ever talks to this origin — no CORS setup on auth-service
+        // needed for GRIPL. Default suits `npm run dev`; the Docker stacks set
+        // AUTH_SERVICE_INTERNAL_URL=http://host.docker.internal:8100 explicitly.
+        const authBase = process.env.AUTH_SERVICE_INTERNAL_URL ?? "http://localhost:8100";
         return [
             {
                 source: '/api/:path*',
@@ -29,6 +34,10 @@ const nextConfig: NextConfig = {
             {
                 source: '/rag/:path*',
                 destination: `${ragBase}/:path*`,
+            },
+            {
+                source: '/auth/:path*',
+                destination: `${authBase}/auth/:path*`,
             }
         ];
     },

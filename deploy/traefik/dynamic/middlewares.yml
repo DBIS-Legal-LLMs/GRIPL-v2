@@ -1,0 +1,31 @@
+# Shared protections, referenced from the app stacks' labels as <name>@file.
+http:
+  middlewares:
+    # Basic browser hardening. HSTS is deliberately NOT set: with a self-signed
+    # certificate it would stop users from clicking through the warning. Add it
+    # (strictTransportSecurity) once a trusted certificate is in place.
+    secure-headers:
+      headers:
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: same-origin
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+
+    # Per client IP. This only slows guessing down; auth-service itself has no
+    # lockout yet. Generous enough for a lecture hall behind one NAT address.
+    login-ratelimit:
+      rateLimit:
+        average: 20
+        period: 1m
+        burst: 20
+    register-ratelimit:
+      rateLimit:
+        average: 5
+        period: 1m
+        burst: 5
+
+    # Answers 403 to everybody: used to hide paths that must never be public.
+    deny-all:
+      ipAllowList:
+        sourceRange:
+          - 127.0.0.1/32

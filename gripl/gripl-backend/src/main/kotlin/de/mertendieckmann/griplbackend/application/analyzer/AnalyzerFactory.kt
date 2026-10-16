@@ -14,10 +14,17 @@ class AnalyzerFactory(
         return PromptBpmnAnalyzer(chatModel, ragApiClient, ragApiProperties)
     }
 
-    fun createBaselineAnalyzer(chatModel: ChatModel): BaselineBpmnAnalyzer {
-        return BaselineBpmnAnalyzer(chatModel)
-    }
     fun createMulticlassAnalyzer(chatModel: ChatModel): MulticlassBpmnAnalyzer {
-        return MulticlassBpmnAnalyzer(chatModel)
-}
+        return MulticlassBpmnAnalyzer(chatModel, ragApiClient, ragApiProperties)
+    }
+
+    /** A user-uploaded custom endpoint whose response shape is binary (critical/not-critical). */
+    fun createCustomBinaryAnalyzer(chatModel: ChatModel, promptText: String): PromptBpmnAnalyzer {
+        return PromptBpmnAnalyzer(chatModel, ragApiClient, ragApiProperties) { _ -> promptText }
+    }
+
+    /** A user-uploaded custom endpoint whose response shape is multiclass (GDPR processing classes). */
+    fun createCustomMulticlassAnalyzer(chatModel: ChatModel, promptText: String): MulticlassBpmnAnalyzer {
+        return MulticlassBpmnAnalyzer(chatModel, ragApiClient, ragApiProperties, promptText)
+    }
 }

@@ -202,6 +202,14 @@ export default function EvaluationConfigDatasetSettings({
                                                     <span className="text-sm truncate">
                                                         {tc.name ?? `Test Case ${tc.id}`}
                                                     </span>
+                                                    {(tc.unclassifiedLabelCount ?? 0) > 0 && (
+                                                        <span
+                                                            className="ml-auto shrink-0 text-xs text-amber-600"
+                                                            title="Labels without class count as missing in multiclass evaluations"
+                                                        >
+                                                            {tc.unclassifiedLabelCount} without class
+                                                        </span>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>

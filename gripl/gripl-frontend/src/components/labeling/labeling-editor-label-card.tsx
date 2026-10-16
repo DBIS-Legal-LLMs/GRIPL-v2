@@ -6,15 +6,14 @@ import {ExpectedValues} from "@/models/dto/EvaluationData";
 import {GDPR_CATEGORIES, GdprCategory} from "@/models/GdprCategory";
 import {cn} from "@/lib/utils";
 
-const BINARY_FALLBACK_CATEGORY: GdprCategory = "Collection";
-
 export interface LabelingEditorLabelCardProps {
     className?: string;
     elementName: string;
     elementId: string;
     criticalActivities: ExpectedValues[];
     allowMulticlass: boolean;
-    onLabelingChange: (elementId: string, classification: GdprCategory[], reason?: string) => void;
+    /** null removes the label; an empty array means "critical, no class assigned yet" (binary / legacy label) */
+    onLabelingChange: (elementId: string, classification: GdprCategory[] | null, explanation?: string) => void;
 }
 
 export default function LabelingEditorLabelCard({ className, elementName, elementId, criticalActivities, allowMulticlass, onLabelingChange }: LabelingEditorLabelCardProps) {
@@ -31,39 +30,37 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
 
     const existing = criticalActivities.find(c => c.value === elementId);
     const [selectedCategories, setSelectedCategories] = useState<GdprCategory[]>(existing?.classification ?? []);
-    const [reason, setReason] = useState<string>(existing?.reason ?? "");
+    const [explanation, setExplanation] = useState<string>(existing?.explanation ?? "");
 
     useEffect(() => {
         const found = criticalActivities.find(c => c.value === elementId);
         setSelectedCategories(found?.classification ?? []);
-        setReason(found?.reason ?? "");
+        setExplanation(found?.explanation ?? "");
     }, [elementId, criticalActivities]);
 
+    // An element is critical as soon as it has a label, with or without classes
+    const isCritical = existing !== undefined;
+
     function toggleCategory(cat: GdprCategory) {
-        let next: GdprCategory[];
-        if (allowMulticlass) {
-            next = selectedCategories.includes(cat)
-                ? selectedCategories.filter(c => c !== cat)
-                : [...selectedCategories, cat];
-        } else {
-            next = selectedCategories.includes(cat) ? [] : [cat];
-        }
+        const next = selectedCategories.includes(cat)
+            ? selectedCategories.filter(c => c !== cat)
+            : [...selectedCategories, cat];
         setSelectedCategories(next);
-        onLabelingChange(elementId, next, reason);
+        // Deselecting the last class removes the label
+        onLabelingChange(elementId, next.length > 0 ? next : null, explanation);
     }
 
     function toggleBinaryCritical() {
-        const next = selectedCategories.length > 0 ? [] : [selectedCategories[0] ?? BINARY_FALLBACK_CATEGORY];
-        setSelectedCategories(next);
-        onLabelingChange(elementId, next, reason);
+        // Binary labels carry no class; existing classes are kept until the label is removed
+        onLabelingChange(elementId, isCritical ? null : selectedCategories, explanation);
     }
 
-    function handleReasonChange(value: string) {
-        setReason(value);
-        onLabelingChange(elementId, selectedCategories, value);
+    function handleExplanationChange(value: string) {
+        setExplanation(value);
+        if (isCritical) {
+            onLabelingChange(elementId, selectedCategories, value);
+        }
     }
-
-    const isCritical = selectedCategories.length > 0;
 
     return <Card className={cn("w-full", className)}>
         <CardHeader className="pb-2">
@@ -71,6 +68,11 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
             <p className={cn("text-xs font-medium", isCritical ? "text-destructive" : "text-muted-foreground")}>
                 {isCritical ? "GDPR Critical" : "Not Critical"}
             </p>
+            {allowMulticlass && isCritical && selectedCategories.length === 0 && (
+                <p className="text-xs font-medium text-amber-600">
+                    No class assigned yet (binary / legacy label)
+                </p>
+            )}
         </CardHeader>
         <CardContent className="flex flex-col space-y-3">
             <>{allowMulticlass ? (
@@ -112,24 +114,24 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
                         onClick={toggleBinaryCritical}
                         className={cn(
                             "px-2 py-0.5 rounded-full border text-xs font-medium transition-colors",
-                            selectedCategories.length > 0
+                            isCritical
                                 ? "bg-destructive border-destructive text-destructive-foreground"
                                 : "bg-background border-border text-muted-foreground hover:border-primary hover:text-primary"
                         )}
                     >
-                        {selectedCategories.length > 0 ? "Critical" : "Not Critical"}
+                        {isCritical ? "Critical" : "Not Critical"}
                     </button>
                 </div>
             )}</>
             <div className="flex flex-col space-y-1">
-                <Label htmlFor="reason" className="text-xs">Notes (optional)</Label>
+                <Label htmlFor="explanation" className="text-xs">Notes (optional)</Label>
                 <Textarea
-                    id="reason"
+                    id="explanation"
                     className="p-2 border rounded text-xs"
                     placeholder="Additional notes..."
                     rows={3}
-                    value={reason}
-                    onChange={(e) => handleReasonChange(e.target.value)}
+                    value={explanation}
+                    onChange={(e) => handleExplanationChange(e.target.value)}
                 />
             </div>
         </CardContent>

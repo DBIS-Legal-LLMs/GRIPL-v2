@@ -1,7 +1,9 @@
 "use client"
 
-import React, {createContext, ReactNode, useContext, useEffect, useMemo, useState} from "react";
+import React, {createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState} from "react";
 import {AnalysisEndpoint} from "@/models/evaluation/Config";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
+import {useAuth} from "@/context/auth-context";
 
 type AnalysisEndpointMode = "binary" | "multiclass";
 
@@ -14,15 +16,15 @@ interface AnalysisEndpointContextValue {
     apiEndpoint: string;
     backendEndpoint: string;
     isMulticlass: boolean;
+    refreshEndpoints: () => void;
 }
 
 const STORAGE_KEY = "gripl.analysis.endpoint.selected";
 const DEFAULT_BINARY_ENDPOINT = "/gdpr/analysis/prompt-engineering";
 const DEFAULT_MULTICLASS_ENDPOINT = "/gdpr/analysis/multiclass";
 const FALLBACK_ENDPOINTS: AnalysisEndpoint[] = [
-    { name: "Preprocessing & Prompt Engineering Analysis", endpoint: DEFAULT_BINARY_ENDPOINT },
-    { name: "Baseline Analysis", endpoint: "/gdpr/analysis/baseline" },
-    { name: "Multiclass Analysis", endpoint: DEFAULT_MULTICLASS_ENDPOINT },
+    { name: "Zero-shot Baseline", endpoint: DEFAULT_BINARY_ENDPOINT, responseType: "BINARY" },
+    { name: "Multiclass Analysis", endpoint: DEFAULT_MULTICLASS_ENDPOINT, responseType: "MULTICLASS" },
 ];
 
 const AnalysisEndpointContext = createContext<AnalysisEndpointContextValue | null>(null);
@@ -31,7 +33,8 @@ export function AnalysisEndpointProvider({children}: { children: ReactNode }) {
     const [availableEndpoints, setAvailableEndpoints] = useState<AnalysisEndpoint[]>([]);
     const [selectedEndpoint, setSelectedEndpoint] = useState<string>(DEFAULT_BINARY_ENDPOINT);
 
-    const isMulticlass = selectedEndpoint.toLowerCase().includes("multiclass");
+    const selectedEndpointInfo = availableEndpoints.find((endpoint) => endpoint.endpoint === selectedEndpoint);
+    const isMulticlass = selectedEndpointInfo?.responseType === "MULTICLASS";
     const mode: AnalysisEndpointMode = isMulticlass ? "multiclass" : "binary";
 
     const setMode = (nextMode: AnalysisEndpointMode) => {
@@ -46,7 +49,7 @@ export function AnalysisEndpointProvider({children}: { children: ReactNode }) {
 
         if (nextMode === "multiclass") {
             const multiclassMatch = availableEndpoints.find((endpoint) =>
-                endpoint.endpoint.toLowerCase().includes("multiclass")
+                endpoint.responseType === "MULTICLASS"
             );
             setSelectedEndpoint(multiclassMatch?.endpoint ?? preferred);
             return;
@@ -56,13 +59,13 @@ export function AnalysisEndpointProvider({children}: { children: ReactNode }) {
             endpoint.endpoint === DEFAULT_BINARY_ENDPOINT
         );
         const nonMulticlass = availableEndpoints.find((endpoint) =>
-            !endpoint.endpoint.toLowerCase().includes("multiclass")
+            endpoint.responseType !== "MULTICLASS"
         );
         setSelectedEndpoint(promptMatch?.endpoint ?? nonMulticlass?.endpoint ?? preferred);
     };
 
-    useEffect(() => {
-        fetch("/api/gdpr/analysis/endpoints")
+    const refreshEndpoints = useCallback(() => {
+        authenticatedFetch("/api/gdpr/analysis/endpoints")
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error("Failed to load analysis endpoints");
@@ -80,6 +83,20 @@ export function AnalysisEndpointProvider({children}: { children: ReactNode }) {
                 setAvailableEndpoints(FALLBACK_ENDPOINTS);
             });
     }, []);
+
+    // Custom endpoints are per user, and this provider lives in the root layout
+    // so it never remounts on login/logout — refetch whenever the logged-in
+    // user changes, otherwise the previous session's list (or the pre-login
+    // fallback) sticks around until a full page reload.
+    const {token, isLoading: isAuthLoading} = useAuth();
+    useEffect(() => {
+        if (isAuthLoading) return;
+        if (!token) {
+            setAvailableEndpoints(FALLBACK_ENDPOINTS);
+            return;
+        }
+        refreshEndpoints();
+    }, [token, isAuthLoading, refreshEndpoints]);
 
     useEffect(() => {
         const storedEndpoint = window.localStorage.getItem(STORAGE_KEY);
@@ -122,8 +139,9 @@ export function AnalysisEndpointProvider({children}: { children: ReactNode }) {
             isMulticlass,
             apiEndpoint,
             backendEndpoint: selectedEndpoint,
+            refreshEndpoints,
         };
-    }, [mode, selectedEndpoint, availableEndpoints, isMulticlass, apiEndpoint]);
+    }, [mode, selectedEndpoint, availableEndpoints, isMulticlass, apiEndpoint, refreshEndpoints]);
 
     return <AnalysisEndpointContext.Provider value={value}>{children}</AnalysisEndpointContext.Provider>;
 }

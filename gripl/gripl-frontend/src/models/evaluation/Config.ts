@@ -1,8 +1,11 @@
 export type EndpointChoice = "default" | "preset" | "custom";
 
+export type AnalysisResponseType = "BINARY" | "MULTICLASS";
+
 export interface AnalysisEndpoint {
     endpoint: string;
     name: string;
+    responseType: AnalysisResponseType;
 }
 
 export interface ModelRowState {

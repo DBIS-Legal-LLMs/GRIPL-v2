@@ -28,19 +28,26 @@ class EvaluationRunner(
     private val bpmnExtractor = BpmnExtractor()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun run(request: EvaluationRequest): Flow<EvaluationReport> {
+    fun run(request: EvaluationRequest, ownerUserId: String): Flow<EvaluationReport> {
         val metricsAccumulator = MetricsAccumulator()
         val startedCounter = AtomicInteger(0)
 
         val entries = (if (request.evaluationDataIds.isNotEmpty()) {
-            evaluationDataRepository.getEvaluationDataByIds(request.evaluationDataIds)
+            evaluationDataRepository.getEvaluationDataByIdsForOwner(request.evaluationDataIds, ownerUserId)
         } else {
-            evaluationDataRepository.getEvaluationDataByDatasetIdsOrAll(request.datasets)
+            evaluationDataRepository.getEvaluationDataByDatasetIdsOrAllForOwner(request.datasets, ownerUserId)
         }).sortedBy { it.id }
         val totalCount = entries.size
         val entriesFlow = entries.asFlow()
 
         log.info { "Starting evaluation with endpoint=${request.evaluationEndpoint}; maxConcurrent=${request.maxConcurrent}; evaluateRag=${request.evaluateRag}" }
+
+        // Labels without classes (binary / legacy labels) yield no expected classes in a multiclass evaluation
+        if (request.evaluationEndpoint.contains("multiclass", ignoreCase = true)) {
+            entries.filter { it.unclassifiedLabelCount > 0 }.forEach { entry ->
+                log.warn { "Test case ${entry.id} (${entry.name}) has ${entry.unclassifiedLabelCount} label(s) without class; multiclass metrics will be distorted" }
+            }
+        }
 
         return entriesFlow
             .flatMapMerge(concurrency = request.maxConcurrent.coerceAtLeast(1)) { entry ->
