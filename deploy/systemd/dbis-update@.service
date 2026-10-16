@@ -1,0 +1,14 @@
+# Pull-and-apply one stack. The instance is the stack directory as a path:
+#   sudo systemctl enable --now "dbis-update@$(systemd-escape --path /srv/dbis-universe/gripl/prod).timer"
+[Unit]
+Description=Pull and apply image updates for the stack in %f
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+ExecStart=/srv/dbis-universe/bin/update-stack.sh %f
+# a stuck registry or health check must not pile up runs
+TimeoutStartSec=15min

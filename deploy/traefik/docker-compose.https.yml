@@ -1,0 +1,44 @@
+# Overlay that turns on HTTPS with a Let's Encrypt wildcard certificate, using
+# the DNS-01 challenge (works for a server that is only reachable inside the
+# university network — no inbound connection from the internet is needed).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+#
+# Requirements (see deploy/README.md, section "HTTPS"):
+#   * BASE_DOMAIN, ACME_EMAIL and the RFC2136_* values in .env
+#   * a DNS server that accepts RFC2136 updates for _acme-challenge.<BASE_DOMAIN>
+#     (or another lego DNS provider: change ACME_DNS_PROVIDER and the env vars)
+#
+# Starts against the Let's Encrypt STAGING CA (untrusted certificates, but no
+# rate limits) — set ACME_CA_SERVER to the production URL once it works.
+services:
+  traefik:
+    command:
+      # --- original flags (a compose override replaces the whole list) ---
+      - --providers.docker.endpoint=tcp://socket-proxy:2375
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.watch=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.transport.respondingtimeouts.readtimeout=0s
+      - --entrypoints.web.transport.respondingtimeouts.idletimeout=1800s
+      - --entrypoints.websecure.transport.respondingtimeouts.readtimeout=0s
+      - --entrypoints.websecure.transport.respondingtimeouts.idletimeout=1800s
+      - --entrypoints.ping.address=:8082
+      - --ping=true
+      - --ping.entrypoint=ping
+      - --api.dashboard=false
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --accesslog=true
+      # --- HTTPS ---
+      # http -> https for every router
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      # one wildcard certificate for the whole base domain, used by all routers
+      - --entrypoints.websecure.http.tls.certresolver=dns
+      - --entrypoints.websecure.http.tls.domains[0].main=${BASE_DOMAIN:?set BASE_DOMAIN in .env}
+      - --entrypoints.websecure.http.tls.domains[0].sans=*.${BASE_DOMAIN}
+      - --certificatesresolvers.dns.acme.email=${ACME_EMAIL:?set ACME_EMAIL in .env}
+      - --certificatesresolvers.dns.acme.storage=/acme/acme.json
+      - --certificatesresolvers.dns.acme.caserver=${ACME_CA_SERVER:-https://acme-staging-v02.api.letsencrypt.org/directory}
+      - --certificatesresolvers.dns.acme.dnschallenge.provider=${ACME_DNS_PROVIDER:-rfc2136}

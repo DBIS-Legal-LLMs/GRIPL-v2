@@ -1,0 +1,10 @@
+[Unit]
+Description=Regularly update the stack in %f
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=3min
+RandomizedDelaySec=20s
+
+[Install]
+WantedBy=timers.target

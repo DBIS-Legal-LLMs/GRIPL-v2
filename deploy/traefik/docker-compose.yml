@@ -1,0 +1,79 @@
+# Shared reverse proxy for every DBIS-universe stack on the server.
+#
+# One Traefik answers on :80/:443 and routes by Host header to the right
+# container in the right environment (prod / dev). Nothing else on the server
+# publishes a port. It also owns the two per-environment Docker networks that
+# the app stacks attach to — see deploy/README.md.
+#
+# HTTP only by default. For HTTPS add the overlay (needs the DNS-01 settings in
+# .env):  docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+name: traefik
+
+services:
+  # Traefik must read container labels from the Docker API. Handing it the raw
+  # socket would be root-equivalent if Traefik were ever compromised, so it only
+  # talks to this proxy, which allows read-only access to the container list.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1   # everything else (POST, exec, images, ...) stays denied
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - socket
+
+  traefik:
+    image: traefik:v3.6
+    restart: unless-stopped
+    depends_on:
+      - socket-proxy
+    command:
+      - --providers.docker.endpoint=tcp://socket-proxy:2375
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.watch=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      # GRIPL analyses and bulk uploads can run for many minutes (the Next.js
+      # proxy allows 30 min), so don't let the proxy cut requests short.
+      - --entrypoints.web.transport.respondingtimeouts.readtimeout=0s
+      - --entrypoints.web.transport.respondingtimeouts.idletimeout=1800s
+      - --entrypoints.websecure.transport.respondingtimeouts.readtimeout=0s
+      - --entrypoints.websecure.transport.respondingtimeouts.idletimeout=1800s
+      # Internal-only endpoint used by the container healthcheck (not published).
+      - --entrypoints.ping.address=:8082
+      - --ping=true
+      - --ping.entrypoint=ping
+      - --api.dashboard=false
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --accesslog=true
+    env_file:
+      - .env
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - acme:/acme
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping", "--ping.entrypoint=ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - socket
+      - dbis-prod
+      - dbis-dev
+
+volumes:
+  acme:
+
+networks:
+  socket:
+    internal: true
+  # Shared by all stacks of one environment (auth-service, GRIPL, later RAGulate).
+  # Prod and dev never share a network, so a prod container can never reach a
+  # dev one by name and vice versa.
+  dbis-prod:
+    name: dbis-prod
+  dbis-dev:
+    name: dbis-dev
