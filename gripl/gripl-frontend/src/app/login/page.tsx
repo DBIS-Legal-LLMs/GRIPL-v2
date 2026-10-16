@@ -60,12 +60,13 @@ function LoginForm() {
         }
     }
 
-    return <div className="h-full w-full flex items-center justify-center p-6">
-        <Card className="w-full max-w-sm">
+    return <div className="relative h-full w-full flex items-center justify-center p-6 overflow-hidden">
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/20 via-background to-muted blur-3xl opacity-60" />
+        <Card className="w-full max-w-sm backdrop-blur-sm bg-background/80 border-border/50 shadow-xl">
             <CardHeader className="items-center text-center">
                 <Image src="/logo.png" alt="GRIPL" width={100} height={100} className="w-24 h-auto mb-2" />
-                <CardTitle>Sign in to GRIPL</CardTitle>
-                <CardDescription>Shared account with RAGulate</CardDescription>
+                <CardTitle className="text-2xl">Welcome to GRIPL</CardTitle>
+                <CardDescription>Sign in to continue</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="login">
