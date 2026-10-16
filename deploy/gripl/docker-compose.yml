@@ -92,7 +92,7 @@ services:
       - default
 
   gripl-neo4j:
-    image: neo4j:5-community
+    image: neo4j:5.26.30-community   # pinned: upgrade deliberately
     restart: unless-stopped
     mem_limit: ${MEM_NEO4J:-2g}
     environment:
@@ -113,7 +113,7 @@ services:
       - default
 
   gripl-postgres:
-    image: postgres:15
+    image: postgres:15.18   # pinned: upgrade deliberately, not whenever the registry changes
     restart: unless-stopped
     mem_limit: ${MEM_POSTGRES:-1g}
     environment:
