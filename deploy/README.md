@@ -268,8 +268,9 @@ What is in place:
   the university network because it holds a copy of prod's users and data.
 * **Rate limits per client IP** on `/auth/login` (20/min) and `/auth/register`
   (5/min), see `traefik/dynamic/middlewares.yml`.
-* **`/rag/*` is blocked** (403). The RAG service has no authentication and runs on the
-  project's own LLM key; the browser never needs it.
+* **`/rag/*` is blocked** (403), except `/rag/api/pdf/` (the sandbox's PDF viewer). The RAG
+  service has no authentication and runs on the project's own LLM key; the PDF routes only serve
+  the corpus's public source documents and match names against existing files (no path input).
 * **API docs are off** (`API_DOCS_ENABLED=false`): the backend serves Swagger without a
   login, and auth-service's `/docs`/`/redoc` are blocked.
 * Security headers (no sniffing, no framing, referrer policy); logs are rotated

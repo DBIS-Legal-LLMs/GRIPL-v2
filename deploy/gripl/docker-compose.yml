@@ -30,6 +30,13 @@ services:
       gripl-backend:
         condition: service_healthy
     mem_limit: ${MEM_FRONTEND:-768m}
+    environment:
+      # The browser-facing proxy targets are frozen into the image at build time, but the
+      # frontend's server-side code (e.g. saving the OpenRouter key in Account Settings)
+      # reads these when it RUNS. Without them it calls "undefined/users/me".
+      - AUTH_SERVICE_INTERNAL_URL=http://auth-service:8000
+      - RAG_INTERNAL_URL=http://gripl-rag:8081
+      - NEXT_PUBLIC_API_BASE_URL=http://gripl-backend:8080
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
       interval: 15s
@@ -66,8 +73,10 @@ services:
       - traefik.http.routers.gripl-${ENVIRONMENT}-register.middlewares=gripl-${ENVIRONMENT}-allow,register-ratelimit@file,secure-headers@file
 
       # The frontend would proxy /rag/* to the RAG service, which has no authentication
-      # and runs on the project's own LLM key. The browser never needs it: answer 403.
-      - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.rule=Host(`${GRIPL_HOST}`) && PathPrefix(`/rag`)
+      # and runs on the project's own LLM key (queries, ragas evaluation), so answer 403.
+      # Exception: /rag/api/pdf/, which the sandbox's PDF viewer calls from the browser. It
+      # only serves the public source documents of the corpus (no LLM calls, no path input).
+      - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.rule=Host(`${GRIPL_HOST}`) && PathPrefix(`/rag`) && !PathPrefix(`/rag/api/pdf/`)
       - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.priority=1000
       - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.entrypoints=websecure
       - traefik.http.routers.gripl-${ENVIRONMENT}-rag-blocked.tls=true
