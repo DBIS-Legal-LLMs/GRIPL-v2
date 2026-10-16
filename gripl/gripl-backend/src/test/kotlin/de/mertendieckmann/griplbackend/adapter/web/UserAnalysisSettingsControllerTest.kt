@@ -36,7 +36,7 @@ class UserAnalysisSettingsControllerTest {
         assertEquals("openai/gpt-oss-20b", result.modelName)
         assertEquals(1.0, result.temperature)
         assertEquals(1.0, result.topP)
-        assertFalse(result.useRag)
+        assertTrue(result.useRag)
         assertEquals(RagMode.HYBRID, result.ragMode)
     }
 

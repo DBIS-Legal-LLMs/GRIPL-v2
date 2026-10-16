@@ -63,7 +63,7 @@ docker compose -f docker-compose.local.yml exec gripl-rag python scripts/ingest.
 - Check it worked: `curl http://localhost:8081/api/status` should return `{"ingested": true, ...}`; the warning in the UI disappears within ~2 minutes (it polls).
 - The graph lives in Neo4j's `neo4j_data` volume and LightRAG's own state in `gripl/gripl-rag/rag_working_dir/`. If you ever wipe the Neo4j volume, also empty `rag_working_dir/` before re-ingesting so the two don't disagree about what's already ingested.
 - Only needed if you add new PDFs under `data/` (not for a fresh clone): run `docker compose -f docker-compose.local.yml exec gripl-rag python scripts/extract_pdfs.py` first to regenerate the `.txt` files, then ingest.
-- RAG is only used for an analysis when **Use RAG** is switched on in the Analysis Settings dialog (off by default), and it only returns anything once this ingestion has run. For production use the same command with `-f docker-compose.yml -f docker-compose.prod.yml`.
+- RAG is only used for an analysis when **Use RAG** is switched on in the Analysis Settings dialog (on by default for new users; it can be switched off there), and it only returns anything once this ingestion has run. For production use the same command with `-f docker-compose.yml -f docker-compose.prod.yml`.
 
 ### 2. Production (server already runs Traefik + Watchtower)
 

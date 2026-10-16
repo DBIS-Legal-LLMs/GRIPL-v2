@@ -19,7 +19,7 @@ data class UserAnalysisSettings(
     val seed: Int? = null,
     val temperature: Double = DEFAULT_TEMPERATURE,
     val topP: Double = DEFAULT_TOP_P,
-    val useRag: Boolean = false,
+    val useRag: Boolean = DEFAULT_USE_RAG,
     val ragMode: RagMode = RagMode.HYBRID,
     val configured: Boolean = false
 ) {
@@ -28,6 +28,8 @@ data class UserAnalysisSettings(
         const val DEFAULT_MODEL_NAME = "openai/gpt-oss-20b"
         const val DEFAULT_TEMPERATURE = 1.0
         const val DEFAULT_TOP_P = 1.0
+        /** RAG context is on unless the user switches it off. Keep in sync with the migration default. */
+        const val DEFAULT_USE_RAG = true
     }
 }
 
@@ -41,7 +43,7 @@ data class SaveUserAnalysisSettingsRequest(
     val seed: Int? = null,
     val temperature: Double? = null,
     val topP: Double? = null,
-    val useRag: Boolean = false,
+    val useRag: Boolean = UserAnalysisSettings.DEFAULT_USE_RAG,
     val ragMode: RagMode? = null
 ) {
     fun withDefaults() = UserAnalysisSettings(
