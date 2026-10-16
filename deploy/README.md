@@ -210,6 +210,21 @@ RAG_INTERNAL_URL=http://gripl-rag:8081
 AUTH_SERVICE_INTERNAL_URL=http://auth-service:8000
 ```
 
+This is implemented in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (GRIPL-v2) and in
+auth-service's own `.github/workflows/ci.yml`:
+
+* every push and pull request runs the tests (GRIPL: backend tests against a Postgres service
+  container, frontend type check; auth-service: pytest) and builds every image
+* only a push to `main` / `dev` publishes (`:prod` / `:dev` plus `:sha-<commit>`); pull requests
+  build but publish nothing
+* layers are cached in the registry (`:buildcache` tag), because the RAG image is several GB
+* third-party actions are pinned to commits; the workflows only get the permissions they need
+
+After the **first** publish, check in the organisation's *Packages* page that the four packages are
+**public** (they inherit the repository's visibility when linked to it, which the image label does).
+If one is private, open its *Package settings* and change the visibility, otherwise the server
+cannot pull it without a login. A manual re-run is possible via *Actions → CI → Run workflow*.
+
 ## HTTPS
 
 Port 80 only redirects to HTTPS; every site lives on 443. Until the project has a
