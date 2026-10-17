@@ -78,7 +78,9 @@ export default function AppSidebar() {
 
     return <Sidebar>
         <SidebarHeader className="flex flex-row justify-start items-center space-x-2 pl-3 pt-3">
-            <Image src="/logo.png" alt="GRIPL App Icon" width={100} height={100} className="w-32 h-auto" />
+            <Link href="/" className="cursor-pointer">
+                <Image src="/logo.png" alt="GRIPL App Icon" width={100} height={100} className="w-32 h-auto" />
+            </Link>
         </SidebarHeader>
         <SidebarContent className="p-2">
             <SidebarMenu>
