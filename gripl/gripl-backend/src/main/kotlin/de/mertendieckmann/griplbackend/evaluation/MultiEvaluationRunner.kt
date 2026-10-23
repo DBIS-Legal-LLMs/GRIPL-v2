@@ -44,6 +44,7 @@ class MultiEvaluationRunner(
                     datasets = request.datasets,
                     evaluationDataIds = request.evaluationDataIds,
                     useRag = request.useRag,
+                    useSQLLM = request.useSQLLM,
                     ragMode = request.ragMode,
                     evaluateRag = request.evaluateRag,
                     activitiesOnly = request.activitiesOnly

@@ -1,0 +1,13 @@
+BPMN Field:
+        {activity_field}
+
+        Available Intents:
+
+        ",".join({available_intents})
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        {{ "intents": ["<intent_name>"] }}

@@ -23,3 +23,8 @@ gripl/gripl-rag/.env
 
 extra/*
 .github/*
+
+gripl/gripl-sql-llm/test.db
+gripl/gripl-sql-llm/venv
+
+
