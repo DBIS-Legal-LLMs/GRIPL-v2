@@ -1,0 +1,20 @@
+Database schema:
+{db_schema}
+
+BPMN Activity Field:
+{activity_field}
+
+Generated SQL:
+{generated_query}
+
+Error:
+{error_message}
+
+Intent:
+{intent}
+
+Reason of Intent:
+{reasons_of_intentions}
+
+Hint:
+{hint}

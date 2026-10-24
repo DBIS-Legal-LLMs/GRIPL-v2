@@ -1,6 +1,6 @@
 "use client";
 
-import React, { JSX } from "react";
+import React, {JSX, useState, useEffect} from "react";
 import {Dataset} from "@/models/dto/Dataset";
 import {MultiEvaluationRequest} from "@/models/dto/MultiEvaluationRequest";
 import {useEvaluationConfig} from "@/hooks/evaluation/use-evaluation-config";
@@ -10,18 +10,27 @@ import EvaluationConfigDefaultSettings from "@/components/evaluation/config/eval
 import EvaluationConfigDatasetSettings from "@/components/evaluation/config/evaluation-config-dataset-settings";
 import EvaluationConfigModelsSettings from "@/components/evaluation/config/evaluation-config-models-settings";
 import {nextLabel} from "@/lib/evaluation-config-utils";
+import {ModelConfig, LLMComponentKey} from "@/components/evaluation/config/sql-llms-config";
 
 interface EvaluationConfigCardMultiProps {
     className?: string;
     children?: JSX.Element;
     datasets: Dataset[];
     onMultiConfigChanged: (config: MultiEvaluationRequest) => void;
+    onSqlLlmConfigChange?: (configs: Record<LLMComponentKey, ModelConfig[]>) => void;
 }
 
-export default function EvaluationConfig({ className, children, datasets, onMultiConfigChanged }: EvaluationConfigCardMultiProps) {
+
+export default function EvaluationConfig({
+                                             className,
+                                             children,
+                                             datasets,
+                                             onMultiConfigChanged,
+                                             onSqlLlmConfigChange
+                                         }: EvaluationConfigCardMultiProps) {
     const config = useEvaluationConfig(datasets, onMultiConfigChanged);
 
-    const { fileInputRef, onClickImportYaml, onFileChange, onClickExportYaml } = useYamlImportExport({
+    const {fileInputRef, onClickImportYaml, onFileChange, onClickExportYaml} = useYamlImportExport({
         availableEvaluationEndpoints: config.availableEvaluationEndpoints,
         effectiveDefaultEndpoint: config.effectiveDefaultEndpoint,
         models: config.models,
@@ -32,6 +41,7 @@ export default function EvaluationConfig({ className, children, datasets, onMult
         useRag: config.useRag,
         ragMode: config.ragMode,
         evaluateRag: config.evaluateRag,
+        useSQLLM: config.useSQLLM,
         activitiesOnly: config.activitiesOnly,
         setDefaultEndpointChoice: (v) => config.setDefaultEndpointChoice(v),
         setDefaultPresetEndpoint: config.setDefaultPresetEndpoint,
@@ -44,8 +54,24 @@ export default function EvaluationConfig({ className, children, datasets, onMult
         setUseRag: config.setUseRag,
         setRagMode: config.setRagMode,
         setEvaluateRag: config.setEvaluateRag,
+        setuseSQLLM: config.setuseSQLLM,
         setActivitiesOnly: config.setActivitiesOnly,
     });
+
+    const [modelConfigs, setModelConfigs] = useState<Record<LLMComponentKey, ModelConfig[]>>({
+        INTENTION_MODEL: [{model: '', apiKeyName: '', baseUrl: ''}],
+        SQL_GENERATION_MODEL: [{model: '', apiKeyName: '', baseUrl: ''}],
+        POST_PROCESSING_MODEL: [{model: '', apiKeyName: '', baseUrl: ''}],
+        VERIFICATION_MODEL: [{model: '', apiKeyName: '', baseUrl: ''}],
+        EMBEDDING_MODEL: [{model: '', apiKeyName: '', baseUrl: ''}],
+    });
+
+    useEffect(() => {
+        if (onSqlLlmConfigChange) {
+            onSqlLlmConfigChange(modelConfigs);
+        }
+    }, [modelConfigs, onSqlLlmConfigChange]);
+
 
     return (
         <div className={`bg-background dark ${className ?? ""}`}>
@@ -79,6 +105,7 @@ export default function EvaluationConfig({ className, children, datasets, onMult
                         useRag={config.useRag}
                         ragMode={config.ragMode}
                         evaluateRag={config.evaluateRag}
+                        useSQLLM={config.useSQLLM}
                         activitiesOnly={config.activitiesOnly}
                         setDefaultEndpointChoice={config.setDefaultEndpointChoice}
                         setDefaultPresetEndpoint={config.setDefaultPresetEndpoint}
@@ -89,7 +116,10 @@ export default function EvaluationConfig({ className, children, datasets, onMult
                         setUseRag={config.setUseRag}
                         setRagMode={config.setRagMode}
                         setEvaluateRag={config.setEvaluateRag}
+                        setuseSQLLM={config.setuseSQLLM}
                         setActivitiesOnly={config.setActivitiesOnly}
+                        modelConfigs={modelConfigs}
+                        setModelConfigs={setModelConfigs}
                     />
 
                     <EvaluationConfigDatasetSettings

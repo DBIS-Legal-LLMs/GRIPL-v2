@@ -11,6 +11,8 @@ import {
 } from "@/models/dto/ReportData";
 import {MultiEvaluationRequest} from "@/models/dto/MultiEvaluationRequest";
 import {authenticatedFetch} from "@/lib/authenticated-fetch";
+import {buildEvaluationPayload} from "@/lib/evaluation-sql-llm-utils";
+import {ModelConfig, LLMComponentKey} from "@/components/evaluation/config/sql-llms-config";
 
 type ModelReportEnvelope = {
     modelLabel: string;
@@ -39,6 +41,8 @@ interface EvaluationJobContextValue {
     isFinished: boolean;
     setIsFinished: (finished: boolean) => void;
     startEvaluation: () => Promise<void>;
+    sqlLlmConfigs: Record<LLMComponentKey, ModelConfig[]>;
+    setSqlLlmConfigs: React.Dispatch<React.SetStateAction<Record<LLMComponentKey, ModelConfig[]>>>;
 }
 
 const EvaluationJobContext = createContext<EvaluationJobContextValue | null>(null);
@@ -137,17 +141,26 @@ export function EvaluationJobProvider({children}: { children: ReactNode }) {
         setIsFinished(false);
     }, []);
 
+    const [sqlLlmConfigs, setSqlLlmConfigs] = useState<Record<LLMComponentKey, ModelConfig[]>>({
+        INTENTION_MODEL: [{model: "", apiKeyName: "", baseUrl: ""}],
+        SQL_GENERATION_MODEL: [{model: "", apiKeyName: "", baseUrl: ""}],
+        POST_PROCESSING_MODEL: [{model: "", apiKeyName: "", baseUrl: ""}],
+        VERIFICATION_MODEL: [{model: "", apiKeyName: "", baseUrl: ""}],
+        EMBEDDING_MODEL: [{model: "", apiKeyName: "", baseUrl: ""}],
+    });
+
     const startEvaluation = useCallback(async () => {
         if (!evaluationRequest) return;
         resetState();
+        const payload = buildEvaluationPayload(evaluationRequest, sqlLlmConfigs);
         console.log("Sending request", evaluationRequest);
         const res = await authenticatedFetch(`/api/gdpr/evaluation/stream`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(evaluationRequest)
+            body: JSON.stringify(payload)
         });
         await processNdjsonStream(res);
-    }, [evaluationRequest, resetState, processNdjsonStream]);
+    }, [evaluationRequest, sqlLlmConfigs, resetState, processNdjsonStream]);
 
     // Prunes "currently evaluating X" entries once their test case has landed as a
     // result or an error — runs regardless of whether the evaluation page is mounted.
@@ -185,6 +198,8 @@ export function EvaluationJobProvider({children}: { children: ReactNode }) {
         isFinished,
         setIsFinished,
         startEvaluation,
+        sqlLlmConfigs,
+        setSqlLlmConfigs,
     };
 
     return <EvaluationJobContext.Provider value={value}>{children}</EvaluationJobContext.Provider>;
