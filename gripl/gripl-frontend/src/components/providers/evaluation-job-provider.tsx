@@ -152,11 +152,14 @@ export function EvaluationJobProvider({children}: { children: ReactNode }) {
     const startEvaluation = useCallback(async () => {
         if (!evaluationRequest) return;
         resetState();
+        const payload = buildEvaluationPayload(evaluationRequest, sqlLlmConfigs);
+        console.log("formatted payload ")
+        console.log(payload)
         console.log("Sending request", evaluationRequest);
         const res = await authenticatedFetch(`/api/gdpr/evaluation/stream`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(evaluationRequest)
+            body: JSON.stringify(payload)
         });
         await processNdjsonStream(res);
     }, [evaluationRequest, sqlLlmConfigs, resetState, processNdjsonStream]);

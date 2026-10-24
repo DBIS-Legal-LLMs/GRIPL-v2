@@ -59,7 +59,8 @@ app.add_middleware(
 async def analyse(analysis_request: AnalysisSQLRequest = Depends(),
             ):
     try:
-
+        print("given api keys ")
+        print(json.loads(analysis_request.llmProps_raw).get("apiKey", ""))
         fill_in_db_models_and_env(
             json.loads(analysis_request.llmProps_raw).get("modelName", ""),
             json.loads(analysis_request.llmProps_raw).get("apiKey", ""),
@@ -101,23 +102,18 @@ def fill_in_db_models_and_env(models: str, api_keys_in_env: str, base_urls: str)
     sql_execution_component = SQLExecution()
 
     models_map = parse_components(models)
-    api_keys_map = parse_components(api_keys_in_env)
     base_urls_map = parse_components(base_urls)
 
     for comp_key, model_list in models_map.items():
-        api_key_list = api_keys_map.get(comp_key, [])
         base_url_list = base_urls_map.get(comp_key, [])
-
         for idx, model_name in enumerate(model_list):
-            api_key_name = api_key_list[idx] if idx < len(api_key_list) else ""
             base_url = base_url_list[idx] if idx < len(base_url_list) else ""
-
             sql = """
                 INSERT INTO fallback_llm 
                     (corresponding_comment, name, "order", model_url, env_api_key_name)
                 VALUES (?, ?, ?, ?, ?)
             """
-            params = (comp_key, model_name, idx + 1, base_url, api_key_name)
+            params = (comp_key, model_name, idx + 1, base_url, api_keys_in_env)
 
             result = sql_execution_component.insert_sql(sql, params)
             if result and "error" in result:

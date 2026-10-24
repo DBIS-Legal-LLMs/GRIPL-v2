@@ -101,7 +101,7 @@ class LLMFallBackManager:
             llm = LLM(
                 model_name=model_name,
                 model_url=model_url,
-                api_key=os.getenv(api_key_env_name),
+                api_key=api_key_env_name,
                 schema_output=self.schema_output
             )
 
