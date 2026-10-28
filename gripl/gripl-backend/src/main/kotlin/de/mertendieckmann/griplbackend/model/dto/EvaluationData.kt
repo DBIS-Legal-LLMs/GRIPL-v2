@@ -47,7 +47,10 @@ data class ExpectedValue(
      */
     @JsonAlias("reason")
     val explanation: String? = null,
-    val classification: List<GdprProcessingClass> = emptyList()
+    val classification: List<GdprProcessingClass> = emptyList(), //keep classification for LLM-analysis and evaluation
+    
+    /** Global labels assigned to this BPMN element. Archived labels remain visible here. */
+    val labels: List<LabelAssignment> = emptyList()
 )
 
 data class EvaluationDataMeta(

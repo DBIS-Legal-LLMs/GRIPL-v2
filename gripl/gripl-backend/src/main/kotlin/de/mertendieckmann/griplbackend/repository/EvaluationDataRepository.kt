@@ -12,7 +12,8 @@ import org.springframework.stereotype.Repository
 @Repository
 class EvaluationDataRepository(
     private val jdbc: JdbcTemplate,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val evaluationDataLabelRepository: EvaluationDataLabelRepository
 ) {
 
     private val mapper = RowMapper { rs, _ ->
@@ -25,8 +26,39 @@ class EvaluationDataRepository(
         )
     }
 
+    /**
+     * Adds relational label assignments to the expected values loaded from the
+     * existing JSON column. Values without an assignment keep an empty label list.
+     */
+    private fun attachLabelAssignments(
+        evaluationData: List<EvaluationData>
+    ): List<EvaluationData> {
+        if (evaluationData.isEmpty()) {
+            return emptyList()
+        }
+
+        val assignmentsByTestCase =
+            evaluationDataLabelRepository.findAssignmentsForEvaluationDataIds(
+                evaluationData.map { it.id }
+            )
+
+        return evaluationData.map { testCase ->
+            val assignmentsByElement =
+                assignmentsByTestCase[testCase.id].orEmpty()
+
+            testCase.copy(
+                expectedValues = testCase.expectedValues.map { expectedValue ->
+                    expectedValue.copy(
+                        labels = assignmentsByElement[expectedValue.value].orEmpty()
+                    )
+                }
+            )
+        }
+    }
+
     fun getAllEvaluationData(): List<EvaluationData> {
-        return jdbc.query("SELECT * FROM evaluation_data", mapper)
+        return attachLabelAssignments(jdbc.query("SELECT * FROM evaluation_data", mapper)
+        )
     }
 
     // ── Owner-scoped access (GRIPL-v2#33) ──────────────────────────────────
@@ -49,7 +81,7 @@ class EvaluationDataRepository(
             if (datasetId != null) append(" AND ed.dataset_id = ?")
         }
         val args = listOfNotNull(ownerUserId, datasetId?.toLong()).toTypedArray()
-        return jdbc.query(sql, mapper, *args)
+        return attachLabelAssignments(jdbc.query(sql, mapper, *args))
     }
 
     fun getEvaluationDataByIdForOwner(id: Long, ownerUserId: String): EvaluationData? {
@@ -58,7 +90,7 @@ class EvaluationDataRepository(
             JOIN dataset d ON ed.dataset_id = d.id
             WHERE ed.id = ? AND d.owner_user_id = ?
         """.trimIndent()
-        return jdbc.query(sql, mapper, id, ownerUserId).firstOrNull()
+        return attachLabelAssignments(jdbc.query(sql, mapper, id, ownerUserId)).firstOrNull()
     }
 
     fun getEvaluationDataByIdsForOwner(ids: List<Int>, ownerUserId: String): List<EvaluationData> {
@@ -69,7 +101,7 @@ class EvaluationDataRepository(
             JOIN dataset d ON ed.dataset_id = d.id
             WHERE ed.id IN ($inSql) AND d.owner_user_id = ?
         """.trimIndent()
-        return jdbc.query(sql, mapper, ownerUserId)
+        return attachLabelAssignments(jdbc.query(sql, mapper, ownerUserId))
     }
 
     fun getEvaluationDataByDatasetIdsOrAllForOwner(datasetIds: List<Int>, ownerUserId: String): List<EvaluationData> {
@@ -82,7 +114,7 @@ class EvaluationDataRepository(
             JOIN dataset d ON ed.dataset_id = d.id
             WHERE ed.dataset_id IN ($inSql) AND d.owner_user_id = ?
         """.trimIndent()
-        return jdbc.query(sql, mapper, ownerUserId)
+        return attachLabelAssignments(jdbc.query(sql, mapper, ownerUserId))
     }
 
     fun countEvaluationDataForDatasetsAndOwner(datasetIds: List<Long>, ownerUserId: String): Int {
@@ -102,7 +134,7 @@ class EvaluationDataRepository(
     // the gap GRIPL-v2#40 closed for the *ForOwner variants above).
 
     fun getEvaluationDataById(id: Long): EvaluationData? {
-        return jdbc.query("SELECT * FROM evaluation_data WHERE id = ?", mapper, id).firstOrNull()
+        return attachLabelAssignments(jdbc.query("SELECT * FROM evaluation_data WHERE id = ?", mapper, id)).firstOrNull()
     }
 
     fun insertEvaluationData(data: EvaluationDataWithOptionalId): Int? {
