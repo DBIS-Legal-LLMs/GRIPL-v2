@@ -30,7 +30,7 @@ class LabelService(
         }
     }
 
-    /** Updates the name and description of an active label. */
+    /** Updates an active label, predefined label names remain unchanged. */
     fun update(
         id: Long,
         request: UpdateLabelRequest,
@@ -39,6 +39,26 @@ class LabelService(
         val name = request.name.trim()
         val description = request.description.trim()
         validateInput(name, description)
+
+        val existingLabel = labelRepository.findById(id)
+            ?: throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Label not found."
+            )
+
+        if (existingLabel.deletedAt != null) {
+            throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Active label not found."
+            )
+        }
+
+        if (existingLabel.predefined && name != existingLabel.name) {
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Predefined label names cannot be changed."
+            )
+        }
 
         return handleDuplicateName {
             labelRepository.update(id, name, description, userId)

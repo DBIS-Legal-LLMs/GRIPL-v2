@@ -119,6 +119,8 @@ class LabelServiceTest {
             updatedBy = "admin-1"
         )
 
+        whenever(repository.findById(8L)).thenReturn(label())
+
         whenever(
             repository.update(
                 8L,
@@ -163,6 +165,8 @@ class LabelServiceTest {
 
     @Test
     fun `update returns not found when no active label matches`() {
+        whenever(repository.findById(8L)).thenReturn(label())
+
         whenever(
             repository.update(8L, "Name", "Description", "admin-1")
         ).thenReturn(null)
@@ -180,6 +184,8 @@ class LabelServiceTest {
 
     @Test
     fun `update returns conflict when the new name is already used`() {
+        whenever(repository.findById(8L)).thenReturn(label())
+
         whenever(
             repository.update(8L, "Name", "Description", "admin-1")
         ).thenThrow(DuplicateKeyException("Duplicate active label name"))
@@ -193,6 +199,67 @@ class LabelServiceTest {
         }
 
         assertEquals(HttpStatus.CONFLICT, exception.statusCode)
+    }
+
+        @Test
+    fun `predefined label names cannot be changed`() {
+        whenever(repository.findById(8L))
+            .thenReturn(label(predefined = true))
+
+        val exception = assertThrows(ResponseStatusException::class.java) {
+            service.update(
+                8L,
+                UpdateLabelRequest(
+                    name = "Renamed collection",
+                    description = "Updated description"
+                ),
+                "admin-1"
+            )
+        }
+
+        assertEquals(HttpStatus.CONFLICT, exception.statusCode)
+        assertEquals(
+            "Predefined label names cannot be changed.",
+            exception.reason
+        )
+        verify(repository).findById(8L)
+        verifyNoMoreInteractions(repository)
+    }
+
+    @Test
+    fun `predefined label descriptions can be changed`() {
+        val predefined = label(predefined = true)
+        val updated = predefined.copy(
+            description = "Updated description",
+            updatedBy = "admin-1"
+        )
+
+        whenever(repository.findById(8L)).thenReturn(predefined)
+        whenever(
+            repository.update(
+                8L,
+                predefined.name,
+                "Updated description",
+                "admin-1"
+            )
+        ).thenReturn(updated)
+
+        val result = service.update(
+            8L,
+            UpdateLabelRequest(
+                name = predefined.name,
+                description = "Updated description"
+            ),
+            "admin-1"
+        )
+
+        assertEquals(updated, result)
+        verify(repository).update(
+            8L,
+            predefined.name,
+            "Updated description",
+            "admin-1"
+        )
     }
 
     @Test
