@@ -195,22 +195,33 @@ own data, so it still uses its own env-configured OpenRouter key
 
 ## Running the Tests
 
-Backend (Kotlin/JUnit/Mockito) — no Maven install needed, runs in a throwaway container:
+The backend currently contains **111 automated tests**. A local Postgres
+instance must be running. The standard tests use `gripl_db`; the label and
+dataset-transfer tests additionally use `gripl_labels_test`.
+
+In Git Bash:
 
 ```bash
 cd gripl/gripl-backend
-docker run --rm -v "$PWD":/app -v gripl-m2:/root/.m2 -w /app \
-  maven:3.8.6-eclipse-temurin-17 \
-  mvn -Dtest='DatasetControllerOwnershipTest,EvaluationDataControllerOwnershipTest,EvaluationControllerRoleTest,JwtAuthenticationWebFilterTest,MultiEvaluationRunnerSeedTest,GlobalExceptionHandlerTest' test
+./mvnw test
 ```
 
-Covers JWKS verification, dataset/test-case ownership, and role-gating — 35
-tests, no external services needed. Clean the root-owned `target/` afterwards:
-`docker run --rm -v "$PWD":/app alpine rm -rf /app/target`.
+In PowerShell:
 
-`GriplBackendApplicationTests` (plain `mvn test` includes it) boots the full
-Spring context and needs a live Postgres + Neo4j + a real LLM key to pass —
-not included above on purpose.
+```powershell
+cd gripl\gripl-backend
+.\mvnw.cmd test
+```
+
+The Maven Wrapper is included in the repository, so no separate Maven
+installation is required.
+
+To compile the backend without running tests:
+
+```bash
+cd gripl/gripl-backend
+./mvnw -DskipTests compile
+```
 
 Frontend has no automated test suite yet (`npm run lint` is the only check) — see [TODOs](#todos).
 
@@ -227,8 +238,11 @@ All paths below except `/actuator/health`, `/swagger-ui`, `/v3/api-docs` and `/t
 | Sandbox | `POST` | `/bpmn/extract` | any | Extract BPMN elements from an uploaded file |
 | Sandbox | `GET` | `/gdpr/rag/status` | any | Whether the RAG knowledge graph currently holds ingested data |
 | Labeling | `POST` `GET` `DELETE` | `/dataset`, `/dataset/{id}` | admin, researcher | Create/list/delete datasets (owner-scoped) |
-| Labeling | `GET` `POST` `DELETE` | `/dataset/testcase`, `/dataset/testcase/{id}` | admin, researcher | List/create/get/update/delete test cases (owner-scoped via parent dataset) |
+| Labeling | `GET` `POST` | `/labels` | admin, researcher | List active labels or create a custom label |
+| Labeling | `PATCH` `DELETE` | `/labels/{id}` | admin | Update or archive a label; labels are never hard-deleted |
+| Labeling | `GET` `POST` `DELETE` | `/dataset/testcase`, `/dataset/testcase/{id}` | admin, researcher | List, create, get, update, or delete test cases; expected values return `labels` and accept `labelIds` |
 | Labeling | `GET` | `/dataset/testcase/{id}/preview` | admin, researcher | SVG preview of a test case's process model |
+| Labeling | `GET` `POST` | `/dataset/export`, `/dataset/{id}/export`, `/dataset/import` | admin, researcher | Export or import datasets as ZIP files; ZIP transfers preserve custom labels and their assignments |
 | Evaluation | `POST` | `/gdpr/evaluation/markdown` | admin, researcher | Run an evaluation, markdown report |
 | Evaluation | `POST` | `/gdpr/evaluation/stream` | admin, researcher | Run an evaluation, NDJSON stream |
 | — | `GET` | `/thesis/pdf` | — (public) | Serves the thesis PDF |
