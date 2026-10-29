@@ -10,6 +10,9 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.annotation.Rollback
 import org.springframework.transaction.annotation.Transactional
+import de.mertendieckmann.griplbackend.model.dto.EvaluationDataWithOptionalId
+import de.mertendieckmann.griplbackend.model.dto.ExpectedValue
+import org.junit.jupiter.api.Assertions.assertFalse
 
 /**
  * Verifies that legacy JSON classifications and relational global labels are
@@ -177,5 +180,163 @@ class EvaluationDataLabelRepositoryTest(
         assertEquals(archivedLabel.id, assignment.id)
         assertNotNull(assignment.deletedAt)
         assertTrue(assignment.name.contains("Archived"))
+    }
+    @Test
+    fun `saving and updating a test case persists explicitly supplied label ids`() {
+        val datasetId = jdbc.queryForObject(
+            """
+            INSERT INTO dataset (name, description, owner_user_id)
+            VALUES (?, ?, ?)
+            RETURNING id
+            """.trimIndent(),
+            Long::class.java,
+            "Saved label test dataset",
+            "Used only by EvaluationDataLabelRepositoryTest",
+            "researcher-1"
+        )!!
+
+        val predefinedCollection =
+            labelRepository.findAllPredefined().single { it.name == "COLLECTION" }
+
+        val firstCustomLabel = labelRepository.create(
+            name = "First saved custom label",
+            description = "Assigned when the test case is created",
+            userId = "researcher-1"
+        )
+
+        val secondCustomLabel = labelRepository.create(
+            name = "Second saved custom label",
+            description = "Assigned when the test case is updated",
+            userId = "researcher-1"
+        )
+
+        val evaluationDataId = evaluationDataRepository.insertEvaluationData(
+            EvaluationDataWithOptionalId(
+                name = "Saved label test case",
+                bpmnXml = "<definitions />",
+                datasetId = datasetId,
+                expectedValues = listOf(
+                    ExpectedValue(
+                        value = "Activity_A",
+                        explanation = "Collection of personal data",
+                        classification = listOf(GdprProcessingClass.COLLECTION),
+                        labelIds = listOf(
+                            predefinedCollection.id,
+                            firstCustomLabel.id
+                        )
+                    )
+                )
+            )
+        )!!.toLong()
+
+        val created = evaluationDataRepository
+            .getEvaluationDataById(evaluationDataId)!!
+
+        assertEquals(
+            setOf("COLLECTION", "First saved custom label"),
+            created.expectedValues.single().labels.map { it.name }.toSet()
+        )
+
+        val legacyStyleUpdate = created.copy(
+            name = "Updated by an older client"
+        )
+
+        assertEquals(
+            1,
+            evaluationDataRepository.updateEvaluationData(
+                legacyStyleUpdate,
+                "researcher-1"
+            )
+        )
+
+        val loadedAfterLegacyUpdate = evaluationDataRepository
+            .getEvaluationDataById(evaluationDataId)!!
+
+        assertEquals(
+            setOf("COLLECTION", "First saved custom label"),
+            loadedAfterLegacyUpdate.expectedValues
+                .single()
+                .labels
+                .map { it.name }
+                .toSet()
+        )
+
+        val updated = loadedAfterLegacyUpdate.copy(
+            expectedValues = created.expectedValues.map { expectedValue ->
+                expectedValue.copy(
+                    labelIds = listOf(
+                        predefinedCollection.id,
+                        secondCustomLabel.id
+                    )
+                )
+            }
+        )
+
+        assertEquals(
+            1,
+            evaluationDataRepository.updateEvaluationData(updated, "researcher-1")
+        )
+
+        val loadedAfterUpdate = evaluationDataRepository
+            .getEvaluationDataById(evaluationDataId)!!
+
+        assertEquals(
+            setOf("COLLECTION", "Second saved custom label"),
+            loadedAfterUpdate.expectedValues.single().labels.map { it.name }.toSet()
+        )
+
+        val storedJson = jdbc.queryForObject(
+            "SELECT expected_values::text FROM evaluation_data WHERE id = ?",
+            String::class.java,
+            evaluationDataId
+        )!!
+
+        assertFalse(storedJson.contains("\"labels\""))
+        assertFalse(storedJson.contains("\"labelIds\""))
+    }
+    @Test
+    fun `importing a legacy test case creates predefined label assignments`() {
+        val datasetId = jdbc.queryForObject(
+            """
+            INSERT INTO dataset (name, description, owner_user_id)
+            VALUES (?, ?, ?)
+            RETURNING id
+            """.trimIndent(),
+            Long::class.java,
+            "Imported legacy label dataset",
+            "Used only by EvaluationDataLabelRepositoryTest",
+            "researcher-1"
+        )!!
+
+        val evaluationDataId = evaluationDataRepository.insertImportedEvaluationData(
+            EvaluationDataWithOptionalId(
+                name = "Imported legacy label test case",
+                bpmnXml = "<definitions />",
+                datasetId = datasetId,
+                expectedValues = listOf(
+                    ExpectedValue(
+                        value = "Activity_A",
+                        explanation = "Imported from an older CSV file",
+                        classification = listOf(GdprProcessingClass.COLLECTION)
+                    )
+                )
+            ),
+            createdAt = null,
+            updatedAt = null
+        )
+
+        val loaded = evaluationDataRepository
+            .getEvaluationDataById(evaluationDataId)!!
+
+        val expectedValue = loaded.expectedValues.single()
+
+        assertEquals(
+            listOf(GdprProcessingClass.COLLECTION),
+            expectedValue.classification
+        )
+        assertEquals(
+            listOf("COLLECTION"),
+            expectedValue.labels.map { it.name }
+        )
     }
 }

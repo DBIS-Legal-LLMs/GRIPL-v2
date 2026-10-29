@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonAlias
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import tools.jackson.module.kotlin.readValue
 import de.mertendieckmann.griplbackend.model.analysis.GdprProcessingClass
+import com.fasterxml.jackson.annotation.JsonProperty
 
 data class EvaluationData(
     val id: Long,
@@ -49,8 +50,21 @@ data class ExpectedValue(
     val explanation: String? = null,
     val classification: List<GdprProcessingClass> = emptyList(), //keep classification for LLM-analysis and evaluation
     
-    /** Global labels assigned to this BPMN element. Archived labels remain visible here. */
-    val labels: List<LabelAssignment> = emptyList()
+    /**
+     * Global labels assigned to this BPMN element.
+     * Archived labels remain visible here.
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    val labels: List<LabelAssignment> = emptyList(),
+
+    /**
+     * Label IDs explicitly supplied when saving an element.
+     *
+     * null means that the caller does not manage relational label assignments;
+     * an empty list explicitly removes all assignments for this element.
+     */
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    val labelIds: List<Long>? = null
 )
 
 data class EvaluationDataMeta(
