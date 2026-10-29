@@ -52,6 +52,60 @@ class LabelRepository(
         return jdbc.query(sql, mapper)
     }
 
+    /**
+    * Returns label definitions assigned to test cases of the selected datasets.
+    *
+    * Deleted labels are included so historical test cases remain transferable.
+    */
+    fun getExportRowsForDatasetIds(
+        datasetIds: List<Long>,
+        ownerUserId: String
+    ): List<List<String?>> {
+        if (datasetIds.isEmpty()) {
+            return emptyList()
+        }
+
+        val sql = """
+            SELECT DISTINCT
+                labels.id::text,
+                labels.name,
+                labels.description,
+                labels.predefined::text
+            FROM labels
+            JOIN evaluation_data_label
+                ON evaluation_data_label.label_id = labels.id
+            JOIN evaluation_data
+                ON evaluation_data.id = evaluation_data_label.evaluation_data_id
+            JOIN dataset
+                ON dataset.id = evaluation_data.dataset_id
+            WHERE evaluation_data.dataset_id IN (${datasetIds.joinToString(",")})
+            AND dataset.owner_user_id = ?
+            ORDER BY 1
+        """.trimIndent()
+
+        val rowMapper = RowMapper { rs, _ ->
+            (1..4).map { rs.getString(it) }
+        }
+
+        return jdbc.query(sql, rowMapper, ownerUserId)
+    }
+
+    /**
+    * Finds a label by name and prefers an active label when archived and active
+    * labels with the same name exist.
+    */
+    fun findByNameIncludingArchived(name: String): Label? {
+        val sql = """
+            SELECT *
+            FROM labels
+            WHERE lower(trim(name)) = lower(trim(?))
+            ORDER BY (deleted_at IS NULL) DESC, id
+            LIMIT 1
+        """.trimIndent()
+
+        return jdbc.query(sql, mapper, name).firstOrNull()
+    }
+
     /** Includes deleted labels so existing assignments remain readable. */
     fun findById(id: Long): Label? {
         val sql = """

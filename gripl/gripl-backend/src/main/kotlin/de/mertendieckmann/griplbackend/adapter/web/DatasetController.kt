@@ -107,7 +107,7 @@ class DatasetController(
     @Operation(
         summary = "Export all Datasets",
         description = "Exports all datasets owned by the authenticated user incl. test cases and labels as ZIP with " +
-            "dataset.csv and evaluation_data.csv in the format of the original Postgres CSV export."
+            "dataset.csv, evaluation_data.csv, labels.csv, and evaluation_data_label.csv."
     )
     @GetMapping("/export", produces = ["application/zip"])
     fun exportAllDatasets(exchange: ServerWebExchange): Mono<ResponseEntity<ByteArray>> {
@@ -121,7 +121,8 @@ class DatasetController(
     @Operation(
         summary = "Export a single Dataset",
         description = "Exports one dataset owned by the authenticated user incl. test cases and labels as ZIP with " +
-            "dataset.csv and evaluation_data.csv. Returns 404 if the dataset does not exist or is not owned by the caller."
+            "dataset.csv, evaluation_data.csv, labels.csv, and evaluation_data_label.csv. " +
+            "Returns 404 if the dataset does not exist or is not owned by the caller."
     )
     @GetMapping("/{datasetId}/export", produces = ["application/zip"])
     fun exportDataset(
@@ -143,9 +144,11 @@ class DatasetController(
 
     @Operation(
         summary = "Import Datasets",
-        description = "Imports datasets incl. test cases and labels as new datasets owned by the authenticated user, " +
-            "either as ZIP (part file) or as the two CSV files (parts datasetCsv and evaluationDataCsv). Files from " +
-            "the version before multiclass labels are supported; their labels are imported without classes."
+        description = "Imports datasets as new datasets owned by the authenticated user. " +
+        "ZIP imports may include labels.csv and evaluation_data_label.csv to restore " +
+        "custom label assignments. Direct CSV imports use datasetCsv and " +
+        "evaluationDataCsv. Files from before multiclass labels are supported; " +
+        "their labels are imported without classes."
     )
     @PostMapping("/import", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
     fun importDatasets(

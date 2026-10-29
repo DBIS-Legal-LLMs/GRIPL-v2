@@ -259,12 +259,92 @@ class EvaluationDataLabelRepository(
         ) ?: false
     }
 
+    /**
+    * Adds label assignments restored from a dataset export.
+    *
+    * Imported assignments may reference archived labels because they describe
+    * historical data rather than newly selected labels.
+    */
+    fun addImportedAssignments(
+        evaluationDataId: Long,
+        labelIdsByElement: Map<String, List<Long>>
+    ) {
+        labelIdsByElement.forEach { (elementId, labelIds) ->
+            labelIds.distinct().forEach { labelId ->
+                val insertedRows = jdbc.update(
+                    """
+                    INSERT INTO evaluation_data_label (
+                        evaluation_data_id,
+                        element_id,
+                        label_id
+                    )
+                    SELECT ?, ?, id
+                    FROM labels
+                    WHERE id = ?
+                    ON CONFLICT DO NOTHING
+                    """.trimIndent(),
+                    evaluationDataId,
+                    elementId,
+                    labelId
+                )
+
+                if (insertedRows == 0 &&
+                    !assignmentAlreadyExists(
+                        evaluationDataId,
+                        elementId,
+                        labelId
+                    )
+                ) {
+                    throw IllegalArgumentException(
+                        "Imported label $labelId does not exist."
+                    )
+                }
+            }
+        }
+    }
+
     /** Holds one row while the query result is grouped by test case and BPMN element. */
     private data class AssignmentRow(
         val evaluationDataId: Long,
         val elementId: String,
         val label: LabelAssignment
     )
+
+    /**
+    * Returns label assignments for test cases of the selected datasets.
+    */
+    fun getExportRowsForDatasetIds(
+        datasetIds: List<Long>,
+        ownerUserId: String
+    ): List<List<String?>> {
+        if (datasetIds.isEmpty()) {
+            return emptyList()
+        }
+
+        val sql = """
+            SELECT
+                evaluation_data_label.evaluation_data_id::text,
+                evaluation_data_label.element_id,
+                evaluation_data_label.label_id::text
+            FROM evaluation_data_label
+            JOIN evaluation_data
+                ON evaluation_data.id = evaluation_data_label.evaluation_data_id
+            JOIN dataset
+                ON dataset.id = evaluation_data.dataset_id
+            WHERE evaluation_data.dataset_id IN (${datasetIds.joinToString(",")})
+            AND dataset.owner_user_id = ?
+            ORDER BY
+                evaluation_data_label.evaluation_data_id,
+                evaluation_data_label.element_id,
+                evaluation_data_label.label_id
+        """.trimIndent()
+
+        val rowMapper = RowMapper { rs, _ ->
+            (1..3).map { rs.getString(it) }
+        }
+
+        return jdbc.query(sql, rowMapper, ownerUserId)
+    }
 
     /** Converts one joined database row into an internal assignment row. */
     private val mapper = RowMapper<AssignmentRow> { rs, _ ->
