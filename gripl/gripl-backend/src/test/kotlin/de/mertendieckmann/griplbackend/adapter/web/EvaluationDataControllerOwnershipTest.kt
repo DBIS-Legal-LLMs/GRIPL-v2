@@ -22,6 +22,8 @@ import org.springframework.http.codec.multipart.FilePart
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest
 import org.springframework.mock.web.server.MockServerWebExchange
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.core.io.buffer.DefaultDataBufferFactory
+import reactor.core.publisher.Flux
 
 /**
  * GRIPL-v2#33 — a test case is reachable only through a dataset the caller
@@ -48,6 +50,13 @@ class EvaluationDataControllerOwnershipTest {
 
     private fun evalData(id: Long, datasetId: Long?) =
         EvaluationData(id = id, name = "tc", bpmnXml = "<x/>", expectedValues = emptyList(), datasetId = datasetId)
+
+    private fun bpmnFile(xml: String): FilePart =
+        mock<FilePart>().also { filePart ->
+            whenever(filePart.content()).thenReturn(
+                Flux.just(DefaultDataBufferFactory().wrap(xml.toByteArray()))
+            )
+        }
 
     @Test
     fun `get by id is 404 when the caller does not own the parent dataset`() {
@@ -106,6 +115,24 @@ class EvaluationDataControllerOwnershipTest {
             )
         }
         assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+        verify(evalRepo, never()).insertEvaluationData(any())
+    }
+
+    @Test
+    fun `invalid BPMN file is rejected before a test case is stored`() {
+        whenever(datasetRepo.isDatasetOwnedBy(3, "user-1")).thenReturn(true)
+
+        val exception = assertThrows(ResponseStatusException::class.java) {
+            controller.insertBpmnDataset(
+                name = "invalid model",
+                bpmnFile = bpmnFile("<not-bpmn />"),
+                expectedValues = emptyList(),
+                datasetId = "3",
+                exchange = exchangeAs("user-1"),
+            ).block()
+        }
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
         verify(evalRepo, never()).insertEvaluationData(any())
     }
 
