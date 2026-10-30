@@ -7,6 +7,7 @@ import {ChevronDown, ChevronUp} from "lucide-react";
 import {EvaluationDataMeta} from "@/models/dto/EvaluationData";
 import TestCaseCard from "@/components/labeling/test-case-card";
 import CreateTestCaseButton from "@/components/labeling/create-test-case-button";
+import BulkBpmnUploadButton from "@/components/labeling/bulk-bpmn-upload-button";
 import DeleteDatasetButton from "@/components/labeling/delete-dataset-button";
 import EditDatasetButton from "@/components/labeling/edit-dataset-button";
 import ExportDatasetsButton from "@/components/labeling/export-datasets-button";
@@ -42,6 +43,7 @@ export default function DatasetListItem({ dataset, evaluationMetadata, className
                 </Card>
             </CollapsibleTrigger>
             <CreateTestCaseButton dataset={dataset} />
+            <BulkBpmnUploadButton dataset={dataset} />
             <EditDatasetButton dataset={dataset} />
             <ExportDatasetsButton dataset={dataset} />
             <DeleteDatasetButton dataset={dataset} testCaseCount={evaluationMetadata.length} />
