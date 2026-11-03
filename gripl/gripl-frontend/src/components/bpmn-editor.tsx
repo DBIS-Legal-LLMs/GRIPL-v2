@@ -1,7 +1,7 @@
 "use client"
 
 import React, {useEffect, useRef, useState} from "react"
-import {Download, PlusCircle, RotateCcw, RotateCw, ZoomIn, ZoomOut} from "lucide-react"
+import {Download, LockKeyhole, PlusCircle, RotateCcw, RotateCw, ZoomIn, ZoomOut} from "lucide-react"
 import {downloadBpmnXml} from "@/lib/download-bpmn"
 import ExportFileNameDialog from "@/components/export-file-name-dialog"
 import {Button} from "@/components/ui/button";
@@ -432,20 +432,23 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
             }, {} as Record<string, BpmnToolCard[]>)
           ).map(([position, positionCards]) => (
             <div
-                key={`bpmn-editor-position-${position}`}
-                className={`absolute z-50 gap-4
-                  ${position === "bottom-left" ? "left-4 bottom-4 flex-flex-col items-start" : ""}
-                  ${position === "bottom-right" ? "right-4 bottom-14 flex flex-col items-end" : ""}
-                  ${position === "top-right" ? "right-4 top-4 flex flex-col items-end" : ""}
-                  ${position === "right-center" ? "right-4 top-1/2 transform -translate-y-1/2 flex flex-col" : ""}
-                  ${position === "bottom-center" ? "left-1/2 transform -translate-x-1/2 bottom-4 flex flex-row items-end" : ""}
-                  ${position === "top-center" ? "left-1/2 transform -translate-x-1/2 top-4 flex flex-row items-start" : ""}
-                `}
+              key={`bpmn-editor-position-${position}`}
+              className={`absolute z-50
+                ${position === "top-right" ? "right-4 top-4 flex max-h-[calc(100%_-_2rem)] flex-col items-end gap-0 overflow-y-auto overscroll-contain bg-background/30 backdrop-blur-md" : ""}
+                ${position === "bottom-left" ? "left-4 bottom-4 flex-flex-col items-start gap-4" : ""}
+                ${position === "bottom-right" ? "right-4 bottom-14 flex flex-col items-end gap-4" : ""}
+                ${position === "right-center" ? "right-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-4" : ""}
+                ${position === "bottom-center" ? "left-1/2 transform -translate-x-1/2 bottom-4 flex flex-row items-end gap-4" : ""}
+                ${position === "top-center" ? "left-1/2 transform -translate-x-1/2 top-4 flex flex-row items-start gap-4" : ""}
+              `}
             >
               {positionCards.map((card, index) => (
-                  <div key={`card-${position}-${index}`}>
-                    {card.content}
-                  </div>
+                <div
+                  key={`card-${position}-${index}`}
+                  className={position === "top-right" ? "mb-4 last:mb-0" : undefined}
+                >
+                  {card.content}
+                </div>
               ))}
             </div>
           ))}
@@ -462,4 +465,3 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
       </div>
   )
 }
-

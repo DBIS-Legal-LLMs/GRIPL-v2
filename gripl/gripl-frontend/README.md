@@ -24,3 +24,21 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Labeling and labels
+
+The existing **Labeltools** area on the BPMN model labeling page contains the
+active predefined and custom label list. Researchers and admins can create
+labels (both name and description are required); a duplicate active name is
+reported as a conflict. Admins can edit labels and archive custom labels.
+Predefined label names stay fixed. Archiving removes a label from future
+choices but does not remove its existing test-case assignments.
+
+In the BPMN test-case editor, an activity can have multiple labels. The
+predefined GDPR label selection remains synchronized with the existing
+`classification` enum so current multiclass analysis/evaluation remains
+compatible. Test-case reads use `expectedValues[].labels`; saves send
+`expectedValues[].labelIds` (and the compatible `classification`) without
+writing the response-only `labels` property. Label management and assignment
+use the backend `/labels` API through the frontend `/api` proxy; backend role
+checks remain authoritative.
