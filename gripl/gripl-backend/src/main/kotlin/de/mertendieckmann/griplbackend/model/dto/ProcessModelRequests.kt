@@ -11,6 +11,11 @@ data class EnqueueAnalysisRequest(
     val activitiesOnly: Boolean? = null
 )
 
+data class CreateLabelingDatasetRequest(
+    /** null creates the dataset from all of the caller's process models */
+    val ids: List<Long>? = null
+)
+
 data class UpdateProcessModelNameRequest(
     val name: String?
 )

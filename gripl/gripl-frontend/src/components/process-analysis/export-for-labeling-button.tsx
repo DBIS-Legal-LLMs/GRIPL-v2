@@ -2,8 +2,14 @@
 
 import {useState} from "react"
 import {Button} from "@/components/ui/button"
-import {Tags} from "lucide-react"
+import {ChevronDown, DatabaseZap, Download, Tags} from "lucide-react"
 import {Spinner} from "@/components/ui/spinner"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {useToast} from "@/components/ui/toast"
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error"
 import {authenticatedFetch} from "@/lib/authenticated-fetch"
@@ -13,15 +19,22 @@ interface ExportForLabelingButtonProps {
     selectedIds: number[]
 }
 
+interface ImportedDataset {
+    id: number
+    name: string
+    testCaseCount: number
+}
+
 /**
- * Downloads the process models as one dataset ZIP in the labeling import format,
- * with the LLM analysis results as pre-filled labels.
+ * Turns the process models into one labeling dataset with the LLM analysis results as
+ * pre-filled labels — either downloaded as ZIP in the labeling import format, or created
+ * directly in the labeling tool.
  */
 export default function ExportForLabelingButton({selectedIds}: ExportForLabelingButtonProps) {
     const [isLoading, setIsLoading] = useState(false)
-    const {showError} = useToast()
+    const {showError, showToast} = useToast()
 
-    async function handleExport() {
+    async function handleDownload() {
         setIsLoading(true)
         try {
             const query = selectedIds.length > 0 ? `?ids=${selectedIds.join(",")}` : ""
@@ -47,13 +60,55 @@ export default function ExportForLabelingButton({selectedIds}: ExportForLabeling
         }
     }
 
-    return <Button
-        variant="outline"
-        onClick={handleExport}
-        disabled={isLoading}
-        title="Export as a dataset for the labeling tool, with the LLM results as pre-filled labels"
-    >
-        {isLoading ? <Spinner size="small" className="mr-2 h-4 w-4"/> : <Tags className="mr-2 h-4 w-4"/>}
-        {selectedIds.length > 0 ? `Export for Labeling (${selectedIds.length})` : "Export All for Labeling"}
-    </Button>
+    async function handleCreateDataset() {
+        setIsLoading(true)
+        try {
+            const response = await authenticatedFetch("/api/process-models/labeling-dataset", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
+                body: JSON.stringify({ids: selectedIds.length > 0 ? selectedIds : null}),
+            })
+            if (!response.ok) {
+                throw new Error(await extractErrorDetails(response))
+            }
+            const dataset = await response.json() as ImportedDataset
+            showToast({
+                title: "Labeling dataset created",
+                description: `'${dataset.name}' with ${dataset.testCaseCount} test case(s) is now available in Labeling.`,
+                variant: "success",
+            })
+        } catch (error) {
+            console.error("There was an error creating the labeling dataset:", error)
+            showError("Failed to create the labeling dataset", toErrorMessage(error))
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    return <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+            <Button
+                variant="outline"
+                disabled={isLoading}
+                title="Use the LLM results as pre-filled labels in the labeling tool"
+            >
+                {isLoading ? <Spinner size="small" className="mr-2 h-4 w-4"/> : <Tags className="mr-2 h-4 w-4"/>}
+                {selectedIds.length > 0 ? `Export for Labeling (${selectedIds.length})` : "Export All for Labeling"}
+                <ChevronDown className="ml-2 h-4 w-4"/>
+            </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuItem onClick={handleCreateDataset}>
+                <DatabaseZap className="mr-2 h-4 w-4"/>
+                Create labeling dataset
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownload}>
+                <Download className="mr-2 h-4 w-4"/>
+                Download as ZIP
+            </DropdownMenuItem>
+        </DropdownMenuContent>
+    </DropdownMenu>
 }

@@ -22,6 +22,7 @@ import {useToast} from "@/components/ui/toast";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
 import {authenticatedFetch} from "@/lib/authenticated-fetch";
+import UnsavedChangesGuard from "@/components/unsaved-changes-guard";
 
 interface LabelingEditorProps {
     className?: string;
@@ -326,6 +327,7 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                     </button>
                 )}
             </aside>
+            <UnsavedChangesGuard when={hasUnsavedChanges}/>
         </div>
     );
 }

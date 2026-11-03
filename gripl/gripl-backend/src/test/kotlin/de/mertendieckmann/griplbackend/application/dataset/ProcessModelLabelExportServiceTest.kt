@@ -8,7 +8,11 @@ import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import tools.jackson.module.kotlin.readValue
@@ -19,7 +23,8 @@ import java.util.zip.ZipInputStream
 class ProcessModelLabelExportServiceTest {
 
     private val repository = mock<ProcessModelRepository>()
-    private val service = ProcessModelLabelExportService(repository)
+    private val datasetTransferService = mock<DatasetTransferService>()
+    private val service = ProcessModelLabelExportService(repository, datasetTransferService)
     private val objectMapper = jacksonObjectMapper()
 
     private val bpmnXml = """
@@ -109,6 +114,25 @@ class ProcessModelLabelExportServiceTest {
 
         assertEquals(listOf("a", "b"), testCases.map { it["name"] })
         assertEquals(listOf(emptyList<ExpectedValue>(), emptyList()), testCases.map(::labelsOf))
+    }
+
+    @Test
+    fun `creating a dataset imports exactly what the ZIP contains`() {
+        val result = """{"classifiedElements": [{"id": "Task_collect", "reason": "r", "classification": ["USAGE"]}]}"""
+        whenever(repository.filterOwnedIds(listOf(1L), "user-1")).thenReturn(listOf(1L))
+        whenever(repository.getByIdAndOwner(1, "user-1")).thenReturn(model(1, "Onboarding", result))
+        val imported = ImportedDataset("1", 42, "LLM pre-labels – Process Analysis 2026-11-03", 1)
+        whenever(datasetTransferService.importCsv(any(), any(), eq("user-1"))).thenReturn(listOf(imported))
+        val date = LocalDate.of(2026, 11, 3)
+
+        assertEquals(imported, service.createDataset("user-1", listOf(1L), date))
+
+        val datasetCsv = argumentCaptor<String>()
+        val evaluationDataCsv = argumentCaptor<String>()
+        verify(datasetTransferService).importCsv(datasetCsv.capture(), evaluationDataCsv.capture(), eq("user-1"))
+        val zip = readZip(service.exportAsZip("user-1", listOf(1L), date))
+        assertEquals(zip[DatasetTransferService.DATASET_FILE], PostgresCsv.read(datasetCsv.firstValue))
+        assertEquals(zip[DatasetTransferService.EVALUATION_DATA_FILE], PostgresCsv.read(evaluationDataCsv.firstValue))
     }
 
     @Test

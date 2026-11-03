@@ -20,7 +20,8 @@ import java.time.LocalDate
  */
 @Service
 class ProcessModelLabelExportService(
-    private val repository: ProcessModelRepository
+    private val repository: ProcessModelRepository,
+    private val datasetTransferService: DatasetTransferService
 ) {
     private val log = KotlinLogging.logger { }
     private val objectMapper = jacksonObjectMapper()
@@ -38,6 +39,30 @@ class ProcessModelLabelExportService(
      * @param ids null exports all of the user's process models
      */
     fun exportAsZip(ownerUserId: String, ids: List<Long>?, date: LocalDate = LocalDate.now()): ByteArray {
+        val (datasetRows, testCaseRows) = buildRows(ownerUserId, ids, date)
+        return DatasetTransferService.writeZip(datasetRows, testCaseRows)
+    }
+
+    /**
+     * Same content as [exportAsZip], but created directly as a labeling dataset owned by [ownerUserId].
+     * Goes through the regular import on purpose, so the result is identical to downloading the ZIP
+     * and importing it (incl. the "(imported)" suffix on name clashes).
+     */
+    fun createDataset(ownerUserId: String, ids: List<Long>?, date: LocalDate = LocalDate.now()): ImportedDataset {
+        val (datasetRows, testCaseRows) = buildRows(ownerUserId, ids, date)
+        return datasetTransferService.importCsv(
+            PostgresCsv.write(DatasetTransferService.DATASET_COLUMNS, datasetRows),
+            PostgresCsv.write(DatasetTransferService.EVALUATION_DATA_COLUMNS, testCaseRows),
+            ownerUserId
+        ).single()
+    }
+
+    /** Rows in the [DatasetTransferService.DATASET_COLUMNS] / [DatasetTransferService.EVALUATION_DATA_COLUMNS] layout. */
+    private fun buildRows(
+        ownerUserId: String,
+        ids: List<Long>?,
+        date: LocalDate
+    ): Pair<List<List<String?>>, List<List<String?>>> {
         val ownedIds = if (ids == null) {
             repository.listByOwner(ownerUserId).map { it.id }
         } else {
@@ -65,7 +90,7 @@ class ProcessModelLabelExportService(
                 DATASET_ID
             )
         }
-        return DatasetTransferService.writeZip(listOf(datasetRow), testCaseRows)
+        return listOf(datasetRow) to testCaseRows
     }
 
     /**

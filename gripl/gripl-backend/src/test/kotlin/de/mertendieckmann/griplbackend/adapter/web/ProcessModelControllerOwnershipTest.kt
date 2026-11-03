@@ -2,7 +2,9 @@ package de.mertendieckmann.griplbackend.adapter.web
 
 import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.application.ProcessModelJobRunner
+import de.mertendieckmann.griplbackend.application.dataset.DatasetTransferService
 import de.mertendieckmann.griplbackend.application.dataset.ProcessModelLabelExportService
+import de.mertendieckmann.griplbackend.model.dto.CreateLabelingDatasetRequest
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.model.dto.ProcessModel
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelListItemDto
@@ -40,7 +42,7 @@ class ProcessModelControllerOwnershipTest {
     private val jobRunner = mock<ProcessModelJobRunner>()
     private val authServiceClient = mock<AuthServiceClient>()
     private val customEndpoints = mock<CustomAnalysisEndpointRepository>()
-    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient, customEndpoints, ProcessModelLabelExportService(repository))
+    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient, customEndpoints, ProcessModelLabelExportService(repository, mock<DatasetTransferService>()))
 
     private fun exchangeAs(userId: String?) =
         MockServerWebExchange.from(
@@ -57,6 +59,18 @@ class ProcessModelControllerOwnershipTest {
         val researcher = exchangeAs("user-1").apply { attributes[AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE] = "researcher" }
         val response = controller.exportForLabeling(null, researcher).block()
         assertEquals(HttpStatus.OK, response?.statusCode)
+    }
+
+    @Test
+    fun `creating a labeling dataset needs a labeling role like the dataset import`() {
+        val endUser = exchangeAs("user-1").apply { attributes[AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE] = "end-user" }
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.createLabelingDataset(CreateLabelingDatasetRequest(), endUser)
+        }
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.statusCode)
+        verify(repository, never()).listByOwner(any())
     }
 
     @Test

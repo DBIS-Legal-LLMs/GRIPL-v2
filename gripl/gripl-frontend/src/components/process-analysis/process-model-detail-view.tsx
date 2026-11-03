@@ -6,6 +6,7 @@ import {useMemo, useState} from "react";
 import {BpmnToolCard} from "@/models/BpmnToolCard";
 import ProcessModelActions from "@/components/process-analysis/process-model-actions";
 import RenameProcessModelButton from "@/components/process-analysis/rename-process-model-button";
+import UnsavedChangesGuard from "@/components/unsaved-changes-guard";
 import {getAnalysisElements} from "@/models/dto/AnalysisDto";
 import AnalysisResultCard, {humanizeType} from "@/components/sandbox/analysis-result-card";
 import RagContextCard from "@/components/sandbox/rag-context-card";
@@ -275,6 +276,8 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
               onEvent={onEvent}
           />
         </div>
+
+        <UnsavedChangesGuard when={hasUnsavedChanges}/>
 
         {pdfViewer && (
             <PdfViewerModal

@@ -3,7 +3,9 @@ package de.mertendieckmann.griplbackend.adapter.web
 import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.adapter.web.utils.ControllerUtils
 import de.mertendieckmann.griplbackend.application.ProcessModelJobRunner
+import de.mertendieckmann.griplbackend.application.dataset.ImportedDataset
 import de.mertendieckmann.griplbackend.application.dataset.ProcessModelLabelExportService
+import de.mertendieckmann.griplbackend.model.dto.CreateLabelingDatasetRequest
 import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisResponse
@@ -97,6 +99,23 @@ class ProcessModelController(
                 .contentType(MediaType.parseMediaType("application/zip"))
                 .body(labelExportService.exportAsZip(userId, ids))
         }.subscribeOn(Schedulers.boundedElastic())
+    }
+
+    @Operation(
+        summary = "Create a labeling dataset from process models",
+        description = "Same content as **/export-labels**, but created directly as a new labeling dataset owned by the " +
+            "caller instead of being downloaded as ZIP."
+    )
+    @PostMapping("/labeling-dataset", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun createLabelingDataset(
+        @RequestBody request: CreateLabelingDatasetRequest,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<ImportedDataset>> {
+        val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
+        return Mono.fromCallable { labelExportService.createDataset(userId, request.ids) }
+            .subscribeOn(Schedulers.boundedElastic())
+            .map { ResponseEntity.status(HttpStatus.CREATED).body(it) }
     }
 
     @Operation(
