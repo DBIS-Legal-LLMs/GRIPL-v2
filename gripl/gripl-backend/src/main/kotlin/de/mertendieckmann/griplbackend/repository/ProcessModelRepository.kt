@@ -82,6 +82,11 @@ class ProcessModelRepository(
         return ids.filter { it in owned }
     }
 
+    fun updateName(id: Long, ownerUserId: String, name: String): Boolean {
+        val sql = "UPDATE process_model SET name = ?, updated_at = now() WHERE id = ? AND owner_user_id = ?"
+        return jdbc.update(sql, name, id, ownerUserId) > 0
+    }
+
     /** Also flags an existing analysis result as outdated if the XML actually changed. */
     fun updateBpmnXmlIfNotRunning(id: Long, ownerUserId: String, bpmnXml: String): Boolean {
         // Right-hand sides of an UPDATE see the row's old values, so `bpmn_xml`

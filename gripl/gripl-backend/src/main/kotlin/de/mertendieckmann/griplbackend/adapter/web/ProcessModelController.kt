@@ -10,6 +10,7 @@ import de.mertendieckmann.griplbackend.model.dto.ProcessModel
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelDetailDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelListItemDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
+import de.mertendieckmann.griplbackend.model.dto.UpdateProcessModelNameRequest
 import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
 import de.mertendieckmann.griplbackend.security.authenticatedUserId
@@ -113,6 +114,33 @@ class ProcessModelController(
     }
 
     @Operation(
+        summary = "Rename a process model",
+        description = "Changes the display name of a process model. Allowed at any time, also during an analysis."
+    )
+    @PatchMapping("/{id}/name", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun renameProcessModel(
+        @PathVariable id: Long,
+        @RequestBody request: UpdateProcessModelNameRequest,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<ProcessModelListItemDto>> {
+        val userId = exchange.authenticatedUserId()
+        val name = request.name?.trim()
+        if (name.isNullOrEmpty()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Name must not be empty")
+        }
+        if (name.length > MAX_NAME_LENGTH) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Name must be at most $MAX_NAME_LENGTH characters long")
+        }
+
+        return Mono.fromCallable {
+            if (!repository.updateName(id, userId, name)) {
+                throw ResponseStatusException(HttpStatus.NOT_FOUND, "No process model found for id $id")
+            }
+            repository.getByIdAndOwner(id, userId)!!.toListItemDto()
+        }.subscribeOn(Schedulers.boundedElastic()).map { ResponseEntity.ok(it) }
+    }
+
+    @Operation(
         summary = "Delete a process model",
         description = "Deletes a process model, unless it is currently being analyzed."
     )
@@ -172,6 +200,11 @@ class ProcessModelController(
                 }.subscribeOn(Schedulers.boundedElastic())
                     .map { ResponseEntity.status(HttpStatus.ACCEPTED).body(it) }
             }
+    }
+
+    private companion object {
+        /** Matches `process_model.name varchar(255)`. */
+        const val MAX_NAME_LENGTH = 255
     }
 
     private fun ProcessModel.toListItemDto(): ProcessModelListItemDto {

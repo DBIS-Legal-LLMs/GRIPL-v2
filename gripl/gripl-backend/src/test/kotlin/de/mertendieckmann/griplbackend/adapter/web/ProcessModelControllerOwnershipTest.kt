@@ -6,6 +6,7 @@ import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.model.dto.ProcessModel
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelListItemDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
+import de.mertendieckmann.griplbackend.model.dto.UpdateProcessModelNameRequest
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
 import de.mertendieckmann.griplbackend.security.AUTHENTICATED_USER_ID_ATTRIBUTE
 import kotlinx.coroutines.runBlocking
@@ -123,6 +124,38 @@ class ProcessModelControllerOwnershipTest {
         assertEquals("<new/>", response?.body?.bpmnXml)
         assertEquals(true, response?.body?.analysisOutdated)
         verify(repository).updateBpmnXmlIfNotRunning(5, "user-1", "<new/>")
+    }
+
+    @Test
+    fun `renaming a model owned by someone else is a 404`() {
+        whenever(repository.updateName(5, "attacker", "new")).thenReturn(false)
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.renameProcessModel(5, UpdateProcessModelNameRequest("new"), exchangeAs("attacker")).block()
+        }
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+    }
+
+    @Test
+    fun `renaming to a blank name is a 400 and renames nothing`() {
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.renameProcessModel(5, UpdateProcessModelNameRequest("   "), exchangeAs("user-1")).block()
+        }
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        verify(repository, never()).updateName(any(), any(), any())
+    }
+
+    @Test
+    fun `renaming the caller's own model stores the trimmed name`() {
+        whenever(repository.updateName(5, "user-1", "new name")).thenReturn(true)
+        whenever(repository.getByIdAndOwner(5, "user-1")).thenReturn(model(ProcessModelStatus.DONE).copy(name = "new name"))
+
+        val response = controller.renameProcessModel(5, UpdateProcessModelNameRequest("  new name "), exchangeAs("user-1")).block()
+
+        assertEquals("new name", response?.body?.name)
+        verify(repository).updateName(5, "user-1", "new name")
     }
 
     @Test

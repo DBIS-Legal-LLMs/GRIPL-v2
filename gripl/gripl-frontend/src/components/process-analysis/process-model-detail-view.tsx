@@ -5,6 +5,7 @@ import BpmnEditor from "@/components/bpmn-editor";
 import {useMemo, useState} from "react";
 import {BpmnToolCard} from "@/models/BpmnToolCard";
 import ProcessModelActions from "@/components/process-analysis/process-model-actions";
+import RenameProcessModelButton from "@/components/process-analysis/rename-process-model-button";
 import {getAnalysisElements} from "@/models/dto/AnalysisDto";
 import AnalysisResultCard, {humanizeType} from "@/components/sandbox/analysis-result-card";
 import RagContextCard from "@/components/sandbox/rag-context-card";
@@ -258,6 +259,12 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
       <main className="flex flex-col justify-center items-center h-full w-full">
         <div className="w-full h-full">
           <BpmnEditor
+              title={model.name}
+              titleAddon={<RenameProcessModelButton
+                  id={model.id}
+                  name={model.name}
+                  onRenamed={name => setModel(current => ({...current, name}))}
+              />}
               bpmnXml={diagram}
               highlightedActivityIds={highlightedActivityIds}
               highlightedActivityCategories={highlightedActivityCategories}

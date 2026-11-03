@@ -47,3 +47,11 @@ export interface EnqueueAnalysisResponse {
 }
 
 export const IN_FLIGHT_STATUSES: ProcessModelStatus[] = ["QUEUED", "RUNNING"];
+
+/** Window event fired after a process model was renamed, e.g. so the breadcrumbs can follow. */
+export const PROCESS_MODEL_RENAMED_EVENT = "gripl:process-model-renamed";
+
+export interface ProcessModelRenamedDetail {
+    id: number;
+    name: string;
+}

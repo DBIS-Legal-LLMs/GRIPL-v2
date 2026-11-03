@@ -8,7 +8,11 @@ import React, {useEffect, useState} from "react";
 import {Crumb} from "@/models/Crumb";
 import {EvaluationData} from "@/models/dto/EvaluationData";
 import {authenticatedFetch} from "@/lib/authenticated-fetch";
-import {ProcessModelDetail} from "@/models/dto/ProcessModel";
+import {
+    PROCESS_MODEL_RENAMED_EVENT,
+    ProcessModelDetail,
+    ProcessModelRenamedDetail
+} from "@/models/dto/ProcessModel";
 
 const nameMap = {
     "process-analysis": "Process Analysis",
@@ -78,6 +82,22 @@ export default function AppBreadCrumbs() {
         }
 
         setCrumbs(newCrumbs)
+    }, [pathname])
+
+    // A rename in the process model detail view doesn't change the pathname,
+    // so the effect above wouldn't refetch — update the crumb label directly.
+    useEffect(() => {
+        const handleRenamed = (event: Event) => {
+            const {id, name} = (event as CustomEvent<ProcessModelRenamedDetail>).detail
+            const newCrumbs = generateBreadcrumbs(pathname, nameMap)
+            if (newCrumbs[0].label !== nameMap["process-analysis"] || newCrumbs.length !== 2) return
+            if (newCrumbs[1].label !== String(id)) return
+            setCrumbs(newCrumbs.map((crumb, index) =>
+                index === 1 ? {...crumb, label: `${name} (${id})`} : crumb
+            ))
+        }
+        window.addEventListener(PROCESS_MODEL_RENAMED_EVENT, handleRenamed)
+        return () => window.removeEventListener(PROCESS_MODEL_RENAMED_EVENT, handleRenamed)
     }, [pathname])
 
     return <Breadcrumb>

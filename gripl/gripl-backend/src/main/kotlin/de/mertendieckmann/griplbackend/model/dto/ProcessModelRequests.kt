@@ -11,6 +11,10 @@ data class EnqueueAnalysisRequest(
     val activitiesOnly: Boolean? = null
 )
 
+data class UpdateProcessModelNameRequest(
+    val name: String?
+)
+
 data class EnqueueAnalysisResponse(
     val enqueuedIds: List<Long>,
     val skippedIds: List<Long>
