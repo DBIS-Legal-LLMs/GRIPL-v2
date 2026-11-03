@@ -27,7 +27,8 @@ class ProcessModelRepository(
             criticalElementCount = rs.getObject("critical_element_count") as Int?,
             errorMessage = rs.getString("error_message"),
             createdAt = rs.getString("created_at"),
-            updatedAt = rs.getString("updated_at")
+            updatedAt = rs.getString("updated_at"),
+            analysisOutdated = rs.getBoolean("analysis_outdated")
         )
     }
 
@@ -41,7 +42,8 @@ class ProcessModelRepository(
             criticalElementCount = rs.getObject("critical_element_count") as Int?,
             errorMessage = rs.getString("error_message"),
             createdAt = rs.getString("created_at"),
-            updatedAt = rs.getString("updated_at")
+            updatedAt = rs.getString("updated_at"),
+            analysisOutdated = rs.getBoolean("analysis_outdated")
         )
     }
 
@@ -57,7 +59,8 @@ class ProcessModelRepository(
 
     fun listByOwner(ownerUserId: String): List<ProcessModelListItemDto> {
         val sql = """
-            SELECT id, name, status, analysis_endpoint, total_elements, critical_element_count, error_message, created_at, updated_at
+            SELECT id, name, status, analysis_endpoint, total_elements, critical_element_count, error_message, created_at, updated_at,
+                   analysis_outdated
             FROM process_model
             WHERE owner_user_id = ?
             ORDER BY created_at DESC
@@ -77,6 +80,20 @@ class ProcessModelRepository(
         val sql = "SELECT id FROM process_model WHERE id IN ($inSql) AND owner_user_id = ?"
         val owned = jdbc.query(sql, { rs, _ -> rs.getLong("id") }, ownerUserId).toSet()
         return ids.filter { it in owned }
+    }
+
+    /** Also flags an existing analysis result as outdated if the XML actually changed. */
+    fun updateBpmnXmlIfNotRunning(id: Long, ownerUserId: String, bpmnXml: String): Boolean {
+        // Right-hand sides of an UPDATE see the row's old values, so `bpmn_xml`
+        // in the outdated check is still the previously stored diagram.
+        val sql = """
+            UPDATE process_model
+            SET bpmn_xml = ?,
+                analysis_outdated = analysis_outdated OR (analysis_result IS NOT NULL AND bpmn_xml IS DISTINCT FROM ?),
+                updated_at = now()
+            WHERE id = ? AND owner_user_id = ? AND status <> 'RUNNING'
+        """.trimIndent()
+        return jdbc.update(sql, bpmnXml, bpmnXml, id, ownerUserId) > 0
     }
 
     fun deleteIfNotRunning(id: Long, ownerUserId: String): Boolean {
@@ -110,15 +127,20 @@ class ProcessModelRepository(
         jdbc.update("UPDATE process_model SET status = 'RUNNING', updated_at = now() WHERE id = ?", id)
     }
 
-    fun markDone(id: Long, resultJson: String, criticalCount: Int, totalElements: Int, amountOfRetries: Int?) {
+    /**
+     * [analyzedBpmnXml] is the diagram the result was computed from; if the stored one
+     * was replaced in the meantime, the fresh result is already outdated.
+     */
+    fun markDone(id: Long, analyzedBpmnXml: String, resultJson: String, criticalCount: Int, totalElements: Int, amountOfRetries: Int?) {
         val sql = """
             UPDATE process_model
             SET status = 'DONE', analysis_result = ?::jsonb, critical_element_count = ?,
-                total_elements = ?, amount_of_retries = ?, error_message = NULL, updated_at = now()
+                total_elements = ?, amount_of_retries = ?, error_message = NULL,
+                analysis_outdated = bpmn_xml IS DISTINCT FROM ?, updated_at = now()
             WHERE id = ?
         """.trimIndent()
         val result = PGobject().apply { type = "jsonb"; value = resultJson }
-        jdbc.update(sql, result, criticalCount, totalElements, amountOfRetries, id)
+        jdbc.update(sql, result, criticalCount, totalElements, amountOfRetries, analyzedBpmnXml, id)
     }
 
     fun markError(id: Long, message: String) {

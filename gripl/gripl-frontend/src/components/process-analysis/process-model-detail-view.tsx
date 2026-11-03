@@ -12,9 +12,12 @@ import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
-import {Brain, BookOpen, Paperclip, FileText, ChevronDown, ChevronRight} from "lucide-react";
+import {AlertTriangle, Brain, BookOpen, Paperclip, FileText, ChevronDown, ChevronRight} from "lucide-react";
 import {useProcessModelPolling} from "@/hooks/use-process-model-polling";
 import {ProcessModelDetail} from "@/models/dto/ProcessModel";
+import {authenticatedFetch} from "@/lib/authenticated-fetch";
+import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
+import {useToast} from "@/components/ui/toast";
 
 const PdfViewerModal = dynamic(() => import("@/components/sandbox/pdf-viewer-modal"), { ssr: false });
 
@@ -30,6 +33,12 @@ interface ProcessModelDetailViewProps {
 export default function ProcessModelDetailView({initialModel}: ProcessModelDetailViewProps) {
   const {model, setModel} = useProcessModelPolling(initialModel)
   const [diagram, setDiagram] = useState<string>(initialModel.bpmnXml)
+  // Last XML persisted to the backend — compared against `diagram` rather than
+  // a boolean flag, so edits made while a save is in flight stay "unsaved".
+  const [savedDiagram, setSavedDiagram] = useState<string>(initialModel.bpmnXml)
+  const [isSaving, setIsSaving] = useState<boolean>(false)
+  const hasUnsavedChanges = diagram !== savedDiagram
+  const {showToast, showError} = useToast()
   const analysisResult = model.analysisResult ?? null
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const analysisElements = getAnalysisElements(analysisResult)
@@ -39,6 +48,35 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
   function onEvent(type: BpmnEditorEvent, event: any) {
     if (type === BpmnEditorEvent.SelectionChanged) {
       setSelectedElementId(event.newSelection?.length === 1 ? event.newSelection[0].id : null)
+    }
+  }
+
+  async function handleSave(): Promise<boolean> {
+    const xml = diagram
+    setIsSaving(true)
+    try {
+      const formData = new FormData()
+      formData.append("bpmnFile", new Blob([xml], {type: "application/xml"}), "diagram.bpmn")
+      const response = await authenticatedFetch(`/api/process-models/${model.id}`, {
+        method: "PUT",
+        headers: {
+          Accept: "application/json",
+        },
+        body: formData,
+      })
+      if (!response.ok) {
+        throw new Error(await extractErrorDetails(response))
+      }
+      setModel(await response.json() as ProcessModelDetail)
+      setSavedDiagram(xml)
+      showToast({title: "Model saved successfully", variant: "success"})
+      return true
+    } catch (error) {
+      console.error("Error while saving process model:", error)
+      showError("Failed to save the model", toErrorMessage(error))
+      return false
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -71,7 +109,22 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
       [analysisResult]
   );
 
-  const bottomPanel = analysisResult ? (
+  // Unsaved edits count too: the result no longer matches the diagram on screen.
+  const isAnalysisOutdated = Boolean(analysisResult) && (Boolean(model.analysisOutdated) || hasUnsavedChanges)
+
+  const outdatedWarning = isAnalysisOutdated ? (
+      <div className="rounded-md bg-background">
+          <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-4 w-4 shrink-0"/>
+              <span>
+                  Outdated analysis: the process model has changed since these results were generated.
+                  Click &quot;Analyze for GDPR&quot; to update them.
+              </span>
+          </div>
+      </div>
+  ) : null;
+
+  const resultPanel = analysisResult ? (
       hasRagContext && "ragContext" in analysisResult ? (
           <Collapsible open={isPanelOpen} onOpenChange={setIsPanelOpen}>
           <Card className="container">
@@ -177,10 +230,23 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
       )
   ) : null;
 
+  const bottomPanel = resultPanel ? (
+      <div className="flex flex-col gap-2">
+          {outdatedWarning}
+          {resultPanel}
+      </div>
+  ) : null;
+
   const editorToolCards: BpmnToolCard[] = [
     {
       position: "top-right",
-      content: <ProcessModelActions model={model} onAnalysisStarted={handleAnalysisStarted}/>
+      content: <ProcessModelActions
+          model={model}
+          hasUnsavedChanges={hasUnsavedChanges}
+          isSaving={isSaving}
+          onSave={handleSave}
+          onAnalysisStarted={handleAnalysisStarted}
+      />
     } as BpmnToolCard,
     ...(bottomPanel ? [{
       position: "bottom-center" as const,

@@ -3,6 +3,7 @@ package de.mertendieckmann.griplbackend.adapter.web
 import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.application.ProcessModelJobRunner
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
+import de.mertendieckmann.griplbackend.model.dto.ProcessModel
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelListItemDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
@@ -19,11 +20,14 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.core.io.buffer.DefaultDataBufferFactory
 import org.springframework.http.HttpMethod
+import org.springframework.http.codec.multipart.FilePart
 import org.springframework.http.HttpStatus
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest
 import org.springframework.mock.web.server.MockServerWebExchange
 import org.springframework.web.server.ResponseStatusException
+import reactor.core.publisher.Flux
 import tools.jackson.databind.ObjectMapper
 
 /** Process models are private to the user that uploaded them. */
@@ -71,6 +75,54 @@ class ProcessModelControllerOwnershipTest {
 
         assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
         verify(repository, never()).deleteIfNotRunning(any(), any())
+    }
+
+    private fun bpmnFilePart(xml: String) = mock<FilePart>().also {
+        whenever(it.content()).thenReturn(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(xml.toByteArray())))
+    }
+
+    private fun model(status: ProcessModelStatus, bpmnXml: String = "<old/>") =
+        ProcessModel(5, "m", bpmnXml, status, null, null, null, null, null, null, null, "t", "t")
+
+    @Test
+    fun `updating a model owned by someone else is a 404 and updates nothing`() {
+        whenever(repository.getByIdAndOwner(5, "attacker")).thenReturn(null)
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.updateProcessModel(5, bpmnFilePart("<new/>"), exchangeAs("attacker")).block()
+        }
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+        verify(repository, never()).updateBpmnXmlIfNotRunning(any(), any(), any())
+    }
+
+    @Test
+    fun `updating a model that is being analyzed is a 409 and updates nothing`() {
+        whenever(repository.getByIdAndOwner(5, "user-1")).thenReturn(model(ProcessModelStatus.RUNNING))
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.updateProcessModel(5, bpmnFilePart("<new/>"), exchangeAs("user-1")).block()
+        }
+
+        assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+        verify(repository, never()).updateBpmnXmlIfNotRunning(any(), any(), any())
+    }
+
+    @Test
+    fun `updating the caller's own model stores the new xml`() {
+        whenever(repository.getByIdAndOwner(5, "user-1"))
+            .thenReturn(
+                model(ProcessModelStatus.DONE),
+                model(ProcessModelStatus.DONE, "<new/>").copy(analysisOutdated = true)
+            )
+        whenever(repository.updateBpmnXmlIfNotRunning(5, "user-1", "<new/>")).thenReturn(true)
+
+        val response = controller.updateProcessModel(5, bpmnFilePart("<new/>"), exchangeAs("user-1")).block()
+
+        assertEquals(HttpStatus.OK, response?.statusCode)
+        assertEquals("<new/>", response?.body?.bpmnXml)
+        assertEquals(true, response?.body?.analysisOutdated)
+        verify(repository).updateBpmnXmlIfNotRunning(5, "user-1", "<new/>")
     }
 
     @Test

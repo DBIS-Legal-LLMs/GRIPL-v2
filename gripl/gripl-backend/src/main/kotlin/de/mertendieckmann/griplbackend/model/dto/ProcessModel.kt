@@ -32,7 +32,9 @@ data class ProcessModel(
     val criticalElementCount: Int?,
     val errorMessage: String?,
     val createdAt: String,
-    val updatedAt: String
+    val updatedAt: String,
+    /** The diagram was saved after [analysisResultJson] was produced, so the result no longer matches it. */
+    val analysisOutdated: Boolean = false
 ) {
     companion object {
         fun fromRow(
@@ -48,7 +50,8 @@ data class ProcessModel(
             criticalElementCount: Int?,
             errorMessage: String?,
             createdAt: String,
-            updatedAt: String
+            updatedAt: String,
+            analysisOutdated: Boolean
         ): ProcessModel = ProcessModel(
             id = id,
             name = name,
@@ -62,7 +65,8 @@ data class ProcessModel(
             criticalElementCount = criticalElementCount,
             errorMessage = errorMessage,
             createdAt = createdAt,
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
+            analysisOutdated = analysisOutdated
         )
     }
 }
@@ -76,7 +80,8 @@ data class ProcessModelListItemDto(
     val criticalElementCount: Int?,
     val errorMessage: String?,
     val createdAt: String,
-    val updatedAt: String
+    val updatedAt: String,
+    val analysisOutdated: Boolean = false
 )
 
 data class ProcessModelDetailDto(
@@ -91,5 +96,6 @@ data class ProcessModelDetailDto(
     val criticalElementCount: Int?,
     val errorMessage: String?,
     val createdAt: String,
-    val updatedAt: String
+    val updatedAt: String,
+    val analysisOutdated: Boolean = false
 )

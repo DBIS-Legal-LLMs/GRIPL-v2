@@ -13,6 +13,7 @@ export interface ProcessModelListItem {
     errorMessage?: string | null;
     createdAt: string;
     updatedAt: string;
+    analysisOutdated?: boolean;
 }
 
 export interface ProcessModelDetail {
@@ -28,6 +29,7 @@ export interface ProcessModelDetail {
     errorMessage?: string | null;
     createdAt: string;
     updatedAt: string;
+    analysisOutdated?: boolean;
 }
 
 export interface EnqueueAnalysisRequest {

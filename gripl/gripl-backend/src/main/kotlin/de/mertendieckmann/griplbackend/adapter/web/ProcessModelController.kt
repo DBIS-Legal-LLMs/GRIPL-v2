@@ -86,6 +86,33 @@ class ProcessModelController(
     }
 
     @Operation(
+        summary = "Update a process model",
+        description = "Replaces the BPMN XML (file part **bpmnFile**) of a process model, unless it is currently being analyzed. " +
+            "An existing analysis result is kept, flagged as **analysisOutdated**, until the model is analyzed again."
+    )
+    @PutMapping("/{id}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun updateProcessModel(
+        @PathVariable id: Long,
+        @RequestPart("bpmnFile") file: FilePart,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<ProcessModelDetailDto>> {
+        val userId = exchange.authenticatedUserId()
+
+        return ControllerUtils.getBpmnXmlMono(file).flatMap { bpmnXml ->
+            Mono.fromCallable {
+                val model = repository.getByIdAndOwner(id, userId)
+                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No process model found for id $id")
+                if (model.status == ProcessModelStatus.RUNNING ||
+                    !repository.updateBpmnXmlIfNotRunning(id, userId, bpmnXml)
+                ) {
+                    throw ResponseStatusException(HttpStatus.CONFLICT, "Process model $id is currently being analyzed")
+                }
+                repository.getByIdAndOwner(id, userId)!!.toDetailDto()
+            }.subscribeOn(Schedulers.boundedElastic())
+        }.map { ResponseEntity.ok(it) }
+    }
+
+    @Operation(
         summary = "Delete a process model",
         description = "Deletes a process model, unless it is currently being analyzed."
     )
@@ -157,7 +184,8 @@ class ProcessModelController(
             criticalElementCount = criticalElementCount,
             errorMessage = errorMessage,
             createdAt = createdAt,
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
+            analysisOutdated = analysisOutdated
         )
     }
 
@@ -174,7 +202,8 @@ class ProcessModelController(
             criticalElementCount = criticalElementCount,
             errorMessage = errorMessage,
             createdAt = createdAt,
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
+            analysisOutdated = analysisOutdated
         )
     }
 }
