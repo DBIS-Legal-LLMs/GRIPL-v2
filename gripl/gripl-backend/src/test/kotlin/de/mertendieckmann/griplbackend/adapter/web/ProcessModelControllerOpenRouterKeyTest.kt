@@ -2,6 +2,7 @@ package de.mertendieckmann.griplbackend.adapter.web
 
 import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.application.ProcessModelJobRunner
+import de.mertendieckmann.griplbackend.application.dataset.ProcessModelLabelExportService
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
 import de.mertendieckmann.griplbackend.security.AUTHENTICATED_USER_ID_ATTRIBUTE
@@ -33,7 +34,7 @@ class ProcessModelControllerOpenRouterKeyTest {
     private val repository = mock<ProcessModelRepository>()
     private val jobRunner = mock<ProcessModelJobRunner>()
     private val authServiceClient = mock<AuthServiceClient>()
-    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient, mock<CustomAnalysisEndpointRepository>())
+    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient, mock<CustomAnalysisEndpointRepository>(), mock<ProcessModelLabelExportService>())
 
     private fun exchange() =
         MockServerWebExchange.from(

@@ -43,9 +43,26 @@ class DatasetTransferService(
     companion object {
         const val DATASET_FILE = "dataset.csv"
         const val EVALUATION_DATA_FILE = "evaluation_data.csv"
-        private val DATASET_COLUMNS = listOf("id", "name", "description", "created_at", "updated_at")
-        private val EVALUATION_DATA_COLUMNS =
+        val DATASET_COLUMNS = listOf("id", "name", "description", "created_at", "updated_at")
+        val EVALUATION_DATA_COLUMNS =
             listOf("id", "bpmn_xml", "expected_values", "created_at", "updated_at", "name", "dataset_id")
+
+        /**
+         * Packs rows in the [DATASET_COLUMNS] / [EVALUATION_DATA_COLUMNS] layout into the ZIP that
+         * [importZip] reads — shared with every other export that should be importable as datasets.
+         */
+        fun writeZip(datasetRows: List<List<String?>>, evaluationDataRows: List<List<String?>>): ByteArray {
+            val bytes = ByteArrayOutputStream()
+            ZipOutputStream(bytes).use { zip ->
+                zip.putNextEntry(ZipEntry(DATASET_FILE))
+                zip.write(PostgresCsv.write(DATASET_COLUMNS, datasetRows).toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+                zip.putNextEntry(ZipEntry(EVALUATION_DATA_FILE))
+                zip.write(PostgresCsv.write(EVALUATION_DATA_COLUMNS, evaluationDataRows).toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+            return bytes.toByteArray()
+        }
     }
 
     /**
@@ -55,24 +72,10 @@ class DatasetTransferService(
     fun exportAsZip(ownerUserId: String, datasetIds: List<Long>?): ByteArray {
         val ownedIds = datasetRepository.getDatasetsByOwner(ownerUserId).map { it.id }
         val idsToExport = if (datasetIds == null) ownedIds else datasetIds.filter { it in ownedIds }
-        val datasetCsv = PostgresCsv.write(
-            DATASET_COLUMNS, datasetRepository.getDatasetExportRows(idsToExport, ownerUserId)
-        )
-        val evaluationDataCsv = PostgresCsv.write(
-            EVALUATION_DATA_COLUMNS,
+        return writeZip(
+            datasetRepository.getDatasetExportRows(idsToExport, ownerUserId),
             evaluationDataRepository.getEvaluationDataExportRows(idsToExport, ownerUserId)
         )
-
-        val bytes = ByteArrayOutputStream()
-        ZipOutputStream(bytes).use { zip ->
-            zip.putNextEntry(ZipEntry(DATASET_FILE))
-            zip.write(datasetCsv.toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry(EVALUATION_DATA_FILE))
-            zip.write(evaluationDataCsv.toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-        }
-        return bytes.toByteArray()
     }
 
     /** Reads dataset.csv and evaluation_data.csv from a ZIP (file names may be inside folders). */

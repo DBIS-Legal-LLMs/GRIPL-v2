@@ -2,12 +2,14 @@ package de.mertendieckmann.griplbackend.adapter.web
 
 import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.application.ProcessModelJobRunner
+import de.mertendieckmann.griplbackend.application.dataset.ProcessModelLabelExportService
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.model.dto.ProcessModel
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelListItemDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
 import de.mertendieckmann.griplbackend.model.dto.UpdateProcessModelNameRequest
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
+import de.mertendieckmann.griplbackend.security.AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE
 import de.mertendieckmann.griplbackend.security.AUTHENTICATED_USER_ID_ATTRIBUTE
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -38,12 +40,24 @@ class ProcessModelControllerOwnershipTest {
     private val jobRunner = mock<ProcessModelJobRunner>()
     private val authServiceClient = mock<AuthServiceClient>()
     private val customEndpoints = mock<CustomAnalysisEndpointRepository>()
-    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient, customEndpoints)
+    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient, customEndpoints, ProcessModelLabelExportService(repository))
 
     private fun exchangeAs(userId: String?) =
         MockServerWebExchange.from(
             MockServerHttpRequest.method(HttpMethod.GET, "/process-models").header("Authorization", "Bearer t")
         ).apply { if (userId != null) attributes[AUTHENTICATED_USER_ID_ATTRIBUTE] = userId }
+
+    @Test
+    fun `exporting for labeling needs a labeling role like the dataset import`() {
+        val endUser = exchangeAs("user-1").apply { attributes[AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE] = "end-user" }
+        val ex = assertThrows(ResponseStatusException::class.java) { controller.exportForLabeling(null, endUser) }
+        assertEquals(HttpStatus.FORBIDDEN, ex.statusCode)
+
+        whenever(repository.listByOwner("user-1")).thenReturn(emptyList())
+        val researcher = exchangeAs("user-1").apply { attributes[AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE] = "researcher" }
+        val response = controller.exportForLabeling(null, researcher).block()
+        assertEquals(HttpStatus.OK, response?.statusCode)
+    }
 
     @Test
     fun `list only returns the caller's own models`() {

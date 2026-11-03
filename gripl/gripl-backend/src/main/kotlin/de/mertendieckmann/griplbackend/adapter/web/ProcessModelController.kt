@@ -3,6 +3,7 @@ package de.mertendieckmann.griplbackend.adapter.web
 import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.adapter.web.utils.ControllerUtils
 import de.mertendieckmann.griplbackend.application.ProcessModelJobRunner
+import de.mertendieckmann.griplbackend.application.dataset.ProcessModelLabelExportService
 import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisResponse
@@ -15,8 +16,11 @@ import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointReposito
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
 import de.mertendieckmann.griplbackend.security.authenticatedUserId
 import de.mertendieckmann.griplbackend.security.bearerToken
+import de.mertendieckmann.griplbackend.security.requirePrivilegedGriplRole
 import io.swagger.v3.oas.annotations.Operation
 import kotlinx.coroutines.reactor.mono
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -29,6 +33,7 @@ import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.readValue
+import java.time.LocalDate
 
 @RestController
 @RequestMapping("/process-models")
@@ -37,7 +42,8 @@ class ProcessModelController(
     private val jobRunner: ProcessModelJobRunner,
     private val objectMapper: ObjectMapper,
     private val authServiceClient: AuthServiceClient,
-    private val customAnalysisEndpointRepository: CustomAnalysisEndpointRepository
+    private val customAnalysisEndpointRepository: CustomAnalysisEndpointRepository,
+    private val labelExportService: ProcessModelLabelExportService
 ) {
 
     @Operation(
@@ -69,6 +75,28 @@ class ProcessModelController(
     fun listProcessModels(exchange: ServerWebExchange): Mono<List<ProcessModelListItemDto>> {
         val userId = exchange.authenticatedUserId()
         return Mono.fromCallable { repository.listByOwner(userId) }.subscribeOn(Schedulers.boundedElastic())
+    }
+
+    @Operation(
+        summary = "Export process models for labeling",
+        description = "Exports the given process models (all of the caller's if **ids** is omitted) as one dataset in " +
+            "the labeling import format (ZIP with dataset.csv and evaluation_data.csv). The LLM analysis results become " +
+            "the labels; labels for elements no longer in the saved diagram are dropped."
+    )
+    @GetMapping("/export-labels", produces = ["application/zip"])
+    fun exportForLabeling(
+        @RequestParam("ids", required = false) ids: List<Long>?,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<ByteArray>> {
+        val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
+        return Mono.fromCallable {
+            val fileName = "gripl-llm-prelabels-${LocalDate.now()}.zip"
+            ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(fileName).build().toString())
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .body(labelExportService.exportAsZip(userId, ids))
+        }.subscribeOn(Schedulers.boundedElastic())
     }
 
     @Operation(
