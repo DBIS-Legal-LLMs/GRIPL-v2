@@ -21,11 +21,16 @@ export default function TestCaseCard({ metadata } : TestCaseCardProps) {
     })
 
     // h-full: all tiles in a grid row get the same height, even with multi-line names
-    return <div className="flex flex-row items-stretch h-full">
-        <Card className="flex-1 relative hover:bg-card/40">
+    return <div className="flex flex-row items-stretch h-full min-w-0">
+        <Card className="flex-1 min-w-0 relative hover:bg-card/40">
             <Link href={`/labeling/${metadata.id}`} className="block h-full">
                 <div className="p-4">
-                    <h2 className="text-lg font-bold mr-24">{metadata.name || "Test Case"}</h2>
+                    <h2
+                        className="mr-24 truncate text-lg font-bold"
+                        title={metadata.name || "Test Case"}
+                    >
+                        {metadata.name || "Test Case"}
+                    </h2>
                     <p className="text-xs text-muted-foreground mb-4 h-4">
                         {metadata.labelCount ?? 0} labeled
                         {(metadata.unclassifiedLabelCount ?? 0) > 0 && (

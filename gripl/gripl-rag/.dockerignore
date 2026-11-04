@@ -18,9 +18,6 @@ rag_working_dir/
 
 # Test / evaluation artefacts
 tests/
-# Source PDFs stay out of the image; the extracted text corpus is baked in (see Dockerfile)
-data/*
-!data/extracted/
 
 # IDE / OS
 .idea/

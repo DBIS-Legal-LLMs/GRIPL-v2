@@ -210,6 +210,25 @@ RAG_INTERNAL_URL=http://gripl-rag:8081
 AUTH_SERVICE_INTERNAL_URL=http://auth-service:8000
 ```
 
+This is implemented in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (GRIPL-v2) and in
+auth-service's own `.github/workflows/ci.yml`:
+
+* every push and pull request runs the tests (GRIPL: backend tests against a Postgres service
+  container, frontend type check; auth-service: pytest) and builds every image
+* only a push to `main` / `dev` publishes (`:prod` / `:dev` plus `:sha-<commit>`); pull requests
+  build but publish nothing
+* layers are cached in the registry (`:buildcache` tag), because the RAG image is several GB
+* third-party actions are pinned to commits; the workflows only get the permissions they need
+
+After the **first** publish, each of the four packages has to be made **public** once, otherwise
+the server cannot pull it without a login. New packages are created **private**; a package
+inherits the access permissions of its repository, but not its visibility. In the organisation's
+*Packages* page open the package, then *Package settings → Danger Zone → Change visibility →
+Public*. GitHub does not allow switching a public package back to private (deleting it is the
+way back), so only do this for images that contain nothing secret. These do not: they are built
+from the public repositories by CI, and no `.env` or key ever enters an image. A manual re-run
+of the pipeline is possible via *Actions → CI → Run workflow*.
+
 ## HTTPS
 
 Port 80 only redirects to HTTPS; every site lives on 443. Until the project has a
@@ -249,8 +268,9 @@ What is in place:
   the university network because it holds a copy of prod's users and data.
 * **Rate limits per client IP** on `/auth/login` (20/min) and `/auth/register`
   (5/min), see `traefik/dynamic/middlewares.yml`.
-* **`/rag/*` is blocked** (403). The RAG service has no authentication and runs on the
-  project's own LLM key; the browser never needs it.
+* **`/rag/*` is blocked** (403), except `/rag/api/pdf/` (the sandbox's PDF viewer). The RAG
+  service has no authentication and runs on the project's own LLM key; the PDF routes only serve
+  the corpus's public source documents and match names against existing files (no path input).
 * **API docs are off** (`API_DOCS_ENABLED=false`): the backend serves Swagger without a
   login, and auth-service's `/docs`/`/redoc` are blocked.
 * Security headers (no sniffing, no framing, referrer policy); logs are rotated
@@ -288,6 +308,10 @@ Known gaps (application level, not solved by this folder):
 
 * **Memory.** Prod and dev together should idle at roughly 4–6 GB. Each container has
   an upper limit (`MEM_*` in `.env`) so one environment cannot starve the other.
+* **CORS.** The browser sends an `Origin` header with every write (upload, saving settings, delete), and the
+  backend answers 403 with an empty body unless the origin is in `APP_CORS_ALLOWED_ORIGINS` (set from
+  `PUBLIC_SCHEME` and `GRIPL_HOST` in the compose file). Symptom when it is wrong: all reads work, every write
+  fails with 403 and nothing shows up in the logs. Change the host name of a stack and this follows by itself.
 * **Database versions are pinned** (`postgres:15.18`, `neo4j:5.26.30-community`,
   `mongo:7.0.25`). A floating tag such as `postgres:15` would make the updater upgrade
   and restart a database whenever the registry publishes a new patch release. Bump the

@@ -1,0 +1,148 @@
+# CI for GRIPL: run the tests, build the three container images, and publish them to
+# GitHub's container registry from main (tag `prod`) and dev (tag `dev`).
+#
+# The server picks the images up by itself (deploy/scripts/update-stack.sh), so nothing
+# here connects to it. See deploy/README.md, section "What CI has to produce".
+#
+#   push to main  -> ghcr.io/dbis-legal-llms/<image>:prod  and  :sha-<commit>
+#   push to dev   -> ghcr.io/dbis-legal-llms/<image>:dev   and  :sha-<commit>
+#   pull request  -> tests + a build of every image, nothing is published
+#
+# Third-party actions are pinned to a commit (the comment names the release) so that a
+# changed or hijacked tag cannot change what runs here.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # a newer push to a pull request replaces the older run; never cancel a publish
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE_PREFIX: ghcr.io/dbis-legal-llms   # must be lower case
+
+jobs:
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      # the application context test needs a real Postgres (Flyway runs all migrations)
+      postgres:
+        image: postgres:15.18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gripl_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: gripl/gripl-backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - name: Run the tests
+        run: ./mvnw -B -ntp test
+
+  frontend-check:
+    name: Frontend type check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: gripl/gripl-frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: gripl/gripl-frontend/package-lock.json
+      # --force: same as the Dockerfile; the dependency tree has known peer conflicts
+      - run: npm ci --force
+      - run: npx tsc --noEmit
+
+  images:
+    name: Image ${{ matrix.image }}
+    needs: [backend-tests, frontend-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write   # publish to ghcr.io (only used on pushes to main/dev)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: gripl-frontend
+            context: gripl/gripl-frontend
+            # Next.js freezes its proxy targets at build time. These are the service
+            # names inside the server's Docker networks, the same in prod and dev.
+            build-args: |
+              NEXT_PUBLIC_API_BASE_URL=http://gripl-backend:8080
+              RAG_INTERNAL_URL=http://gripl-rag:8081
+              AUTH_SERVICE_INTERNAL_URL=http://auth-service:8000
+          - image: gripl-backend
+            context: gripl/gripl-backend
+            build-args: ""
+          - image: gripl-rag
+            context: gripl/gripl-rag
+            build-args: ""
+    env:
+      PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to ghcr.io
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tags and labels
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=sha,prefix=sha-,format=short,enable=${{ env.PUBLISH == 'true' }}
+      - name: Build${{ env.PUBLISH == 'true' && ' and publish' || '' }}
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          push: ${{ env.PUBLISH == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build-args }}
+          provenance: false
+          sbom: false
+          # layer cache in the registry: the RAG image is several GB and rebuilding it
+          # from scratch every time would be slow
+          cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:buildcache
+          cache-to: ${{ env.PUBLISH == 'true' && format('type=registry,ref={0}/{1}:buildcache,mode=max', env.IMAGE_PREFIX, matrix.image) || '' }}

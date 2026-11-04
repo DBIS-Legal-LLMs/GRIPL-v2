@@ -23,3 +23,6 @@ gripl/gripl-rag/.env
 
 extra/*
 .github/*
+
+# CI workflows are tracked; everything else in .github stays ignored
+!.github/workflows/
