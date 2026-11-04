@@ -20,6 +20,9 @@ COPY package*.json ./
 RUN npm i --force
 
 COPY . .
+# build version (set by CI), shown in the sidebar; NEXT_PUBLIC_ values are frozen at build time
+ARG APP_VERSION=dev
+ENV NEXT_PUBLIC_APP_VERSION=$APP_VERSION
 RUN npm run build
 
 # Stage 2: Run
