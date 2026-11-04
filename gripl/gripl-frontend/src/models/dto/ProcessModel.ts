@@ -20,6 +20,8 @@ export interface ProcessModelDetail {
     id: number;
     name: string;
     bpmnXml: string;
+    /** Bumped on every diagram save; sent back when saving to detect concurrent edits */
+    bpmnVersion: number;
     status: ProcessModelStatus;
     analysisEndpoint?: string | null;
     analysisResult?: AnalysisResponse | null;

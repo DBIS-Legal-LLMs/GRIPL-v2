@@ -6,13 +6,25 @@ import org.springframework.core.env.Environment
 import org.springframework.core.io.buffer.DataBufferUtils
 import org.springframework.http.codec.multipart.FilePart
 import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.web.server.ResponseStatusException
 import reactor.core.publisher.Mono
 
 object ControllerUtils {
 
     const val CUSTOM_ENDPOINT_PREFIX = "/gdpr/analysis/custom/"
+
+    /** A ZIP file download named [fileName], with optional [extraHeaders]. */
+    fun zipResponse(bytes: ByteArray, fileName: String, extraHeaders: Map<String, String> = emptyMap()): ResponseEntity<ByteArray> =
+        ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(fileName).build().toString())
+            .headers { headers -> extraHeaders.forEach { (name, value) -> headers.set(name, value) } }
+            .contentType(MediaType.parseMediaType("application/zip"))
+            .body(bytes)
 
     /**
      * If [endpoint] points at a custom analysis endpoint (`/gdpr/analysis/custom/{id}`), require

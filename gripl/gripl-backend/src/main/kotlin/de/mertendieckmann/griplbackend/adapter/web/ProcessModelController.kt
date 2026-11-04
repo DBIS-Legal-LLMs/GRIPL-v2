@@ -3,9 +3,6 @@ package de.mertendieckmann.griplbackend.adapter.web
 import de.mertendieckmann.griplbackend.adapter.auth.AuthServiceClient
 import de.mertendieckmann.griplbackend.adapter.web.utils.ControllerUtils
 import de.mertendieckmann.griplbackend.application.ProcessModelJobRunner
-import de.mertendieckmann.griplbackend.application.dataset.ImportedDataset
-import de.mertendieckmann.griplbackend.application.dataset.ProcessModelLabelExportService
-import de.mertendieckmann.griplbackend.model.dto.CreateLabelingDatasetRequest
 import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisResponse
@@ -18,11 +15,8 @@ import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointReposito
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
 import de.mertendieckmann.griplbackend.security.authenticatedUserId
 import de.mertendieckmann.griplbackend.security.bearerToken
-import de.mertendieckmann.griplbackend.security.requirePrivilegedGriplRole
 import io.swagger.v3.oas.annotations.Operation
 import kotlinx.coroutines.reactor.mono
-import org.springframework.http.ContentDisposition
-import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -35,7 +29,6 @@ import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.readValue
-import java.time.LocalDate
 
 @RestController
 @RequestMapping("/process-models")
@@ -44,8 +37,7 @@ class ProcessModelController(
     private val jobRunner: ProcessModelJobRunner,
     private val objectMapper: ObjectMapper,
     private val authServiceClient: AuthServiceClient,
-    private val customAnalysisEndpointRepository: CustomAnalysisEndpointRepository,
-    private val labelExportService: ProcessModelLabelExportService
+    private val customAnalysisEndpointRepository: CustomAnalysisEndpointRepository
 ) {
 
     @Operation(
@@ -59,7 +51,7 @@ class ProcessModelController(
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<ProcessModelListItemDto>> {
         val userId = exchange.authenticatedUserId()
-        val name = namePart?.value()?.takeIf { it.isNotBlank() } ?: file.filename()
+        val name = validName(namePart?.value()?.takeIf { it.isNotBlank() } ?: file.filename())
 
         return ControllerUtils.getBpmnXmlMono(file).flatMap { bpmnXml ->
             Mono.fromCallable {
@@ -80,45 +72,6 @@ class ProcessModelController(
     }
 
     @Operation(
-        summary = "Export process models for labeling",
-        description = "Exports the given process models (all of the caller's if **ids** is omitted) as one dataset in " +
-            "the labeling import format (ZIP with dataset.csv and evaluation_data.csv). The LLM analysis results become " +
-            "the labels; labels for elements no longer in the saved diagram are dropped."
-    )
-    @GetMapping("/export-labels", produces = ["application/zip"])
-    fun exportForLabeling(
-        @RequestParam("ids", required = false) ids: List<Long>?,
-        exchange: ServerWebExchange
-    ): Mono<ResponseEntity<ByteArray>> {
-        val userId = exchange.authenticatedUserId()
-        exchange.requirePrivilegedGriplRole()
-        return Mono.fromCallable {
-            val fileName = "gripl-llm-prelabels-${LocalDate.now()}.zip"
-            ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(fileName).build().toString())
-                .contentType(MediaType.parseMediaType("application/zip"))
-                .body(labelExportService.exportAsZip(userId, ids))
-        }.subscribeOn(Schedulers.boundedElastic())
-    }
-
-    @Operation(
-        summary = "Create a labeling dataset from process models",
-        description = "Same content as **/export-labels**, but created directly as a new labeling dataset owned by the " +
-            "caller instead of being downloaded as ZIP."
-    )
-    @PostMapping("/labeling-dataset", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
-    fun createLabelingDataset(
-        @RequestBody request: CreateLabelingDatasetRequest,
-        exchange: ServerWebExchange
-    ): Mono<ResponseEntity<ImportedDataset>> {
-        val userId = exchange.authenticatedUserId()
-        exchange.requirePrivilegedGriplRole()
-        return Mono.fromCallable { labelExportService.createDataset(userId, request.ids) }
-            .subscribeOn(Schedulers.boundedElastic())
-            .map { ResponseEntity.status(HttpStatus.CREATED).body(it) }
-    }
-
-    @Operation(
         summary = "Get a process model",
         description = "Returns the full process model, including its BPMN XML and analysis result if available."
     )
@@ -136,28 +89,49 @@ class ProcessModelController(
     @Operation(
         summary = "Update a process model",
         description = "Replaces the BPMN XML (file part **bpmnFile**) of a process model, unless it is currently being analyzed. " +
+            "**bpmnVersion** must be the version the edit is based on (from GET); if the diagram was saved elsewhere " +
+            "since, the request fails with 409 instead of overwriting it. " +
             "An existing analysis result is kept, flagged as **analysisOutdated**, until the model is analyzed again."
     )
     @PutMapping("/{id}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
     fun updateProcessModel(
         @PathVariable id: Long,
         @RequestPart("bpmnFile") file: FilePart,
+        @RequestPart("bpmnVersion") versionPart: FormFieldPart,
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<ProcessModelDetailDto>> {
         val userId = exchange.authenticatedUserId()
+        val expectedVersion = versionPart.value().trim().toIntOrNull()
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "bpmnVersion must be a number")
 
         return ControllerUtils.getBpmnXmlMono(file).flatMap { bpmnXml ->
             Mono.fromCallable {
                 val model = repository.getByIdAndOwner(id, userId)
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No process model found for id $id")
-                if (model.status == ProcessModelStatus.RUNNING ||
-                    !repository.updateBpmnXmlIfNotRunning(id, userId, bpmnXml)
-                ) {
-                    throw ResponseStatusException(HttpStatus.CONFLICT, "Process model $id is currently being analyzed")
+                model.requireSavableAt(expectedVersion)
+                if (!repository.updateBpmnXmlIfUnchanged(id, userId, bpmnXml, expectedVersion)) {
+                    // Something changed between the check above and the update — report what.
+                    val current = repository.getByIdAndOwner(id, userId)
+                        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No process model found for id $id")
+                    current.requireSavableAt(expectedVersion)
+                    throw ResponseStatusException(HttpStatus.CONFLICT, "Process model $id could not be saved, please try again")
                 }
                 repository.getByIdAndOwner(id, userId)!!.toDetailDto()
             }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
+    }
+
+    private fun ProcessModel.requireSavableAt(expectedVersion: Int) {
+        if (status == ProcessModelStatus.RUNNING) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Process model $id is currently being analyzed")
+        }
+        if (bpmnVersion != expectedVersion) {
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Process model '$name' was saved elsewhere (e.g. in another tab) since you opened it. " +
+                    "Reload the page to get the latest version — download your diagram first to keep your changes."
+            )
+        }
     }
 
     @Operation(
@@ -171,13 +145,7 @@ class ProcessModelController(
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<ProcessModelListItemDto>> {
         val userId = exchange.authenticatedUserId()
-        val name = request.name?.trim()
-        if (name.isNullOrEmpty()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Name must not be empty")
-        }
-        if (name.length > MAX_NAME_LENGTH) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Name must be at most $MAX_NAME_LENGTH characters long")
-        }
+        val name = validName(request.name)
 
         return Mono.fromCallable {
             if (!repository.updateName(id, userId, name)) {
@@ -254,6 +222,21 @@ class ProcessModelController(
         const val MAX_NAME_LENGTH = 255
     }
 
+    /** Trimmed [raw] if it fits `process_model.name`; a 400 instead of a database error otherwise. */
+    private fun validName(raw: String?): String {
+        val name = raw?.trim()
+        if (name.isNullOrEmpty()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Name must not be empty")
+        }
+        if (name.length > MAX_NAME_LENGTH) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Name must be at most $MAX_NAME_LENGTH characters long (got ${name.length}): '${name.take(40)}…'"
+            )
+        }
+        return name
+    }
+
     private fun ProcessModel.toListItemDto(): ProcessModelListItemDto {
         return ProcessModelListItemDto(
             id = id,
@@ -283,7 +266,8 @@ class ProcessModelController(
             errorMessage = errorMessage,
             createdAt = createdAt,
             updatedAt = updatedAt,
-            analysisOutdated = analysisOutdated
+            analysisOutdated = analysisOutdated,
+            bpmnVersion = bpmnVersion
         )
     }
 }

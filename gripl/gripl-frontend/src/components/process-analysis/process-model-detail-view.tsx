@@ -38,6 +38,9 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
   // Last XML persisted to the backend — compared against `diagram` rather than
   // a boolean flag, so edits made while a save is in flight stay "unsaved".
   const [savedDiagram, setSavedDiagram] = useState<string>(initialModel.bpmnXml)
+  // Version the edited diagram is based on. Deliberately not `model.bpmnVersion`: polling
+  // would pick up a save from another tab, and this one would then overwrite it unnoticed.
+  const [baseVersion, setBaseVersion] = useState<number>(initialModel.bpmnVersion)
   const [isSaving, setIsSaving] = useState<boolean>(false)
   const hasUnsavedChanges = diagram !== savedDiagram
   const {showToast, showError} = useToast()
@@ -59,6 +62,7 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
     try {
       const formData = new FormData()
       formData.append("bpmnFile", new Blob([xml], {type: "application/xml"}), "diagram.bpmn")
+      formData.append("bpmnVersion", String(baseVersion))
       const response = await authenticatedFetch(`/api/process-models/${model.id}`, {
         method: "PUT",
         headers: {
@@ -69,7 +73,9 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
       if (!response.ok) {
         throw new Error(await extractErrorDetails(response))
       }
-      setModel(await response.json() as ProcessModelDetail)
+      const updated = await response.json() as ProcessModelDetail
+      setModel(updated)
+      setBaseVersion(updated.bpmnVersion)
       setSavedDiagram(xml)
       showToast({title: "Model saved successfully", variant: "success"})
       return true

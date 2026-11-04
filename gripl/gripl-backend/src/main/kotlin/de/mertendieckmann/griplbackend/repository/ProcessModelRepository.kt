@@ -28,7 +28,8 @@ class ProcessModelRepository(
             errorMessage = rs.getString("error_message"),
             createdAt = rs.getString("created_at"),
             updatedAt = rs.getString("updated_at"),
-            analysisOutdated = rs.getBoolean("analysis_outdated")
+            analysisOutdated = rs.getBoolean("analysis_outdated"),
+            bpmnVersion = rs.getInt("bpmn_version")
         )
     }
 
@@ -87,18 +88,23 @@ class ProcessModelRepository(
         return jdbc.update(sql, name, id, ownerUserId) > 0
     }
 
-    /** Also flags an existing analysis result as outdated if the XML actually changed. */
-    fun updateBpmnXmlIfNotRunning(id: Long, ownerUserId: String, bpmnXml: String): Boolean {
+    /**
+     * Saves the diagram only if it is still at [expectedVersion] and not being analyzed, and bumps the version.
+     * Also flags an existing analysis result as outdated if the XML actually changed.
+     * @return false if nothing was updated (missing, not owned, running, or changed in the meantime)
+     */
+    fun updateBpmnXmlIfUnchanged(id: Long, ownerUserId: String, bpmnXml: String, expectedVersion: Int): Boolean {
         // Right-hand sides of an UPDATE see the row's old values, so `bpmn_xml`
         // in the outdated check is still the previously stored diagram.
         val sql = """
             UPDATE process_model
             SET bpmn_xml = ?,
                 analysis_outdated = analysis_outdated OR (analysis_result IS NOT NULL AND bpmn_xml IS DISTINCT FROM ?),
+                bpmn_version = bpmn_version + 1,
                 updated_at = now()
-            WHERE id = ? AND owner_user_id = ? AND status <> 'RUNNING'
+            WHERE id = ? AND owner_user_id = ? AND status <> 'RUNNING' AND bpmn_version = ?
         """.trimIndent()
-        return jdbc.update(sql, bpmnXml, bpmnXml, id, ownerUserId) > 0
+        return jdbc.update(sql, bpmnXml, bpmnXml, id, ownerUserId, expectedVersion) > 0
     }
 
     fun deleteIfNotRunning(id: Long, ownerUserId: String): Boolean {

@@ -34,7 +34,9 @@ data class ProcessModel(
     val createdAt: String,
     val updatedAt: String,
     /** The diagram was saved after [analysisResultJson] was produced, so the result no longer matches it. */
-    val analysisOutdated: Boolean = false
+    val analysisOutdated: Boolean = false,
+    /** Bumped on every diagram save; a save has to name the version it was based on. */
+    val bpmnVersion: Int
 ) {
     companion object {
         fun fromRow(
@@ -51,7 +53,8 @@ data class ProcessModel(
             errorMessage: String?,
             createdAt: String,
             updatedAt: String,
-            analysisOutdated: Boolean
+            analysisOutdated: Boolean,
+            bpmnVersion: Int
         ): ProcessModel = ProcessModel(
             id = id,
             name = name,
@@ -66,7 +69,8 @@ data class ProcessModel(
             errorMessage = errorMessage,
             createdAt = createdAt,
             updatedAt = updatedAt,
-            analysisOutdated = analysisOutdated
+            analysisOutdated = analysisOutdated,
+            bpmnVersion = bpmnVersion
         )
     }
 }
@@ -97,5 +101,6 @@ data class ProcessModelDetailDto(
     val errorMessage: String?,
     val createdAt: String,
     val updatedAt: String,
-    val analysisOutdated: Boolean = false
+    val analysisOutdated: Boolean = false,
+    val bpmnVersion: Int
 )
