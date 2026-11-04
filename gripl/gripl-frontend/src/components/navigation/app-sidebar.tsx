@@ -17,6 +17,7 @@ import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-prov
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {useAuth} from "@/context/auth-context";
 import {isPrivilegedGriplRole} from "@/lib/gripl-role";
+import {confirmLeave} from "@/lib/unsaved-changes";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -147,7 +148,7 @@ export default function AppSidebar() {
                                         Account Settings
                                     </Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={logout}>
+                                <DropdownMenuItem onClick={() => confirmLeave(logout)}>
                                     <LogOut />
                                     Log out
                                 </DropdownMenuItem>

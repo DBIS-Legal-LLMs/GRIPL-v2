@@ -33,7 +33,13 @@ class ProcessModelControllerOpenRouterKeyTest {
     private val repository = mock<ProcessModelRepository>()
     private val jobRunner = mock<ProcessModelJobRunner>()
     private val authServiceClient = mock<AuthServiceClient>()
-    private val controller = ProcessModelController(repository, jobRunner, ObjectMapper(), authServiceClient, mock<CustomAnalysisEndpointRepository>())
+    private val controller = ProcessModelController(
+        repository = repository,
+        jobRunner = jobRunner,
+        objectMapper = ObjectMapper(),
+        authServiceClient = authServiceClient,
+        customAnalysisEndpointRepository = mock<CustomAnalysisEndpointRepository>()
+    )
 
     private fun exchange() =
         MockServerWebExchange.from(
