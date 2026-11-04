@@ -33,6 +33,8 @@ const GDPR_MARKER_CLASSES = [
 
 interface BpmnEditorProps {
   title?: string
+  /** Rendered right next to the title, e.g. an edit button */
+  titleAddon?: React.ReactNode
   bpmnXml: string
   highlightedActivityIds?: string[]
   highlightedActivityCategories?: Record<string, GdprCategory[]>
@@ -49,7 +51,7 @@ interface BpmnEditorProps {
   askForExportFileName?: boolean
 }
 
-export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = [], onNew, onDiagramChanged, cards = [],
+export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActivityIds = [], onNew, onDiagramChanged, cards = [],
                                      highlightedActivityCategories = {}, editorClassName, disableEditing, onEvent, onModelerChanged,
                                      exportFileName, askForExportFileName }: BpmnEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -350,7 +352,10 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
       <div className="flex flex-col h-full w-full">
         <div className="flex flex-wrap items-center justify-between p-2 bg-card border-b gap-2">
           <div className="flex items-center space-x-1">
-            {title && <h2 className="text-lg font-semibold mr-4 ml-2">{title}</h2>}
+            {title && <div className="flex items-center gap-1 mr-4 ml-2">
+              <h2 className="text-lg font-semibold">{title}</h2>
+              {titleAddon}
+            </div>}
             <Button
                 variant="outline"
                 size="sm"

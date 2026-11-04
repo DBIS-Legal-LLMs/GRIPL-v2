@@ -11,6 +11,9 @@ import AnalysisSettingsButton from "@/components/process-analysis/analysis-setti
 import AnalyzeSelectedButton from "@/components/process-analysis/analyze-selected-button"
 import DownloadListReportButton from "@/components/process-analysis/download-list-report-button"
 import DeleteSelectedButton from "@/components/process-analysis/delete-selected-button"
+import ExportForLabelingButton from "@/components/process-analysis/export-for-labeling-button"
+import {useAuth} from "@/context/auth-context"
+import {isPrivilegedGriplRole} from "@/lib/gripl-role"
 import deleteProcessModel from "@/actions/delete-process-model"
 import {useToast} from "@/components/ui/toast"
 import {ProcessModelDetail, ProcessModelListItem, ProcessModelStatus} from "@/models/dto/ProcessModel"
@@ -26,6 +29,9 @@ export default function ProcessModelList({initialModels}: ProcessModelListProps)
     const settings = useAnalysisSettings()
     const router = useRouter()
     const {showError} = useToast()
+    // The export is a labeling dataset, so it's offered to the same roles as the labeling tool.
+    const {griplRole} = useAuth()
+    const canExportForLabeling = isPrivilegedGriplRole(griplRole)
 
     function handleSelectChange(id: number, selected: boolean) {
         setSelectedIds(prev => {
@@ -101,6 +107,7 @@ export default function ProcessModelList({initialModels}: ProcessModelListProps)
                 <AnalysisSettingsButton settings={settings}/>
                 <AnalyzeSelectedButton selectedIds={Array.from(selectedIds)} settings={settings} onEnqueued={handleEnqueued}/>
                 <DownloadListReportButton models={selectedModels}/>
+                {canExportForLabeling && <ExportForLabelingButton selectedIds={selectedModels.map(m => m.id)}/>}
                 <DeleteSelectedButton models={selectedModels} onCleared={handleCleared}/>
             </div>
         </div>
