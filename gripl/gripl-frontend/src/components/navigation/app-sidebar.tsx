@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/sidebar";
 import Link from "next/link";
 import {ChartBarDecreasing, LogIn, LogOut, Settings, Sparkles, Tag, User, Workflow} from "lucide-react";
-import React, {ReactNode} from "react";
+import React, {ReactNode, useEffect, useState} from "react";
 import Image from "next/image";
 import {Label} from "@/components/ui/label";
 import {useAnalysisEndpoint} from "@/components/providers/analysis-endpoint-provider";
@@ -42,6 +42,17 @@ export default function AppSidebar() {
     } = useAnalysisEndpoint();
 
     const { logout, token, username, griplRole } = useAuth();
+
+    // The same image runs on dev and prod, so the environment comes from the host name
+    // (gripl-dev.* is dev, localhost is local, anything else is prod). Set after mount to
+    // keep the server-rendered and the first client render identical.
+    const [environment, setEnvironment] = useState("");
+    useEffect(() => {
+        const host = window.location.hostname;
+        setEnvironment(
+            host === "localhost" || host === "127.0.0.1" ? "local" : host.includes("-dev") ? "dev" : "prod"
+        );
+    }, []);
 
     // GRIPL-v2#40: Labeling/Evaluation are admin/researcher only — dpo and
     // end-user only see Sandbox. Real enforcement is server-side
@@ -165,7 +176,7 @@ export default function AppSidebar() {
                 </SidebarMenuItem>
             </SidebarMenu>
             <p className="px-2 text-[11px] text-muted-foreground">
-                GRIPL {process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
+                GRIPL {environment ? `${environment}-` : ""}{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
             </p>
         </SidebarFooter>
     </Sidebar>

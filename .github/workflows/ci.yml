@@ -1,16 +1,16 @@
 # CI for GRIPL: run the tests, build the three container images, and publish them to
-# GitHub's container registry from main (tag `prod`) and dev (tag `dev`).
+# GitHub's container registry from dev (tag `dev`). Prod is never built: the promote workflow sets
+# `:prod` on an image that was already built and tested on dev.
 #
 # Versions: every merge into dev that contains a fix:/feat:/... commit is a release. The next
 # version is computed from the conventional commits since the last tag (.github/scripts/next-version.sh),
-# built into the images (shown in the app as dev-v1.2.3), published as :1.2.3, and after the images
+# built into the images (shown in the app as v1.2.3, with the environment in front), published as :1.2.3, and after the images
 # are published the git tag v1.2.3 and a GitHub Release are created. Commits like chore: and docs:
-# make no release. Prod is promoted from an existing version, see the promote workflow.
+# make no release. Prod is promoted from an existing version, see promote.yml.
 #
 # The server picks the images up by itself (deploy/scripts/update-stack.sh), so nothing
 # here connects to it. See deploy/README.md, section "What CI has to produce".
 #
-#   push to main  -> ghcr.io/dbis-legal-llms/<image>:prod  and  :sha-<commit>
 #   push to dev   -> ghcr.io/dbis-legal-llms/<image>:dev, :sha-<commit>, and :X.Y.Z for a release
 #   pull request  -> tests + a build of every image, nothing is published
 #
@@ -21,7 +21,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, dev]
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
@@ -107,10 +107,15 @@ jobs:
         run: .github/scripts/next-version.sh | tee -a "$GITHUB_OUTPUT"
       - name: Label shown in the app
         id: label
-        # <branch>-v<version>, e.g. dev-v1.0.1; on a pull request the branch it comes from
+        # v<version> for a build on dev, e.g. v1.0.1: the same image runs on dev and, once promoted,
+        # on prod, so the environment is not baked in (the frontend adds it from the host name).
+        # On a pull request the branch it comes from is in front, e.g. feat-x-v1.1.0.
         run: |
-          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          echo "value=${branch//\//-}-v${{ steps.v.outputs.next }}" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            branch="$GITHUB_HEAD_REF"; echo "value=${branch//\//-}-v${{ steps.v.outputs.next }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=v${{ steps.v.outputs.next }}" >> "$GITHUB_OUTPUT"
+          fi
 
   images:
     name: Image ${{ matrix.image }}
@@ -119,7 +124,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
-      packages: write   # publish to ghcr.io (only used on pushes to main/dev)
+      packages: write   # publish to ghcr.io (only used on pushes to dev)
     strategy:
       fail-fast: false
       matrix:
@@ -139,7 +144,7 @@ jobs:
             context: gripl/gripl-rag
             build-args: ""
     env:
-      PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') }}
+      PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -158,7 +163,6 @@ jobs:
         with:
           images: ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}
           tags: |
-            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
             type=sha,prefix=sha-,format=short,enable=${{ env.PUBLISH == 'true' }}
             # a version tag is set once, by the release build, and never moves afterwards
@@ -196,4 +200,5 @@ jobs:
         run: |
           gh release create "v${{ needs.version.outputs.next }}" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "v${{ needs.version.outputs.next }}" --generate-notes
+            --title "v${{ needs.version.outputs.next }}" --generate-notes \
+            --prerelease   # a pre-release until it is promoted to prod (promote.yml)
