@@ -163,6 +163,9 @@ export default function AppSidebar() {
                     )}
                 </SidebarMenuItem>
             </SidebarMenu>
+            <p className="px-2 text-[11px] text-muted-foreground">
+                GRIPL {process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
+            </p>
         </SidebarFooter>
     </Sidebar>
 }

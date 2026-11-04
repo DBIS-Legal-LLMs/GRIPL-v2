@@ -1,5 +1,6 @@
 # CI for GRIPL: run the tests, build the three container images, and publish them to
-# GitHub's container registry from main (tag `prod`) and dev (tag `dev`).
+# GitHub's container registry from main (tag `prod`) and dev (tag `dev`), and on a `v*` git tag
+# also with the version (`v0.1.0` -> `:0.1.0`, `:0.1`).
 #
 # The server picks the images up by itself (deploy/scripts/update-stack.sh), so nothing
 # here connects to it. See deploy/README.md, section "What CI has to produce".
@@ -16,6 +17,7 @@ on:
   pull_request:
   push:
     branches: [main, dev]
+    tags: ["v*"]   # a release: publishes the version tags (:0.1.0, :0.1) next to :sha-<commit>
   workflow_dispatch:
 
 permissions:
@@ -110,7 +112,7 @@ jobs:
             context: gripl/gripl-rag
             build-args: ""
     env:
-      PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') }}
+      PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/v')) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -123,6 +125,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build version
+        id: version
+        # shown in the app and in the image label: the tag on a release (v0.1.0),
+        # otherwise <branch>-<short commit> (dev-ab12cd3)
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then v="$GITHUB_REF_NAME"; else v="${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}"; fi
+          echo "value=$v" >> "$GITHUB_OUTPUT"
       - name: Tags and labels
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -132,6 +141,8 @@ jobs:
             type=raw,value=prod,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
             type=sha,prefix=sha-,format=short,enable=${{ env.PUBLISH == 'true' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
       - name: Build${{ env.PUBLISH == 'true' && ' and publish' || '' }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -139,7 +150,9 @@ jobs:
           push: ${{ env.PUBLISH == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: ${{ matrix.build-args }}
+          build-args: |
+            ${{ matrix.build-args }}
+            APP_VERSION=${{ steps.version.outputs.value }}
           provenance: false
           sbom: false
           # layer cache in the registry: the RAG image is several GB and rebuilding it
