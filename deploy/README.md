@@ -215,7 +215,7 @@ auth-service's own `.github/workflows/ci.yml`:
 
 * every push and pull request runs the tests (GRIPL: backend tests against a Postgres service
   container, frontend type check; auth-service: pytest) and builds every image
-* only a push to `main` / `dev` publishes (`:prod` / `:dev` plus `:sha-<commit>`); pull requests
+* only a push to `dev` builds and publishes (`:dev`, `:sha-<commit>`, and `:X.Y.Z` when the push is a release); `:prod` is set by the promote workflow after the `dev` → `main` merge, without a build; pull requests
   build but publish nothing
 * layers are cached in the registry (`:buildcache` tag), because the RAG image is several GB
 * third-party actions are pinned to commits; the workflows only get the permissions they need
