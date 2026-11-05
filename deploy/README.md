@@ -57,6 +57,7 @@ and **dev** (branch `dev`).
 | `scripts/init-stack.sh` | creates a stack directory on the server |
 | `scripts/update-stack.sh` | pulls new images and applies them (run by a timer) |
 | `scripts/clone-prod-to-dev.sh` | overwrites the GRIPL dev databases with a copy of prod |
+| `scripts/clone-dev-to-prod.sh` | one-time cutover: copies the GRIPL dev data into an empty prod (see `docs/move-dev-to-prod.md`) |
 | `systemd/` | timer + service templates that run the updater |
 
 auth-service has its own `deploy/` folder in its repo (same structure, plus its own
