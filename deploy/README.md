@@ -299,6 +299,20 @@ Known gaps (application level, not solved by this folder):
 * Rate limits count per client IP, so many users behind one university NAT address
   share a budget.
 
+## Database migrations
+
+Flyway applies the migrations in `gripl/gripl-backend/src/main/resources/db/migration` when a new backend
+starts, on dev and on prod. Going back to the old image does not undo them, which is why the updater takes a
+backup first. The pull request check `Migrations` (`.github/workflows/migrations.yml`) enforces the rules:
+
+* an existing `V*.sql` is never edited, renamed or deleted (Flyway stores a checksum of each applied file and the
+  backend would not start); add a new migration instead
+* a new migration has a higher version than the newest one on the target branch (Flyway does not apply them out
+  of order); if two pull requests both add `V17`, the second one has to be renumbered
+* statements that can lose data (`DROP TABLE/COLUMN`, `TRUNCATE`, `DELETE FROM`, a column type change, a rename)
+  only produce a **warning**. Treat it as the reminder to run the migration on dev against a copy of prod's data
+  (`clone-prod-to-dev.sh`) before a release with it is approved.
+
 ## Dev as a copy of prod
 
 ```bash
