@@ -7,10 +7,8 @@ and **dev** (branch `dev`).
 > **The server is reachable from the internet on ports 80 and 443.** Everything
 > published there must be protected; see [Security](#security).
 >
-> Status: the files in this folder are tested locally with real containers
-> (routing, prod/dev isolation, protections, updater, dev copy). They have **not**
-> been run on the server yet; the server still needs Docker and the one-time steps
-> below.
+> This file explains how the deployment is built. For day-to-day tasks (releasing, promoting to prod, backups,
+> users and roles) see [`docs/README.md`](../docs/README.md).
 
 ## The idea in one picture
 
