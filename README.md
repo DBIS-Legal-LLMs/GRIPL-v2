@@ -11,6 +11,12 @@ reasoning.
 
 ---
 
+## Documentation
+
+How to release, deploy to prod, manage users and roles, run the server and restore backups: see [docs/README.md](docs/README.md).
+
+---
+
 ## Installation Guide
 
 ### Prerequisites
