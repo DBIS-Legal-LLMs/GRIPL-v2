@@ -61,7 +61,7 @@ class DatasetTransferService(
             listOf("id", "bpmn_xml", "expected_values", "created_at", "updated_at", "name", "dataset_id")
 
         private val LABEL_COLUMNS =
-            listOf("id", "name", "description", "predefined")
+            listOf("id", "name", "description", "predefined", "color")
         private val EVALUATION_DATA_LABEL_COLUMNS =
             listOf("evaluation_data_id", "element_id", "label_id")
 
