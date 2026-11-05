@@ -42,6 +42,11 @@ COPY scripts/ ./scripts/
 # files still bind-mount ./data over this; the server stacks rely on the baked-in copy.
 COPY data/ ./data/
 
+# build version (set by CI)
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+LABEL org.opencontainers.image.version=$APP_VERSION
+
 # Expose the port uvicorn will listen on
 EXPOSE 8081
 

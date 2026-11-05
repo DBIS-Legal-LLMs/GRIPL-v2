@@ -10,6 +10,7 @@ import de.mertendieckmann.griplbackend.model.dto.ProcessModel
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelDetailDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelListItemDto
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
+import de.mertendieckmann.griplbackend.model.dto.UpdateProcessModelNameRequest
 import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
 import de.mertendieckmann.griplbackend.security.authenticatedUserId
@@ -50,7 +51,7 @@ class ProcessModelController(
         exchange: ServerWebExchange
     ): Mono<ResponseEntity<ProcessModelListItemDto>> {
         val userId = exchange.authenticatedUserId()
-        val name = namePart?.value()?.takeIf { it.isNotBlank() } ?: file.filename()
+        val name = validName(namePart?.value()?.takeIf { it.isNotBlank() } ?: file.filename())
 
         return ControllerUtils.getBpmnXmlMono(file).flatMap { bpmnXml ->
             Mono.fromCallable {
@@ -83,6 +84,75 @@ class ProcessModelController(
             .subscribeOn(Schedulers.boundedElastic())
             .map { model -> ResponseEntity.ok(model.toDetailDto()) }
             .defaultIfEmpty(ResponseEntity.notFound().build())
+    }
+
+    @Operation(
+        summary = "Update a process model",
+        description = "Replaces the BPMN XML (file part **bpmnFile**) of a process model, unless it is currently being analyzed. " +
+            "**bpmnVersion** must be the version the edit is based on (from GET); if the diagram was saved elsewhere " +
+            "since, the request fails with 409 instead of overwriting it. " +
+            "An existing analysis result is kept, flagged as **analysisOutdated**, until the model is analyzed again."
+    )
+    @PutMapping("/{id}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun updateProcessModel(
+        @PathVariable id: Long,
+        @RequestPart("bpmnFile") file: FilePart,
+        @RequestPart("bpmnVersion") versionPart: FormFieldPart,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<ProcessModelDetailDto>> {
+        val userId = exchange.authenticatedUserId()
+        val expectedVersion = versionPart.value().trim().toIntOrNull()
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "bpmnVersion must be a number")
+
+        return ControllerUtils.getBpmnXmlMono(file).flatMap { bpmnXml ->
+            Mono.fromCallable {
+                val model = repository.getByIdAndOwner(id, userId)
+                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No process model found for id $id")
+                model.requireSavableAt(expectedVersion)
+                if (!repository.updateBpmnXmlIfUnchanged(id, userId, bpmnXml, expectedVersion)) {
+                    // Something changed between the check above and the update — report what.
+                    val current = repository.getByIdAndOwner(id, userId)
+                        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No process model found for id $id")
+                    current.requireSavableAt(expectedVersion)
+                    throw ResponseStatusException(HttpStatus.CONFLICT, "Process model $id could not be saved, please try again")
+                }
+                repository.getByIdAndOwner(id, userId)!!.toDetailDto()
+            }.subscribeOn(Schedulers.boundedElastic())
+        }.map { ResponseEntity.ok(it) }
+    }
+
+    private fun ProcessModel.requireSavableAt(expectedVersion: Int) {
+        if (status == ProcessModelStatus.RUNNING) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Process model $id is currently being analyzed")
+        }
+        if (bpmnVersion != expectedVersion) {
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Process model '$name' was saved elsewhere (e.g. in another tab) since you opened it. " +
+                    "Reload the page to get the latest version — download your diagram first to keep your changes."
+            )
+        }
+    }
+
+    @Operation(
+        summary = "Rename a process model",
+        description = "Changes the display name of a process model. Allowed at any time, also during an analysis."
+    )
+    @PatchMapping("/{id}/name", consumes = [MediaType.APPLICATION_JSON_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
+    fun renameProcessModel(
+        @PathVariable id: Long,
+        @RequestBody request: UpdateProcessModelNameRequest,
+        exchange: ServerWebExchange
+    ): Mono<ResponseEntity<ProcessModelListItemDto>> {
+        val userId = exchange.authenticatedUserId()
+        val name = validName(request.name)
+
+        return Mono.fromCallable {
+            if (!repository.updateName(id, userId, name)) {
+                throw ResponseStatusException(HttpStatus.NOT_FOUND, "No process model found for id $id")
+            }
+            repository.getByIdAndOwner(id, userId)!!.toListItemDto()
+        }.subscribeOn(Schedulers.boundedElastic()).map { ResponseEntity.ok(it) }
     }
 
     @Operation(
@@ -147,6 +217,26 @@ class ProcessModelController(
             }
     }
 
+    private companion object {
+        /** Matches `process_model.name varchar(255)`. */
+        const val MAX_NAME_LENGTH = 255
+    }
+
+    /** Trimmed [raw] if it fits `process_model.name`; a 400 instead of a database error otherwise. */
+    private fun validName(raw: String?): String {
+        val name = raw?.trim()
+        if (name.isNullOrEmpty()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Name must not be empty")
+        }
+        if (name.length > MAX_NAME_LENGTH) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Name must be at most $MAX_NAME_LENGTH characters long (got ${name.length}): '${name.take(40)}…'"
+            )
+        }
+        return name
+    }
+
     private fun ProcessModel.toListItemDto(): ProcessModelListItemDto {
         return ProcessModelListItemDto(
             id = id,
@@ -157,7 +247,8 @@ class ProcessModelController(
             criticalElementCount = criticalElementCount,
             errorMessage = errorMessage,
             createdAt = createdAt,
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
+            analysisOutdated = analysisOutdated
         )
     }
 
@@ -174,7 +265,9 @@ class ProcessModelController(
             criticalElementCount = criticalElementCount,
             errorMessage = errorMessage,
             createdAt = createdAt,
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
+            analysisOutdated = analysisOutdated,
+            bpmnVersion = bpmnVersion
         )
     }
 }

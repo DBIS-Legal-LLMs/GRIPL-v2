@@ -27,6 +27,7 @@ import {Label as LabelDto} from "@/models/dto/Label";
 import {useAuth} from "@/context/auth-context";
 import ActiveLabelsPanel from "@/components/labeling/active-labels-panel";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
+import UnsavedChangesGuard from "@/components/unsaved-changes-guard";
 
 interface LabelingEditorProps {
     className?: string;
@@ -465,6 +466,7 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                     </button>
                 )}
             </aside>
+            <UnsavedChangesGuard when={hasUnsavedChanges}/>
         </div>
     );
 }

@@ -55,13 +55,51 @@ class DatasetTransferService(
         const val EVALUATION_DATA_FILE = "evaluation_data.csv"
         const val LABEL_FILE = "labels.csv"
         const val EVALUATION_DATA_LABEL_FILE = "evaluation_data_label.csv"
-        private val DATASET_COLUMNS = listOf("id", "name", "description", "created_at", "updated_at")
-        private val EVALUATION_DATA_COLUMNS =
+
+        val DATASET_COLUMNS = listOf("id", "name", "description", "created_at", "updated_at")
+        val EVALUATION_DATA_COLUMNS =
             listOf("id", "bpmn_xml", "expected_values", "created_at", "updated_at", "name", "dataset_id")
+
         private val LABEL_COLUMNS =
             listOf("id", "name", "description", "predefined")
         private val EVALUATION_DATA_LABEL_COLUMNS =
             listOf("evaluation_data_id", "element_id", "label_id")
+
+        fun writeZip(
+            datasetRows: List<List<String?>>,
+            evaluationDataRows: List<List<String?>>,
+            labelRows: List<List<String?>>? = null,
+            evaluationDataLabelRows: List<List<String?>>? = null
+        ): ByteArray {
+            require((labelRows == null) == (evaluationDataLabelRows == null)) {
+                "Label definitions and assignments must be exported together."
+            }
+
+            val bytes = ByteArrayOutputStream()
+            ZipOutputStream(bytes).use { zip ->
+                zip.putNextEntry(ZipEntry(DATASET_FILE))
+                zip.write(PostgresCsv.write(DATASET_COLUMNS, datasetRows).toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+
+                zip.putNextEntry(ZipEntry(EVALUATION_DATA_FILE))
+                zip.write(PostgresCsv.write(EVALUATION_DATA_COLUMNS, evaluationDataRows).toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+
+                if (labelRows != null && evaluationDataLabelRows != null) {
+                    zip.putNextEntry(ZipEntry(LABEL_FILE))
+                    zip.write(PostgresCsv.write(LABEL_COLUMNS, labelRows).toByteArray(Charsets.UTF_8))
+                    zip.closeEntry()
+
+                    zip.putNextEntry(ZipEntry(EVALUATION_DATA_LABEL_FILE))
+                    zip.write(
+                        PostgresCsv.write(EVALUATION_DATA_LABEL_COLUMNS, evaluationDataLabelRows)
+                            .toByteArray(Charsets.UTF_8)
+                    )
+                    zip.closeEntry()
+                }
+            }
+            return bytes.toByteArray()
+        }
     }
 
     /**
@@ -71,46 +109,17 @@ class DatasetTransferService(
     fun exportAsZip(ownerUserId: String, datasetIds: List<Long>?): ByteArray {
         val ownedIds = datasetRepository.getDatasetsByOwner(ownerUserId).map { it.id }
         val idsToExport = if (datasetIds == null) ownedIds else datasetIds.filter { it in ownedIds }
-        val datasetCsv = PostgresCsv.write(
-            DATASET_COLUMNS, datasetRepository.getDatasetExportRows(idsToExport, ownerUserId)
-        )
-        val evaluationDataCsv = PostgresCsv.write(
-            EVALUATION_DATA_COLUMNS,
-            evaluationDataRepository.getEvaluationDataExportRows(idsToExport, ownerUserId)
-        )
-        val labelsCsv = PostgresCsv.write(
-            LABEL_COLUMNS,
-            labelRepository.getExportRowsForDatasetIds(
-                idsToExport,
-                ownerUserId
-            )
-        )
 
-        val evaluationDataLabelCsv = PostgresCsv.write(
-            EVALUATION_DATA_LABEL_COLUMNS,
-            evaluationDataLabelRepository.getExportRowsForDatasetIds(
-                idsToExport,
-                ownerUserId
-            )
+        val labelRows = labelRepository.getExportRowsForDatasetIds(idsToExport, ownerUserId)
+        val evaluationDataLabelRows =
+            evaluationDataLabelRepository.getExportRowsForDatasetIds(idsToExport, ownerUserId)
+
+        return writeZip(
+            datasetRepository.getDatasetExportRows(idsToExport, ownerUserId),
+            evaluationDataRepository.getEvaluationDataExportRows(idsToExport, ownerUserId),
+            labelRows,
+            evaluationDataLabelRows
         )
-
-        val bytes = ByteArrayOutputStream()
-        ZipOutputStream(bytes).use { zip ->
-            zip.putNextEntry(ZipEntry(DATASET_FILE))
-            zip.write(datasetCsv.toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry(EVALUATION_DATA_FILE))
-            zip.write(evaluationDataCsv.toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry(LABEL_FILE))
-            zip.write(labelsCsv.toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-
-            zip.putNextEntry(ZipEntry(EVALUATION_DATA_LABEL_FILE))
-            zip.write(evaluationDataLabelCsv.toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-        }
-        return bytes.toByteArray()
     }
 
     /**

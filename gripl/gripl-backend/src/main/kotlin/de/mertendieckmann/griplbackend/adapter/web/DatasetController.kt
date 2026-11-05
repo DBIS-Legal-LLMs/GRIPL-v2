@@ -1,5 +1,6 @@
 package de.mertendieckmann.griplbackend.adapter.web
 
+import de.mertendieckmann.griplbackend.adapter.web.utils.ControllerUtils.zipResponse
 import de.mertendieckmann.griplbackend.application.dataset.DatasetTransferService
 import de.mertendieckmann.griplbackend.application.dataset.ImportedDataset
 import de.mertendieckmann.griplbackend.model.dto.CreateDatasetRequest
@@ -9,8 +10,6 @@ import de.mertendieckmann.griplbackend.security.authenticatedUserId
 import de.mertendieckmann.griplbackend.security.requirePrivilegedGriplRole
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.core.io.buffer.DataBufferUtils
-import org.springframework.http.ContentDisposition
-import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -177,10 +176,4 @@ class DatasetController(
         DataBufferUtils.join(part.content()).map { buffer ->
             buffer.asInputStream().use { it.readBytes() }.also { DataBufferUtils.release(buffer) }
         }
-
-    private fun zipResponse(bytes: ByteArray, fileName: String): ResponseEntity<ByteArray> =
-        ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(fileName).build().toString())
-            .contentType(MediaType.parseMediaType("application/zip"))
-            .body(bytes)
 }
