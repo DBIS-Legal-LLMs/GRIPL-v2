@@ -163,11 +163,22 @@ First-start chores per environment:
 merge into dev/main ──► CI builds the images ──► ghcr.io/dbis-legal-llms/<name>:dev|prod
                                                           │
          timer on the server, every ~3 min, per stack ◄───┘  update-stack.sh:
-           git fetch (compose definition) → docker compose pull → docker compose up -d --wait
+           git fetch (compose definition) → docker compose pull (one service at a time)
+           → dry run → backup, when something running is about to be replaced
+           → docker compose up -d --wait
 ```
 
 * Nothing connects *into* the server for deployments.
-* A registry outage or a failing pull leaves the running containers untouched.
+* A registry outage or a failing pull leaves the running containers untouched. Images are pulled
+  one at a time (three attempts each): pulled in parallel, images that share layers make containerd fail
+  with `failed commit on ref layer-sha256...`.
+* **Backup before every update that replaces something.** A dry run of `up` decides whether anything changes;
+  if so, Postgres (GRIPL) and MongoDB (auth-service) are dumped to
+  `/srv/gripl/backups/<env>/<app>/<timestamp>-before-update/` (newest 5 kept, `BACKUP_KEEP`, `BACKUP_DIR`), and on
+  prod the Neo4j and RAG volumes are archived when the RAG service is about to be replaced (`BACKUP_VOLUMES=1|0`).
+  The dumps are read back once to prove they are usable. **If the backup fails, nothing is updated.** A migration that
+  a new backend applies cannot be undone by going back to the old image, so this is how you get the data back.
+  These backups are on the same server; they do not replace an off-server copy (SERVER-SETUP.md, part 11).
 * `up -d` only recreates containers whose image or configuration changed.
 * A container that never becomes healthy makes the run fail (visible with
   `journalctl -u 'dbis-update@*'`); the previous image is not rolled back
