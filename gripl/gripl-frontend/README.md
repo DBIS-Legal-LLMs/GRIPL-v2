@@ -29,16 +29,20 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 The existing **Labeltools** area on the BPMN model labeling page contains the
 active predefined and custom label list. Researchers and admins can create
-labels (both name and description are required); a duplicate active name is
-reported as a conflict. Admins can edit labels and archive custom labels.
-Predefined label names stay fixed. Archiving removes a label from future
-choices but does not remove its existing test-case assignments.
+labels (both name and description are required). Each custom label can have an
+individual color, chosen with a color picker or entered as a hex value. If no
+color is set, a default color is used. A duplicate active name is reported as a
+conflict. Admins can edit labels and archive custom labels. Predefined label
+names stay fixed. Archiving removes a label from future choices but does not
+remove its existing test-case assignments.
 
 In the BPMN test-case editor, an activity can have multiple labels. The
 predefined GDPR label selection remains synchronized with the existing
 `classification` enum so current multiclass analysis/evaluation remains
-compatible. Test-case reads use `expectedValues[].labels`; saves send
-`expectedValues[].labelIds` (and the compatible `classification`) without
-writing the response-only `labels` property. Label management and assignment
-use the backend `/labels` API through the frontend `/api` proxy; backend role
-checks remain authoritative.
+compatible. Custom labels are shown in their own color in the label lists and
+on the BPMN canvas: an activity that has only custom labels (no GDPR class) is
+highlighted in the label's color instead of the generic privacy tint. Test-case
+reads use `expectedValues[].labels`; saves send `expectedValues[].labelIds` (and
+the compatible `classification`) without writing the response-only `labels`
+property. Label management and assignment use the backend `/labels` API through
+the frontend `/api` proxy; backend role checks remain authoritative.

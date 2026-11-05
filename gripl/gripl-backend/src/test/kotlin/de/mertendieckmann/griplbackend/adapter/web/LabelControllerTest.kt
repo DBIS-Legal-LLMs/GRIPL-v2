@@ -37,6 +37,7 @@ class LabelControllerTest {
         name = "Contract review",
         description = "Reviews personal data",
         predefined = false,
+        color = "#06b6d4",
         createdBy = "user-1",
         createdAt = "2026-10-28T12:00:00Z",
         updatedBy = "user-1",

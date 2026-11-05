@@ -76,6 +76,7 @@ class EvaluationDataLabelRepositoryTest(
         val customLabel = labelRepository.create(
             name = "Contract review",
             description = "Reviews personal data in contracts",
+            color = "#ff0000",
             userId = "researcher-1"
         )
 
@@ -151,6 +152,7 @@ class EvaluationDataLabelRepositoryTest(
         val archivedLabel = labelRepository.create(
             name = "Archived custom label",
             description = "Will be archived during this test",
+            color = null,
             userId = "researcher-1"
         )
 
@@ -201,12 +203,14 @@ class EvaluationDataLabelRepositoryTest(
         val firstCustomLabel = labelRepository.create(
             name = "First saved custom label",
             description = "Assigned when the test case is created",
+            color = "#ff0000",
             userId = "researcher-1"
         )
 
         val secondCustomLabel = labelRepository.create(
             name = "Second saved custom label",
             description = "Assigned when the test case is updated",
+            color = "#00ff00",
             userId = "researcher-1"
         )
 

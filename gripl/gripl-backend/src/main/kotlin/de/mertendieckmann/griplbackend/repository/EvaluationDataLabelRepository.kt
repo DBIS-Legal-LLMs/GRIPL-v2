@@ -33,6 +33,7 @@ class EvaluationDataLabelRepository(
                 labels.name,
                 labels.description,
                 labels.predefined,
+                labels.color,
                 labels.deleted_at
             FROM evaluation_data_label
             JOIN labels
@@ -356,6 +357,7 @@ class EvaluationDataLabelRepository(
                 name = rs.getString("name"),
                 description = rs.getString("description"),
                 predefined = rs.getBoolean("predefined"),
+                color = rs.getString("color"),
                 deletedAt = rs.getString("deleted_at")
             )
         )

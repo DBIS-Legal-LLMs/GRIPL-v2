@@ -18,6 +18,7 @@ class LabelRepository(
             name = rs.getString("name"),
             description = rs.getString("description"),
             predefined = rs.getBoolean("predefined"),
+            color = rs.getString("color"),
             createdBy = rs.getString("created_by"),
             createdAt = rs.getString("created_at"),
             updatedBy = rs.getString("updated_by"),
@@ -70,7 +71,8 @@ class LabelRepository(
                 labels.id::text,
                 labels.name,
                 labels.description,
-                labels.predefined::text
+                labels.predefined::text,
+                labels.color
             FROM labels
             JOIN evaluation_data_label
                 ON evaluation_data_label.label_id = labels.id
@@ -84,7 +86,7 @@ class LabelRepository(
         """.trimIndent()
 
         val rowMapper = RowMapper { rs, _ ->
-            (1..4).map { rs.getString(it) }
+            (1..5).map { rs.getString(it) }
         }
 
         return jdbc.query(sql, rowMapper, ownerUserId)
@@ -121,6 +123,7 @@ class LabelRepository(
     fun create(
         name: String,
         description: String,
+        color: String?,
         userId: String
     ): Label {
         val sql = """
@@ -128,10 +131,11 @@ class LabelRepository(
                 name,
                 description,
                 predefined,
+                color,
                 created_by,
                 updated_by
             )
-            VALUES (?, ?, false, ?, ?)
+            VALUES (?, ?, false, ?, ?, ?)
             RETURNING *
         """.trimIndent()
 
@@ -140,6 +144,7 @@ class LabelRepository(
             mapper,
             name,
             description,
+            color,
             userId,
             userId
         )!!
@@ -150,12 +155,14 @@ class LabelRepository(
         id: Long,
         name: String,
         description: String,
+        color: String?,
         userId: String
     ): Label? {
         val sql = """
             UPDATE labels
             SET name = ?,
                 description = ?,
+                color = ?,
                 updated_by = ?,
                 updated_at = now()
             WHERE id = ?
@@ -168,6 +175,7 @@ class LabelRepository(
             mapper,
             name,
             description,
+            color,
             userId,
             id
         ).firstOrNull()

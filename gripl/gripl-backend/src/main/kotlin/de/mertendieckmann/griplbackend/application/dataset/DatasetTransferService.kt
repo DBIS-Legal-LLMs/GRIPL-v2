@@ -387,6 +387,7 @@ class DatasetTransferService(
         return labelRepository.create(
             name = importedLabel.name,
             description = importedLabel.description,
+            color = importedLabel.color,
             userId = ownerUserId
         ).id
     }
@@ -411,7 +412,8 @@ class DatasetTransferService(
                     ?.toBooleanStrictOrNull()
                     ?: throw DatasetImportException(
                         "$LABEL_FILE row $line: predefined must be true or false"
-                    )
+                    ),
+                color = row["color"]?.trim()?.takeIf { it.isNotEmpty() }
             )
         }
 
@@ -478,7 +480,8 @@ class DatasetTransferService(
         val originalId: String,
         val name: String,
         val description: String,
-        val predefined: Boolean
+        val predefined: Boolean,
+        val color: String?
     )
 
     private data class ImportedLabelAssignment(

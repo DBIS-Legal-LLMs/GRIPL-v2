@@ -60,6 +60,7 @@ class DatasetTransferServiceTest(
         val customLabel = labelRepository.create(
             name = "Exported custom label",
             description = "Must survive dataset transfer",
+            color = "#aabbcc",
             userId = ownerUserId
         )
 

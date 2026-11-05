@@ -22,14 +22,18 @@ interface ActiveLabelsPanelProps {
 export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelProps) {
     const {griplRole, isLoading: isAuthLoading, token} = useAuth();
     const {showToast} = useToast();
+    const DEFAULT_CUSTOM_LABEL_COLOR = "#06b6d4";
+
     const [labels, setLabels] = useState<Label[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
+    const [color, setColor] = useState(DEFAULT_CUSTOM_LABEL_COLOR);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [editName, setEditName] = useState("");
     const [editDescription, setEditDescription] = useState("");
+    const [editColor, setEditColor] = useState(DEFAULT_CUSTOM_LABEL_COLOR);
     const [archiveTarget, setArchiveTarget] = useState<Label | null>(null);
     const [formError, setFormError] = useState("");
     const canCreate = griplRole === "researcher" || griplRole === "admin";
@@ -38,6 +42,7 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
 
     const loadLabels = useCallback(async () => {
         setIsLoading(true);
+        setFormError("");
         try {
             const response = await authenticatedFetch("/api/labels");
             if (!response.ok) throw new Error(await extractErrorDetails(response));
@@ -71,7 +76,7 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
             const response = await authenticatedFetch("/api/labels", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({name: requestName, description: requestDescription}),
+                body: JSON.stringify({name: requestName, description: requestDescription, color}),
             });
             if (response.status === 409) {
                 setFormError("An active label with this name already exists.");
@@ -81,6 +86,7 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
             if (!response.ok) throw new Error(await extractErrorDetails(response));
             setName("");
             setDescription("");
+            setColor(DEFAULT_CUSTOM_LABEL_COLOR);
             showToast({title: `Label ${requestName} created.`, variant: "success"});
             await loadLabels();
         } catch (error) {
@@ -94,6 +100,7 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
         setEditingId(label.id);
         setEditName(label.name);
         setEditDescription(label.description);
+        setEditColor(label.color ?? DEFAULT_CUSTOM_LABEL_COLOR);
         setFormError("");
     }
 
@@ -107,10 +114,17 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
         setFormError("");
         setIsSaving(true);
         try {
+            const body: { name: string; description: string; color?: string } = {
+                name: requestName,
+                description: requestDescription,
+            };
+            if (!label.predefined) {
+                body.color = editColor;
+            }
             const response = await authenticatedFetch(`/api/labels/${label.id}`, {
                 method: "PATCH",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({name: requestName, description: requestDescription}),
+                body: JSON.stringify(body),
             });
             if (response.status === 409) {
                 setFormError("An active label with this name already exists.");
@@ -187,6 +201,24 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
                                                             onChange={(event) => setEditName(event.target.value)}
                                                         />
                                                         <Textarea aria-label="Label description" rows={2} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} />
+                                                        {!label.predefined && (
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="color"
+                                                                    value={editColor}
+                                                                    onChange={(event) => setEditColor(event.target.value)}
+                                                                    className="h-8 w-8 cursor-pointer rounded border p-0"
+                                                                    aria-label="Label color"
+                                                                />
+                                                                <Input
+                                                                    type="text"
+                                                                    value={editColor}
+                                                                    onChange={(event) => setEditColor(event.target.value)}
+                                                                    className="h-8 w-28 text-xs"
+                                                                    aria-label="Label hex color"
+                                                                />
+                                                            </div>
+                                                        )}
                                                         <div className="flex gap-2">
                                                             <Button size="sm" onClick={() => void saveEdit(label)} disabled={isSaving}><Save className="h-4 w-4" /> Save</Button>
                                                             <Button size="sm" variant="outline" onClick={() => setEditingId(null)} disabled={isSaving}><X className="h-4 w-4" /> Cancel</Button>
@@ -195,7 +227,17 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
                                                 ) : (
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div className="min-w-0">
-                                                            <p className="font-medium">{label.name}</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <span
+                                                                    className="inline-block h-3 w-3 rounded-full border"
+                                                                    style={{
+                                                                        backgroundColor: !label.predefined ? (label.color ?? DEFAULT_CUSTOM_LABEL_COLOR) : undefined,
+                                                                        borderColor: !label.predefined ? (label.color ?? DEFAULT_CUSTOM_LABEL_COLOR) : "currentColor",
+                                                                    }}
+                                                                    aria-hidden="true"
+                                                                />
+                                                                <p className="font-medium">{label.name}</p>
+                                                            </div>
                                                             <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{label.description}</p>
                                                         </div>
                                                         {(isAdmin || (!label.predefined && canEditCustomLabels)) && (
@@ -225,6 +267,26 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
                                         <div className="space-y-1">
                                             <FormLabel htmlFor="new-label-description">Description</FormLabel>
                                             <Textarea id="new-label-description" rows={2} value={description} onChange={(event) => setDescription(event.target.value)} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <FormLabel htmlFor="new-label-color">Color</FormLabel>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    id="new-label-color"
+                                                    type="color"
+                                                    value={color}
+                                                    onChange={(event) => setColor(event.target.value)}
+                                                    className="h-8 w-8 cursor-pointer rounded border p-0"
+                                                    aria-label="Label color"
+                                                />
+                                                <Input
+                                                    type="text"
+                                                    value={color}
+                                                    onChange={(event) => setColor(event.target.value)}
+                                                    className="h-8 w-28 text-xs"
+                                                    aria-label="Label hex color"
+                                                />
+                                            </div>
                                         </div>
                                         <Button type="submit" className="w-full" disabled={isSaving || isAuthLoading}>
                                             <Plus className="h-4 w-4" /> Create label

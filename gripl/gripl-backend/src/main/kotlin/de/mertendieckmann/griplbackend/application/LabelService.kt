@@ -23,10 +23,11 @@ class LabelService(
     fun create(request: CreateLabelRequest, userId: String): Label {
         val name = request.name.trim()
         val description = request.description.trim()
+        val color = request.color?.trim()?.ifBlank { null }
         validateInput(name, description)
 
         return handleDuplicateName {
-            labelRepository.create(name, description, userId)
+            labelRepository.create(name, description, color, userId)
         }
     }
 
@@ -38,6 +39,7 @@ class LabelService(
     ): Label {
         val name = request.name.trim()
         val description = request.description.trim()
+        val color = request.color?.trim()?.ifBlank { null }
         validateInput(name, description)
 
         val existingLabel = labelRepository.findById(id)
@@ -61,7 +63,7 @@ class LabelService(
         }
 
         return handleDuplicateName {
-            labelRepository.update(id, name, description, userId)
+            labelRepository.update(id, name, description, color, userId)
                 ?: throw ResponseStatusException(
                     HttpStatus.NOT_FOUND,
                     "Active label not found."

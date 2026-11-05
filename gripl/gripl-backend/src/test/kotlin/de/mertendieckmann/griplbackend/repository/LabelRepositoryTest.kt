@@ -58,10 +58,12 @@ class LabelRepositoryTest(
         val created = repository.create(
             name = "Contract review",
             description = "Reviews personal data in contracts",
+            color = "#ff0000",
             userId = "researcher-1"
         )
 
         assertFalse(created.predefined)
+        assertEquals("#ff0000", created.color)
         assertEquals("researcher-1", created.createdBy)
         assertEquals("researcher-1", created.updatedBy)
         assertNotNull(created.createdAt)
@@ -78,6 +80,7 @@ class LabelRepositoryTest(
         repository.create(
             name = "Contract review",
             description = "First description",
+            color = null,
             userId = "researcher-1"
         )
 
@@ -85,6 +88,7 @@ class LabelRepositoryTest(
             repository.create(
                 name = "  contract REVIEW  ",
                 description = "Second description",
+                color = null,
                 userId = "researcher-2"
             )
         }
@@ -95,6 +99,7 @@ class LabelRepositoryTest(
         val created = repository.create(
             name = "Contract review",
             description = "Initial description",
+            color = "#ff0000",
             userId = "researcher-1"
         )
 
@@ -102,6 +107,7 @@ class LabelRepositoryTest(
             id = created.id,
             name = "Updated contract review",
             description = "Updated description",
+            color = "#00ff00",
             userId = "admin-1"
         )
 
@@ -117,6 +123,7 @@ class LabelRepositoryTest(
         val created = repository.create(
             name = "Contract review",
             description = "Reviews personal data in contracts",
+            color = null,
             userId = "researcher-1"
         )
 
@@ -133,6 +140,7 @@ class LabelRepositoryTest(
                 id = created.id,
                 name = "Changed after deletion",
                 description = "This must not be saved",
+                color = null,
                 userId = "admin-1"
             )
         )

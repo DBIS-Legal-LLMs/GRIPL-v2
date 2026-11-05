@@ -36,6 +36,8 @@ interface BpmnEditorProps {
   bpmnXml: string
   highlightedActivityIds?: string[]
   highlightedActivityCategories?: Record<string, GdprCategory[]>
+  /** Map of activity id -> hex colors for custom label highlighting */
+  highlightedActivityLabelColors?: Record<string, string[]>
   onNew?: () => void
   onDiagramChanged: (xml: string) => void
   cards?: BpmnToolCard[]
@@ -50,7 +52,7 @@ interface BpmnEditorProps {
 }
 
 export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = [], onNew, onDiagramChanged, cards = [],
-                                     highlightedActivityCategories = {}, editorClassName, disableEditing, onEvent, onModelerChanged,
+                                     highlightedActivityCategories = {}, highlightedActivityLabelColors = {}, editorClassName, disableEditing, onEvent, onModelerChanged,
                                      exportFileName, askForExportFileName }: BpmnEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const modelerRef = useRef<any>(null)
@@ -106,8 +108,8 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
 
   useEffect(() => {
     if (!modelerRef.current || !isLoaded || !highlightedActivityIds) return
-    highlightActivities(modelerRef.current, highlightedActivityIds, highlightedActivityCategories)
-  }, [highlightedActivityIds, highlightedActivityCategories, isLoaded])
+    highlightActivities(modelerRef.current, highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors)
+  }, [highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors, isLoaded])
 
   async function handleFileLoaded(content: string) {
     onDiagramChanged(content)
@@ -185,7 +187,7 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
         }
 
         if (highlightedActivityIds) {
-          highlightActivities(modeler, highlightedActivityIds, highlightedActivityCategories)
+          highlightActivities(modeler, highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors)
         }
       } catch (err) {
         console.error("Error while importing BPMN XML", err)
@@ -196,7 +198,30 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
     }
   }
 
-  function highlightActivities(modeler: any, activityIds: string[], categoryMap: Record<string, GdprCategory[]>) {
+  function hexToRgba(hex: string, alpha: number): string {
+    const clean = hex.replace("#", "");
+    const bigint = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function mixColors(colors: string[], alpha: number): string {
+    if (colors.length === 0) return "rgba(239, 68, 68, 0.45)";
+    if (colors.length === 1) return hexToRgba(colors[0], alpha);
+    // Average multiple label colors for a visually distinct blend.
+    const rgb = colors.map((hex) => {
+      const clean = hex.replace("#", "");
+      const bigint = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
+      return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+    });
+    const sums = rgb.reduce(([r, g, b], [rr, gg, bb]) => [r + rr, g + gg, b + bb], [0, 0, 0]);
+    const avg = sums.map((v) => Math.round(v / colors.length));
+    return `rgba(${avg[0]}, ${avg[1]}, ${avg[2]}, ${alpha})`;
+  }
+
+  function highlightActivities(modeler: any, activityIds: string[], categoryMap: Record<string, GdprCategory[]>, labelColorMap: Record<string, string[]>) {
     try {
       const canvas = modeler.get("canvas")
       const elementRegistry = modeler.get("elementRegistry")
@@ -211,13 +236,28 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
         return
       }
 
+      // Remove previously injected custom label styles so colors update cleanly.
+      const existingCustomStyle = document.getElementById("bpmn-custom-label-highlight-styles");
+      if (existingCustomStyle) {
+        existingCustomStyle.remove();
+      }
+      const customStyles: string[] = [];
+
       activityIds.forEach((id) => {
         const element = elementRegistry.get(id)
         if (element) {
           const categories = categoryMap[id] || []
+          const labelColors = labelColorMap[id] || []
 
           if (categories.length === 0) {
-            canvas.addMarker(id, "highlight-privacy")
+            if (labelColors.length > 0) {
+              const className = `highlight-custom-label-${id}`;
+              canvas.addMarker(id, className);
+              const fill = mixColors(labelColors, labelColors.length === 1 ? 0.45 : 0.55);
+              customStyles.push(`.${className} .djs-visual > :nth-child(1) { fill: ${fill} !important; }`);
+            } else {
+              canvas.addMarker(id, "highlight-privacy")
+            }
             return
           }
 
@@ -230,6 +270,13 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
         }
       })
 
+      if (customStyles.length > 0) {
+        const styleElement = document.createElement("style");
+        styleElement.id = "bpmn-custom-label-highlight-styles";
+        styleElement.textContent = customStyles.join("\n");
+        document.head.appendChild(styleElement);
+      }
+
       if (!styleElementRef.current) {
         const styleElement = document.createElement("style")
         styleElement.textContent = `
@@ -240,7 +287,7 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
              a darker patch. We only set fill, never stroke or opacity, so the
              element outline and the label text keep their normal colour. */  
         .highlight-privacy .djs-visual > :nth-child(1) {
-            fill: rgba(239, 68, 68, 0.45) !important;
+            fill: rgba(148, 163, 184, 0.45) !important;
           }
           .highlight-gdpr-collection .djs-visual > :nth-child(1) {
             fill: rgba(16, 185, 129, 0.45) !important;

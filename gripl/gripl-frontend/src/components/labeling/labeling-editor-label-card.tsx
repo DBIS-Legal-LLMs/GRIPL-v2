@@ -203,15 +203,25 @@ export default function LabelingEditorLabelCard({ className, elementName, elemen
                                                 className={cn(
                                                     "rounded-full border px-2 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
                                                     selected
-                                                        ? "border-primary bg-primary text-primary-foreground"
-                                                        : "border-border bg-background text-muted-foreground hover:border-primary hover:text-primary"
+                                                        ? "text-white"
+                                                        : "bg-background text-muted-foreground hover:opacity-80"
                                                 )}
+                                                style={selected ? {
+                                                    backgroundColor: label.color ?? "#06b6d4",
+                                                    borderColor: label.color ?? "#06b6d4",
+                                                } : {
+                                                    borderColor: label.color ?? "#06b6d4",
+                                                    color: label.color ?? "#06b6d4",
+                                                }}
                                             >
                                                 {label.name}
                                                 {archived && (
-                                                    <Badge variant="outline" className="ml-1 border-amber-500 text-[9px] text-amber-700 dark:text-amber-300">
-                                                        Archived
-                                                    </Badge>
+                                                    <Badge 
+    variant="outline" 
+    className="ml-1 text-[9px] bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-700"
+>
+    Archived
+</Badge>
                                                 )}
                                             </button>
                                         );

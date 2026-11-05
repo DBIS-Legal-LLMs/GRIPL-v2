@@ -24,12 +24,14 @@ class LabelServiceTest {
 
     private fun label(
         predefined: Boolean = false,
+        color: String? = "#06b6d4",
         deletedAt: String? = null
     ) = Label(
         id = 8L,
         name = "Contract review",
         description = "Reviews personal data in contracts",
         predefined = predefined,
+        color = color,
         createdBy = "user-1",
         createdAt = "2026-10-28T12:00:00Z",
         updatedBy = "user-1",
@@ -45,6 +47,7 @@ class LabelServiceTest {
             repository.create(
                 stored.name,
                 stored.description,
+                stored.color,
                 "user-1"
             )
         ).thenReturn(stored)
@@ -61,6 +64,7 @@ class LabelServiceTest {
         verify(repository).create(
             stored.name,
             stored.description,
+            stored.color,
             "user-1"
         )
     }
@@ -94,7 +98,7 @@ class LabelServiceTest {
     @Test
     fun `create returns conflict when the database rejects a duplicate name`() {
         whenever(
-            repository.create("Contract review", "Description", "user-1")
+            repository.create("Contract review", "Description", null, "user-1")
         ).thenThrow(DuplicateKeyException("Duplicate active label name"))
 
         val exception = assertThrows(ResponseStatusException::class.java) {
@@ -126,6 +130,7 @@ class LabelServiceTest {
                 8L,
                 "Updated name",
                 "Updated description",
+                updated.color,
                 "admin-1"
             )
         ).thenReturn(updated)
@@ -141,6 +146,7 @@ class LabelServiceTest {
             8L,
             "Updated name",
             "Updated description",
+            updated.color,
             "admin-1"
         )
     }
@@ -168,7 +174,7 @@ class LabelServiceTest {
         whenever(repository.findById(8L)).thenReturn(label())
 
         whenever(
-            repository.update(8L, "Name", "Description", "admin-1")
+            repository.update(8L, "Name", "Description", null, "admin-1")
         ).thenReturn(null)
 
         val exception = assertThrows(ResponseStatusException::class.java) {
@@ -187,7 +193,7 @@ class LabelServiceTest {
         whenever(repository.findById(8L)).thenReturn(label())
 
         whenever(
-            repository.update(8L, "Name", "Description", "admin-1")
+            repository.update(8L, "Name", "Description", null, "admin-1")
         ).thenThrow(DuplicateKeyException("Duplicate active label name"))
 
         val exception = assertThrows(ResponseStatusException::class.java) {
@@ -240,6 +246,7 @@ class LabelServiceTest {
                 8L,
                 predefined.name,
                 "Updated description",
+                null,
                 "admin-1"
             )
         ).thenReturn(updated)
@@ -258,6 +265,7 @@ class LabelServiceTest {
             8L,
             predefined.name,
             "Updated description",
+            null,
             "admin-1"
         )
     }

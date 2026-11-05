@@ -65,10 +65,22 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
     const {isMulticlass, backendEndpoint} = useAnalysisEndpoint();
 
     const handleAvailableLabelsChanged = useCallback((activeLabels: LabelDto[]) => {
-        const assignedLabels = (evaluationData.expectedValues ?? []).flatMap((entry) => entry.labels ?? []);
-        const merged = new Map<number, LabelDto>();
-        [...activeLabels, ...assignedLabels].forEach((label) => merged.set(label.id, label));
-        setAvailableLabels(Array.from(merged.values()));
+        const initialAssignedLabels = (evaluationData.expectedValues ?? []).flatMap((entry) => entry.labels ?? []);
+        const activeIds = new Set(activeLabels.map((label) => label.id));
+        setAvailableLabels((previous) => {
+            const merged = new Map<number, LabelDto>();
+            [...activeLabels, ...initialAssignedLabels].forEach((label) => merged.set(label.id, label));
+            previous.forEach((label) => {
+                if (merged.has(label.id)) return;
+                if (activeIds.has(label.id)) return;
+                // Label is no longer active (archived) but still known in this session.
+                merged.set(label.id, {
+                    ...label,
+                    deletedAt: label.deletedAt ?? new Date().toISOString(),
+                });
+            });
+            return Array.from(merged.values());
+        });
     }, [evaluationData.expectedValues]);
 
     useEffect(() => {
@@ -220,6 +232,20 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
         return acc;
     }, {} as Record<string, GdprCategory[]>);
 
+    const highlightedActivityLabelColors = criticalActivities.reduce((acc, critical) => {
+        const assignedIds = critical.labelIds ?? critical.labels?.map((label) => label.id) ?? [];
+        const labelColors = assignedIds
+            .map((id) => {
+                const active = availableLabels.find((l) => l.id === id);
+                const embedded = critical.labels?.find((l) => l.id === id);
+                const label = active ?? embedded;
+                return label?.predefined === false ? label.color : null;
+            })
+            .filter((color): color is string => Boolean(color));
+        acc[critical.value] = labelColors.length > 0 ? labelColors : [];
+        return acc;
+    }, {} as Record<string, string[]>);
+
     const cards: BpmnToolCard[] = [
         {
             position: "top-right",
@@ -288,6 +314,7 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                     cards={cards}
                     highlightedActivityIds={criticalActivities.map(critical => critical.value)}
                     highlightedActivityCategories={highlightedActivityCategoryMap}
+                    highlightedActivityLabelColors={highlightedActivityLabelColors}
                     onDiagramChanged={handleDiagramChanged}
                     editorClassName={isLabelMode ? "border border-destructive" : ""}
                     disableEditing={isLabelMode}
@@ -397,7 +424,16 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                                                 </Badge>
                                             )}</>
                                             {assignedLabels.filter((label) => !label.predefined).map((label) => (
-                                                <Badge key={`${critical.value}-label-${label.id}`} variant="outline" className="text-[10px]">
+                                                <Badge
+                                                    key={`${critical.value}-label-${label.id}`}
+                                                    variant="outline"
+                                                    className="text-[10px]"
+                                                    style={{
+                                                        backgroundColor: label.color ?? "#06b6d4",
+                                                        borderColor: label.color ?? "#06b6d4",
+                                                        color: "#ffffff",
+                                                    }}
+                                                >
                                                     {label.name}{label.deletedAt ? " (archived)" : ""}
                                                 </Badge>
                                             ))}
