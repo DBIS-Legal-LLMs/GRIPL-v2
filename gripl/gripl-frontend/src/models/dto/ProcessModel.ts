@@ -13,12 +13,15 @@ export interface ProcessModelListItem {
     errorMessage?: string | null;
     createdAt: string;
     updatedAt: string;
+    analysisOutdated?: boolean;
 }
 
 export interface ProcessModelDetail {
     id: number;
     name: string;
     bpmnXml: string;
+    /** Bumped on every diagram save; sent back when saving to detect concurrent edits */
+    bpmnVersion: number;
     status: ProcessModelStatus;
     analysisEndpoint?: string | null;
     analysisResult?: AnalysisResponse | null;
@@ -28,6 +31,7 @@ export interface ProcessModelDetail {
     errorMessage?: string | null;
     createdAt: string;
     updatedAt: string;
+    analysisOutdated?: boolean;
 }
 
 export interface EnqueueAnalysisRequest {
@@ -45,3 +49,11 @@ export interface EnqueueAnalysisResponse {
 }
 
 export const IN_FLIGHT_STATUSES: ProcessModelStatus[] = ["QUEUED", "RUNNING"];
+
+/** Window event fired after a process model was renamed, e.g. so the breadcrumbs can follow. */
+export const PROCESS_MODEL_RENAMED_EVENT = "gripl:process-model-renamed";
+
+export interface ProcessModelRenamedDetail {
+    id: number;
+    name: string;
+}

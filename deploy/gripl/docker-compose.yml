@@ -4,7 +4,7 @@
 # next to it (ENVIRONMENT, GRIPL_HOST, IMAGE_TAG, secrets). See deploy/README.md.
 #
 # Images are NOT built here: CI builds them and pushes them to GHCR
-# (:prod from main, :dev from dev); the updater on the server pulls them.
+# (:dev built from dev, :prod promoted from a dev release); the updater on the server pulls them.
 #
 # The service names below (gripl-frontend, gripl-backend, gripl-rag, auth-service)
 # are baked into the frontend image as proxy targets (see "Frontend build args"

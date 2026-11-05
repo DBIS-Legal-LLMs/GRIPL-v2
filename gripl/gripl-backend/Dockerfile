@@ -25,6 +25,11 @@ RUN openssl x509 -in /usr/local/share/ca-certificates/dbis-infrastruktur-ca.crt 
 
 WORKDIR /app
 
+# build version (set by CI), served at /actuator/info; last so it does not invalidate cached layers
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+LABEL org.opencontainers.image.version=$APP_VERSION
+
 COPY --from=builder /app/target/*.jar ./app.jar
 
 EXPOSE 8080

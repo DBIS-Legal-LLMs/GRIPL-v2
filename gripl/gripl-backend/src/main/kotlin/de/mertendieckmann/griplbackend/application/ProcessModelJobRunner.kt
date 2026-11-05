@@ -172,7 +172,7 @@ class ProcessModelJobRunner(
             }
 
             val totalElements = BpmnExtractor().extractBpmnElements(model.bpmnXml).size
-            repository.markDone(id, resultJson, criticalCount, totalElements, amountOfRetries)
+            repository.markDone(id, model.bpmnXml, resultJson, criticalCount, totalElements, amountOfRetries)
         } catch (e: Exception) {
             log.error(e) { "Analysis failed for process model $id" }
             repository.markError(id, e.message ?: "Analysis failed")

@@ -1,11 +1,17 @@
 # CI for GRIPL: run the tests, build the three container images, and publish them to
-# GitHub's container registry from main (tag `prod`) and dev (tag `dev`).
+# GitHub's container registry from dev (tag `dev`). Prod is never built: the promote workflow sets
+# `:prod` on an image that was already built and tested on dev.
+#
+# Versions: every merge into dev that contains a fix:/feat:/... commit is a release. The next
+# version is computed from the conventional commits since the last tag (.github/scripts/next-version.sh),
+# built into the images (shown in the app as v1.2.3, with the environment in front), published as :1.2.3, and after the images
+# are published the git tag v1.2.3 and a GitHub Release are created. Commits like chore: and docs:
+# make no release. Prod is promoted from an existing version, see promote.yml.
 #
 # The server picks the images up by itself (deploy/scripts/update-stack.sh), so nothing
 # here connects to it. See deploy/README.md, section "What CI has to produce".
 #
-#   push to main  -> ghcr.io/dbis-legal-llms/<image>:prod  and  :sha-<commit>
-#   push to dev   -> ghcr.io/dbis-legal-llms/<image>:dev   and  :sha-<commit>
+#   push to dev   -> ghcr.io/dbis-legal-llms/<image>:dev, :sha-<commit>, and :X.Y.Z for a release
 #   pull request  -> tests + a build of every image, nothing is published
 #
 # Third-party actions are pinned to a commit (the comment names the release) so that a
@@ -15,7 +21,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, dev]
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
@@ -83,14 +89,42 @@ jobs:
       - run: npm ci --force
       - run: npx tsc --noEmit
 
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      next: ${{ steps.v.outputs.next }}
+      release: ${{ steps.v.outputs.release }}
+      label: ${{ steps.label.outputs.value }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0   # all history and tags
+      - name: Next version
+        id: v
+        run: .github/scripts/next-version.sh | tee -a "$GITHUB_OUTPUT"
+      - name: Label shown in the app
+        id: label
+        # v<version> for a build on dev, e.g. v1.0.1: the same image runs on dev and, once promoted,
+        # on prod, so the environment is not baked in (the frontend adds it from the host name).
+        # On a pull request the branch it comes from is in front, e.g. feat-x-v1.1.0.
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            branch="$GITHUB_HEAD_REF"; echo "value=${branch//\//-}-v${{ steps.v.outputs.next }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=v${{ steps.v.outputs.next }}" >> "$GITHUB_OUTPUT"
+          fi
+
   images:
     name: Image ${{ matrix.image }}
-    needs: [backend-tests, frontend-check]
+    needs: [backend-tests, frontend-check, version]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
       contents: read
-      packages: write   # publish to ghcr.io (only used on pushes to main/dev)
+      packages: write   # publish to ghcr.io (only used on pushes to dev)
     strategy:
       fail-fast: false
       matrix:
@@ -110,7 +144,7 @@ jobs:
             context: gripl/gripl-rag
             build-args: ""
     env:
-      PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') }}
+      PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -129,9 +163,10 @@ jobs:
         with:
           images: ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}
           tags: |
-            type=raw,value=prod,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
             type=sha,prefix=sha-,format=short,enable=${{ env.PUBLISH == 'true' }}
+            # a version tag is set once, by the release build, and never moves afterwards
+            type=raw,value=${{ needs.version.outputs.next }},enable=${{ github.ref == 'refs/heads/dev' && needs.version.outputs.release == 'true' }}
       - name: Build${{ env.PUBLISH == 'true' && ' and publish' || '' }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -139,10 +174,31 @@ jobs:
           push: ${{ env.PUBLISH == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: ${{ matrix.build-args }}
+          build-args: |
+            ${{ matrix.build-args }}
+            APP_VERSION=${{ needs.version.outputs.label }}
           provenance: false
           sbom: false
           # layer cache in the registry: the RAG image is several GB and rebuilding it
           # from scratch every time would be slow
           cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:buildcache
           cache-to: ${{ env.PUBLISH == 'true' && format('type=registry,ref={0}/{1}:buildcache,mode=max', env.IMAGE_PREFIX, matrix.image) || '' }}
+
+  release:
+    name: Release v${{ needs.version.outputs.next }}
+    # only after all three images of this version are published
+    needs: [version, images]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write   # the tag and the GitHub Release
+    steps:
+      - name: Tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ needs.version.outputs.next }}" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "v${{ needs.version.outputs.next }}" --generate-notes \
+            --prerelease   # a pre-release until it is promoted to prod (promote.yml)
