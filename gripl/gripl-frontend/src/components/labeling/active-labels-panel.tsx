@@ -12,6 +12,7 @@ import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 import {Label} from "@/models/dto/Label";
 import {ConfirmationDialog} from "@/components/ui/confirmation-dialog";
 import {useToast} from "@/components/ui/toast";
+import {GDPR_CATEGORIES, GdprCategory} from "@/models/GdprCategory";
 
 type LabelGroup = "predefined" | "custom";
 
@@ -23,6 +24,27 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
     const {griplRole, isLoading: isAuthLoading, token} = useAuth();
     const {showToast} = useToast();
     const DEFAULT_CUSTOM_LABEL_COLOR = "#06b6d4";
+
+    const categoryColor: Record<GdprCategory, string> = {
+        Collection: "#059669",
+        Storage: "#2563eb",
+        Usage: "#f59e0b",
+        Transferal: "#7c3aed",
+        Modification: "#0284c7",
+        Deletion: "#dc2626",
+        Access: "#0d9488",
+    };
+
+    function categoryFromLabel(label: Label): GdprCategory | null {
+        if (!label.predefined) return null;
+        const category = GDPR_CATEGORIES.find((item) => item.value.toUpperCase() === label.name.toUpperCase());
+        return category?.value ?? null;
+    }
+
+    function getLabelColor(label: Label): string {
+        const category = categoryFromLabel(label);
+        return category ? categoryColor[category] : (label.color ?? DEFAULT_CUSTOM_LABEL_COLOR);
+    }
 
     const [labels, setLabels] = useState<Label[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -231,8 +253,8 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
                                                                 <span
                                                                     className="inline-block h-3 w-3 rounded-full border"
                                                                     style={{
-                                                                        backgroundColor: !label.predefined ? (label.color ?? DEFAULT_CUSTOM_LABEL_COLOR) : undefined,
-                                                                        borderColor: !label.predefined ? (label.color ?? DEFAULT_CUSTOM_LABEL_COLOR) : "currentColor",
+                                                                        backgroundColor: getLabelColor(label),
+                                                                        borderColor: getLabelColor(label),
                                                                     }}
                                                                     aria-hidden="true"
                                                                 />
