@@ -4,6 +4,7 @@ import traceback
 from dotenv import load_dotenv
 import os
 from app.llm_fallback_manager_component.llm_fallback_manager import LLMFallBackManager
+from app.schemas import RunConfig
 
 load_dotenv()
 
@@ -101,29 +102,33 @@ class ChromaDatabaseClient:
         except Exception as e:
             print(traceback.format_exc())
 
-    def get_top_k_results_only_meta_data(self, query):
+    def get_top_k_results_only_meta_data(
+            self,
+            query: str,
+            run_config: RunConfig,
+    ):
         try:
             collection = self.get_collection()
 
-            embedded_query = self.embedding_model_handler.get_embedding_of_current_embedding_model([query])[0]
+            embedded_query = (
+                self.embedding_model_handler
+                .get_embedding_of_current_embedding_model(
+                    [query],
+                    run_config=run_config,
+                )[0]
+            )
 
             results = collection.query(
-                        query_embeddings=[embedded_query],
-                        n_results=self.top_k
-                    )
+                query_embeddings=[embedded_query],
+                n_results=self.top_k,
+            )
 
             documents = results["documents"][0]
             metadatas = results["metadatas"][0]
+
             return list(zip(documents, metadatas))
 
-        except Exception as e:
-                print(traceback.format_exc())
-                return []
-
-
-
-        except Exception as e:
-            print(traceback.format_exc())
-
+        except Exception:
+            raise
 
 

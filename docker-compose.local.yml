@@ -101,7 +101,7 @@ services:
 
     environment:
       MCP_SERVER_URL: http://mcp-server:7000/sse
-      DB_PATH: /app/data/test.db
+      DB_PATH: /app/test.db
 
     depends_on:
       mcp-server:
@@ -109,7 +109,7 @@ services:
 
     volumes:
       - huggingface_cache:/root/.cache/huggingface
-      - gripl_nlpsql_db:/app/data
+      - ./gripl/gripl-sql-llm:/app
 
     networks:
       - app
@@ -121,16 +121,26 @@ services:
     build:
       context: ./gripl/gripl-sql-llm
       dockerfile: Dockerfile
+
     image: gripl-nlpsql:latest
     container_name: mcp-server
     restart: unless-stopped
-    command: python -m app.sql_post_processing_component.post_processing_mcp_server
+
+    environment:
+      DB_PATH: /app/test.db
 
     volumes:
-      - ./gripl/gripl-sql-llm/test.db:/app/test.db
+      - ./gripl/gripl-sql-llm:/app
       - huggingface_cache:/root/.cache/huggingface
+
+    entrypoint: [ "python" ]
+    command:
+      - -m
+      - app.sql_post_processing_component.post_processing_mcp_server
+
     networks:
       - app
+
     ports:
       - "7000:7000"
 

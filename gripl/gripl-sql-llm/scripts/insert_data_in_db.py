@@ -1,9 +1,10 @@
 import sqlite3
 import logging
 from app.database.db import Base, engine, DATABASE_PATH
-
+from app.database import models as _models
 
 logger = logging.getLogger(__name__)
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -512,9 +513,10 @@ try:
     connection.commit()
 
 
-except Exception as e:
+except Exception:
     connection.rollback()
-    print(f"Fehler: {e}")
+    logger.exception("Database initialization failed")
+    raise
 
 finally:
     connection.close()

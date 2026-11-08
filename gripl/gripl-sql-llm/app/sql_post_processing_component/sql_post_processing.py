@@ -5,6 +5,8 @@ from .post_processing_mcp_client import PostProcessingMcpClient
 from pathlib import Path
 import traceback
 
+from ..schemas import RunConfig
+
 
 class SQLPostProcessing:
 
@@ -29,16 +31,17 @@ class SQLPostProcessing:
         self.verification_system_prompt_path = base_dir / "verification_system_prompt.txt"
         self.verification_user_prompt_path = base_dir / "verification_user_prompt.txt"
 
-    async def post_process_generated_query(self,
-                                           db_schema: str,
-                                           activity_field: str,
-                                           generated_query: str,
-                                           error_message: str,
-                                           intentions: list[str],
-                                           reasons_of_intentions: list[str],
-                                           ) -> str:
+    async def post_process_generated_query(
+            self,
+            db_schema: str,
+            activity_field: str,
+            generated_query: str,
+            error_message: str,
+            intentions: list[str],
+            reasons_of_intentions: list[str],
+            run_config: RunConfig,
+    ) -> str:
         try:
-
             return await self.post_processing_mcp_client.get_mcp_client_answer(
                 db_schema,
                 activity_field,
@@ -46,14 +49,12 @@ class SQLPostProcessing:
                 error_message,
                 intentions,
                 reasons_of_intentions,
-                self
+                self,
+                run_config,
             )
 
-        except Exception as e:
-            print("e in post_processing")
-            print(traceback.format_exc())
-            print(e)
-            return ""
+        except Exception:
+            raise
 
     def current_post_processed_query(self,
                                      db_schema: str,

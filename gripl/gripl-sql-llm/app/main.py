@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from .schemas import AnalysisSQLRequest, RunConfig
+from .schemas import AnalysisSQLRequest, RunConfig, ComponentLLMConfig
 import os
 from app.database.db import Base, engine
 from app.database.models import *
@@ -54,18 +54,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+SUPPORTED_COMPONENTS = {
+    "INTENTION_MODEL",
+    "SQL_GENERATION_MODEL",
+    "POST_PROCESSING_MODEL",
+    "VERIFICATION_MODEL",
+    "EMBEDDING_MODEL",
+}
+
 
 @app.post("/analyze", include_in_schema=False, response_model=None)
 async def analyse(
     analysis_request: AnalysisSQLRequest = Depends(),
 ):
     try:
+        print("in analyse")
         if not analysis_request.llmProps_raw:
             raise HTTPException(
                 status_code=400,
                 detail="LLM configuration is missing.",
             )
-
+        print("analysis request")
+        print(vars(analysis_request))
         try:
             llm_props = json.loads(analysis_request.llmProps_raw)
         except json.JSONDecodeError:
@@ -74,21 +84,61 @@ async def analyse(
                 detail="Invalid LLM configuration JSON.",
             )
 
+
+
         if not isinstance(llm_props, dict):
             raise HTTPException(
                 status_code=400,
                 detail="LLM configuration must be a JSON object.",
             )
 
-        model_name = llm_props.get("modelName")
+        model_names_raw = llm_props.get("modelName")
+        base_urls_raw = llm_props.get("baseUrl")
         api_key = llm_props.get("apiKey")
-        base_url = llm_props.get("baseUrl")
 
-        if not all([model_name, api_key, base_url]):
+        if not isinstance(api_key, str) or not api_key.strip():
             raise HTTPException(
                 status_code=400,
-                detail="Incomplete LLM configuration.",
+                detail="API key is missing.",
             )
+
+        if not isinstance(model_names_raw, str) or not isinstance(base_urls_raw, str):
+            raise HTTPException(
+                status_code=400,
+                detail="Model names or base URLs are missing.",
+            )
+
+        model_names = parse_component_configs(
+            model_names_raw,
+            "modelName",
+        )
+
+        base_urls = parse_component_configs(
+            base_urls_raw,
+            "baseUrl",
+        )
+
+        if model_names.keys() != base_urls.keys():
+            raise HTTPException(
+                status_code=400,
+                detail="Model names and base URLs must contain the same components.",
+            )
+
+        missing_components = SUPPORTED_COMPONENTS - model_names.keys()
+
+        if missing_components:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing model configurations: {sorted(missing_components)}",
+            )
+
+        models_by_component = {
+            component: ComponentLLMConfig(
+                model_name=model_names[component],
+                base_url=base_urls[component],
+            )
+            for component in model_names
+        }
 
         bpmn_file = await analysis_request.bpmnFile.read()
 
@@ -100,9 +150,8 @@ async def analyse(
 
         run_config = RunConfig(
             bpmn_file=bpmn_file,
-            model_name=model_name,
             api_key=api_key,
-            base_url=base_url,
+            models_by_component=models_by_component,
         )
 
         pipeline_component = get_pipeline()
@@ -215,4 +264,35 @@ def get_pipeline(
     except Exception:
         print(traceback.format_exc())
         raise
+
+def parse_component_configs(raw_value: str, field_name: str) -> dict[str, str]:
+    result = {}
+
+    for entry in raw_value.split(";"):
+        component, separator, value = entry.strip().partition(":")
+
+        if not separator or not component.strip() or not value.strip():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid {field_name} configuration.",
+            )
+
+        component = component.strip()
+        value = value.strip()
+
+        if component not in SUPPORTED_COMPONENTS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown component: {component}.",
+            )
+
+        if component in result:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Duplicate component: {component}.",
+            )
+
+        result[component] = value
+
+    return result
 

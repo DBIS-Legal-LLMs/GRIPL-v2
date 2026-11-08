@@ -62,3 +62,757 @@ system_prompt,user_prompt,output
         Do not generate SQL.
         Return the result strictly valid JSON format without any comment.
         { ""intents"": [""<intent_name>""] }",['Usage']
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""sid-11be-ee789fd174af9e196addcb471ade761f"" name=""Überstundenberechtigung erteilen"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>h619-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>lv0z-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""sid-11bf-ee789fd174af9e196addcb471ade761f"" name=""Zeitguthaben ändern"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>dnvn-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>dopz-f27a558c2c6ace26a255ac4b248a454f</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""sid-11bi-ee789fd174af9e196addcb471ade761f"" name=""Für das Löschen sperren"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>ai18-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>aisz-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""a934-1f26bc8df5723441a7c06602674717dc"" name=""Zeiterfassungsdaten löschen"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>ajjm-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>k5lc-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""c21b-1f26bc8df5723441a7c06602674717dc"" name=""Stammsätze anlegen"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>cxaq-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>k9tj-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""la0c-1f26bc8df5723441a7c06602674717dc"" name=""Überstundenguthaben ändern"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>li1i-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>lm95-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""sid-11be-ee789fd174af9e196addcb471ade761f"" name=""Überstundenberechtigung erteilen"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>h619-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>lv0z-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""sid-11bf-ee789fd174af9e196addcb471ade761f"" name=""Zeitguthaben ändern"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>dnvn-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>dopz-f27a558c2c6ace26a255ac4b248a454f</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""sid-11bi-ee789fd174af9e196addcb471ade761f"" name=""Für das Löschen sperren"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>ai18-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>aisz-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""a934-1f26bc8df5723441a7c06602674717dc"" name=""Zeiterfassungsdaten löschen"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>ajjm-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>k5lc-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""c21b-1f26bc8df5723441a7c06602674717dc"" name=""Stammsätze anlegen"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>cxaq-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>k9tj-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""la0c-1f26bc8df5723441a7c06602674717dc"" name=""Überstundenguthaben ändern"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>li1i-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>lm95-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",[]
+"You are an intent classification component in an NLP-to-SQL pipeline.
+
+        Your task is to identify which predefined intent best match given bpmn activity field.
+
+        You will receive:
+
+        The user's natural language question.
+        A list of available intents.
+        For each intent, a description of its purpose.
+        The database tables associated with that intent.
+
+        Rules:
+
+        Only select the best intention from the provided list.
+        Never invent, rename, merge, or modify intents.
+        Return only the best intention that are clearly required to answer the given bpmn activity field.
+        If none of the provided intents apply, return an empty list.
+        Do not explain your reasoning.
+        Base your decision solely on the semantic meaning of the given bpmn activity field.
+
+        Use this definition for finding the most suitable intention:
+
+        Collection, Storage, Usage, Transferal, Modification, Deletion, Access
+        Output format:
+
+        { ""intents"": [""<intent_name>"",] }
+
+        If no intent matches:
+
+        {""intents"": []}
+
+        Output only a json object with the given format. No more explanation or comments of you.","BPMN Field:
+        <ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""sid-11be-ee789fd174af9e196addcb471ade761f"" name=""Überstundenberechtigung erteilen"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>h619-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>lv0z-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+        Available Intents:
+
+        - Collection
+- Storage
+- Usage
+- Transferal
+- Modification
+- Deletion
+- Access
+
+        Instructions:
+        Select only from the intents listed above.
+        Return the best intention for the given activity_field
+        Do not generate SQL.
+        Return the result strictly valid JSON format without any comment.
+        { ""intents"": [""<intent_name>""] }",['Modification']

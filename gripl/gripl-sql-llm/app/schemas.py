@@ -22,8 +22,21 @@ class AnalysisSQLRequest:
 
 
 @dataclass(frozen=True)
+class ComponentLLMConfig:
+    model_name: str
+    base_url: str
+
+
+@dataclass(frozen=True)
 class RunConfig:
     bpmn_file: bytes = field(repr=False)
-    model_name: str
     api_key: str = field(repr=False)
-    base_url: str
+    models_by_component: dict[str, ComponentLLMConfig] = field(repr=False)
+
+    def get_model_config(self, component_name: str) -> ComponentLLMConfig:
+        try:
+            return self.models_by_component[component_name]
+        except KeyError:
+            raise ValueError(
+                f"No model configuration found for {component_name}"
+            )

@@ -2,6 +2,7 @@ import traceback
 from typing import Type
 from pydantic import BaseModel
 from app.llm_component.llm import LLM
+from app.schemas import RunConfig
 from app.sql_execution_component.sql_execution import SQLExecution
 from dotenv import load_dotenv
 import os
@@ -30,33 +31,29 @@ class LLMFallBackManager:
 
     def get_answer_with_fallback(self,
                                  messages: list,
+                                 run_config: RunConfig,
                                  tools: list | None = None,
                                  ):
 
         try:
 
-            models_env_api_key_list = self.get_all_possible_llm_models_of_component(self.llm_component_name)
+            model_config = run_config.get_model_config(
+                self.llm_component_name
+            )
 
-            for model, env_api_key_name, model_url in models_env_api_key_list:
-                try:
-                    return self.get_answer_from_current_llm(
-                        messages=messages,
-                        tools=tools,
-                        model_name=model,
-                        model_url=model_url,
-                        api_key_env_name=env_api_key_name,
-                    )
+            return self.get_answer_from_current_llm(
+                messages=messages,
+                tools=tools,
+                model_name=model_config.model_name,
+                model_url=model_config.base_url,
+                api_key=run_config.api_key,
+            )
 
-                except InstructorRetryException:
-                    print(f"Model {model} failed after all retries. Trying next model...")
-                    continue
-
-            return self.schema_output()
 
         except Exception as e:
             print("fehler in llm handler")
             print(traceback.format_exc())
-            return self.schema_output()
+            raise
 
     def get_all_possible_llm_models_of_component(self, component_name: str) -> list:
 
@@ -98,11 +95,11 @@ class LLMFallBackManager:
                                     messages: list,
                                     model_name: str,
                                     model_url: str,
-                                    api_key_env_name: str,
+                                    api_key: str,
                                     tools: list | None = None,
                                     ):
         try:
-            api_key = self._resolve_api_key(api_key_env_name)
+            api_key = self._resolve_api_key(api_key)
             llm = LLM(
                 model_name=model_name,
                 model_url=model_url,

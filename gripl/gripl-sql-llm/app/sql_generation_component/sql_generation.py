@@ -4,7 +4,7 @@ from app.prompt_management_component.prompt_management import PromptManagement
 from pathlib import Path
 import traceback
 
-
+from app.schemas import RunConfig
 
 
 class SQLGenerator:
@@ -23,14 +23,15 @@ class SQLGenerator:
         self.system_prompt_path = base_dir / "system_prompt.txt"
         self.user_prompt_path = base_dir / "user_prompt.txt"
 
-
-    def generate_query(self,
-                       activity_field: str,
-                       db_schema:str,
-                       intentions: list[str],
-                       reasons_of_intentions: list[str],
-                       few_shot_examples: str
-                       )->str:
+    def generate_query(
+            self,
+            activity_field: str,
+            db_schema: str,
+            intentions: list[str],
+            reasons_of_intentions: list[str],
+            few_shot_examples: str,
+            run_config: RunConfig,
+    ) -> str:
         try:
             user_prompt = self.prompt_management.fill_prompt(
                 self.user_prompt_path,
@@ -38,7 +39,7 @@ class SQLGenerator:
                 db_schema=db_schema,
                 intent=intentions,
                 reasons_of_intentions=reasons_of_intentions,
-                few_shot_examples=few_shot_examples
+                few_shot_examples=few_shot_examples,
             )
 
             system_prompt = self.prompt_management.fill_prompt(
@@ -57,7 +58,8 @@ class SQLGenerator:
             ]
 
             answer = self.llm_handler.get_answer_with_fallback(
-                messages
+                messages=messages,
+                run_config=run_config,
             ).query
 
             self.logging_component.log(
@@ -67,9 +69,6 @@ class SQLGenerator:
             )
 
             return answer
-        except Exception as e:
-            print("in sql generating ")
-            print(traceback.format_exc())
-            print(e)
-            return ""
 
+        except Exception:
+            raise

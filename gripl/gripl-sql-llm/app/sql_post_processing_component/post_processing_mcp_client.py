@@ -5,6 +5,7 @@ from app.bpmn_data_pre_processor_component.bpmn_data_pre_processor import BPMNDa
 from typing import TYPE_CHECKING
 import json
 from app.sql_post_processing_component.schemas import SQLVerificationResultAnswer
+from ..schemas import RunConfig
 
 if TYPE_CHECKING:
     from .sql_post_processing import SQLPostProcessing
@@ -28,7 +29,8 @@ class PostProcessingMcpClient:
                                     error_message: str,
                                     intentions: list[str],
                                     reasons_of_intentions: list[str],
-                                    sql_post_processing_component: "SQLPostProcessing"
+                                    sql_post_processing_component: "SQLPostProcessing",
+                                    run_config: RunConfig,
                                     ):
 
         try:
@@ -95,6 +97,7 @@ class PostProcessingMcpClient:
                                 verification_answer = sql_post_processing_component.verification_llm_handler.get_answer_with_fallback(
                                     messages=verification_component_messages[:],
                                     tools=groq_tools,
+                                    run_config=run_config,
                                 )
 
                                 tool_calls = getattr(verification_answer, "tool_calls", None)
@@ -158,7 +161,8 @@ class PostProcessingMcpClient:
                             continue
 
                     final_query = sql_post_processing_component.llm_handler.get_answer_with_fallback(
-                        verification_component_messages[:]
+                        messages=verification_component_messages[:],
+                        run_config=run_config,
                     ).final_query
 
                     sql_post_processing_component.logging_component.log(
