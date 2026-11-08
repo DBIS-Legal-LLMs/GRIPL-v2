@@ -110,7 +110,7 @@ data_into_vector_database = [
     {
         "row": 13,
         "activity_field_id": "sid-4FAB8B03-8311-42F4-91B2-BDC72772535E",
-        "category": "Collect"
+        "category": "Collection"
     },
     {
         "row": 14,
@@ -120,7 +120,7 @@ data_into_vector_database = [
     {
         "row": 14,
         "activity_field_id": "sid-E6D606BE-E68F-47F3-9B7A-B89B778BA550",
-        "category": "Collect"
+        "category": "Collection"
     },
     {
         "row": 14,
