@@ -1,13 +1,12 @@
 import sqlite3
-from pathlib import Path
 from typing import Any
+from app.database.db import DATABASE_PATH
 
 
 class SQLExecution:
 
     def __init__(self):
-        project_root = Path(__file__).resolve().parents[2]
-        self.db_path = project_root / "test.db"
+        self.db_path = str(DATABASE_PATH)
 
     def get_sql_query_results(
             self,

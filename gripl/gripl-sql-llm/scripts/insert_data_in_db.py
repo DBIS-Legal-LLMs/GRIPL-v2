@@ -1,8 +1,14 @@
 import sqlite3
-from pathlib import Path
+import logging
+from app.database.db import Base, engine, DATABASE_PATH
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = PROJECT_ROOT / "test.db"
+
+logger = logging.getLogger(__name__)
+
+Base.metadata.create_all(bind=engine)
+
+connection = sqlite3.connect(str(DATABASE_PATH))
+cursor = connection.cursor()
 
 categories = [
     "Collection",
@@ -397,8 +403,7 @@ reason_mapping = {
     ]
 }
 
-connection = sqlite3.connect(DB_PATH)
-cursor = connection.cursor()
+
 
 try:
     cursor.execute("PRAGMA foreign_keys = OFF")

@@ -86,31 +86,30 @@ services:
       - app
     ports:
       - "8081:8081"
+
   gripl-nlpsql:
     build:
       context: ./gripl/gripl-sql-llm
       dockerfile: Dockerfile
 
     image: gripl-nlpsql:latest
-
     container_name: gripl-nlpsql
-
     restart: unless-stopped
 
     env_file:
       - ./gripl/gripl-sql-llm/.env
 
     environment:
-        - MCP_SERVER_URL=http://mcp-server:7000/sse
+      MCP_SERVER_URL: http://mcp-server:7000/sse
+      DB_PATH: /app/data/test.db
 
     depends_on:
       mcp-server:
         condition: service_started
 
     volumes:
-
       - huggingface_cache:/root/.cache/huggingface
-      - ./gripl/gripl-sql-llm/test.db:/app/test.db
+      - gripl_nlpsql_db:/app/data
 
     networks:
       - app
@@ -192,6 +191,7 @@ volumes:
   gripl-postgres-data:
   huggingface_cache:
   neo4j_data:
+  gripl_nlpsql_db:
 
 networks:
   app:

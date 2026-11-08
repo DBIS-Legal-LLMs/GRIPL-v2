@@ -42,5 +42,11 @@ COPY scripts/ ./scripts/
 
 EXPOSE 8082
 
+COPY database-setup/init-database.sh /init-database.sh
+
+RUN chmod +x /init-database.sh
+
+ENTRYPOINT ["/init-database.sh"]
+
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8082"]

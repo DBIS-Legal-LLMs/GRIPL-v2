@@ -27,4 +27,13 @@ extra/*
 gripl/gripl-sql-llm/test.db
 gripl/gripl-sql-llm/venv
 
+# Generated files
+gripl/gripl-sql-llm/**/.DS_Store
+gripl/gripl-sql-llm/system_demo/*.mp4
+gripl/gripl-sql-llm/app/chroma_database_client/embeddings/
+
+# Generated log CSVs
+gripl/gripl-sql-llm/**/logs/*.csv
+gripl/gripl-sql-llm/**/log/*.csv
+
 
