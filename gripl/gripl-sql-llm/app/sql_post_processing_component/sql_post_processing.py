@@ -66,7 +66,10 @@ class SQLPostProcessing:
                                      ) -> str:
 
         try:
-
+            reasons_of_intentions_text = "\n".join(
+                f"{index}. {reason}"
+                for index, reason in enumerate(reasons_of_intentions, start=1)
+            )
             post_processed_user_prompt = self.prompt_management.fill_prompt(
                 self.user_prompt_path,
                 db_schema=db_schema,
@@ -74,7 +77,7 @@ class SQLPostProcessing:
                 generated_query=generated_query,
                 error_message=error_message,
                 intent=intentions[0],
-                reasons_of_intentions=",".join(reasons_of_intentions),
+                reasons_of_intentions=reasons_of_intentions_text,
                 hint=hint
             )
 
