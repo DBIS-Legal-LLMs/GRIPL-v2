@@ -70,8 +70,7 @@ class FindIntention:
 
         except Exception as e:
             print(traceback.format_exc())
-            print(e)
-            return []
+            raise
 
     def get_all_intentions(self,)->list[str]:
         try:
@@ -79,8 +78,5 @@ class FindIntention:
 
             return [r.get('name', '') for r in row ]
         except Exception as e:
-            print("in intent finding")
-            print(traceback.format_exc())
-            print(e)
-            return []
+            raise
 

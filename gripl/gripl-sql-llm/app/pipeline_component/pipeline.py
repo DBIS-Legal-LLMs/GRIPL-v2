@@ -49,8 +49,7 @@ class PipelineComponent:
             return results
 
         except Exception:
-            print(traceback.format_exc())
-            return []
+            raise
 
 
     def get_only_activity_fields(self, bpmn_file_content: bytes):
@@ -59,8 +58,7 @@ class PipelineComponent:
                 bpmn_content=bpmn_file_content,
             )
         except Exception as e:
-            print(e)
-            return []
+            raise
 
     async def get_sid_and_reason_if_critical(
             self,

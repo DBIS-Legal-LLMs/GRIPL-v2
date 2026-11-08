@@ -85,7 +85,7 @@ class LLMFallBackManager:
             ]
 
         except Exception:
-            
+
             raise
 
     @retry(

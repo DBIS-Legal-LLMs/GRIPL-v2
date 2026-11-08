@@ -7,7 +7,6 @@ from app.database.models import *
 import json
 import traceback
 from app.pipeline_component.pipeline import PipelineComponent
-from app.data_loader_component.data_loader import DataLoader
 from app.chroma_database_client.chroma_db_client import ChromaDatabaseClient
 from app.find_intention_component.find_intention import FindIntention
 from app.find_intention_component.schemas import IntentionAnswer
@@ -24,6 +23,7 @@ from dotenv import load_dotenv
 from app.config.component_name import (INTENTION_MODEL, SQL_GENERATION_MODEL, POST_PROCESSING_MODEL, VERIFICATION_MODEL,
                                        EMBEDDING_MODEL)
 from app.logging_component.logger import Logger
+from fastapi import HTTPException
 
 load_dotenv()
 
@@ -56,17 +56,53 @@ app.add_middleware(
 
 
 @app.post("/analyze", include_in_schema=False, response_model=None)
-async def analyse(analysis_request: AnalysisSQLRequest = Depends(),
-            ):
+async def analyse(
+    analysis_request: AnalysisSQLRequest = Depends(),
+):
     try:
+        if not analysis_request.llmProps_raw:
+            raise HTTPException(
+                status_code=400,
+                detail="LLM configuration is missing.",
+            )
 
-        llm_props = json.loads(analysis_request.llmProps_raw)
+        try:
+            llm_props = json.loads(analysis_request.llmProps_raw)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid LLM configuration JSON.",
+            )
+
+        if not isinstance(llm_props, dict):
+            raise HTTPException(
+                status_code=400,
+                detail="LLM configuration must be a JSON object.",
+            )
+
+        model_name = llm_props.get("modelName")
+        api_key = llm_props.get("apiKey")
+        base_url = llm_props.get("baseUrl")
+
+        if not all([model_name, api_key, base_url]):
+            raise HTTPException(
+                status_code=400,
+                detail="Incomplete LLM configuration.",
+            )
+
+        bpmn_file = await analysis_request.bpmnFile.read()
+
+        if not bpmn_file:
+            raise HTTPException(
+                status_code=400,
+                detail="BPMN file is empty.",
+            )
 
         run_config = RunConfig(
-            bpmn_file=await analysis_request.bpmnFile.read(),
-            model_name=llm_props["modelName"],
-            api_key=llm_props["apiKey"],
-            base_url=llm_props["baseUrl"],
+            bpmn_file=bpmn_file,
+            model_name=model_name,
+            api_key=api_key,
+            base_url=base_url,
         )
 
         pipeline_component = get_pipeline()
@@ -76,9 +112,16 @@ async def analyse(analysis_request: AnalysisSQLRequest = Depends(),
         return {
             "criticalElements": result
         }
+
+    except HTTPException:
+        raise
+
     except Exception:
-        print(traceback.format_exc())
-        return []
+
+        raise HTTPException(
+            status_code=500,
+            detail="Analysis failed due to an internal server error.",
+        )
 
 def get_pipeline(
 ):
