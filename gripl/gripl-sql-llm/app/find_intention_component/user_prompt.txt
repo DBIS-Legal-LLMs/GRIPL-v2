@@ -3,7 +3,7 @@ BPMN Field:
 
         Available Intents:
 
-        ",".join({available_intents})
+        {available_intents}
 
         Instructions:
         Select only from the intents listed above.

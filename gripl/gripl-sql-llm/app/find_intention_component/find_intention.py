@@ -34,10 +34,15 @@ class FindIntention:
 
             available_intents = self.get_all_intentions()
 
+            available_intents_text = "\n".join(
+                f"- {intent}"
+                for intent in available_intents
+            )
+
             user_prompt = self.prompt_management.fill_prompt(
                 self.user_prompt_path,
                 activity_field=activity_field,
-                available_intents=available_intents,
+                available_intents=available_intents_text,
             )
 
             system_prompt = self.prompt_management.fill_prompt(
