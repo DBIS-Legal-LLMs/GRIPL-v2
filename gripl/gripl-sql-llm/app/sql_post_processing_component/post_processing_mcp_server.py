@@ -36,17 +36,21 @@ class MCPServer:
                         :return: list of all reasons of one intention.
                         """
 
-            return [reason_result.get("reason", "") for reason_result in self.execution_component.get_sql_query_results(
-                f"""
-                                                                                        SELECT  r.reason
-                                                                                        FROM reason r
-                                                                                                 JOIN category_reason_association cra
-                                                                                                      ON r.id = cra.reason_id
-                                                                                                 JOIN category c
-                                                                                                      ON c.id = cra.category_id
-                                                                                        WHERE c.name = '{category_name}';
-                                                                                        """
-            )]
+            return [
+                reason_result.get("reason", "")
+                for reason_result in self.execution_component.get_sql_query_results(
+                    """
+                    SELECT r.reason
+                    FROM reason r
+                             JOIN category_reason_association cra
+                                  ON r.id = cra.reason_id
+                             JOIN category c
+                                  ON c.id = cra.category_id
+                    WHERE c.name = ?;
+                    """,
+                    (category_name,),
+                )
+            ]
 
     def start(self):
         self.mcp.run(transport="sse")

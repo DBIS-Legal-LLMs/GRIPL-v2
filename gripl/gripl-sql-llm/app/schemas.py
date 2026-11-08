@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from fastapi import File, UploadFile, Form
 
@@ -19,3 +19,11 @@ class AnalysisSQLRequest:
         self.useSQLLM = useSQLLM
         self.activitiesOnly = activitiesOnly
         self.llmProps_raw = llmProps
+
+
+@dataclass(frozen=True)
+class RunConfig:
+    bpmn_file: bytes = field(repr=False)
+    model_name: str
+    api_key: str = field(repr=False)
+    base_url: str

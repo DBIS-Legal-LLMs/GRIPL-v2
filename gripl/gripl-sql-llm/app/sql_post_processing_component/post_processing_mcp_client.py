@@ -4,7 +4,6 @@ import traceback
 from app.bpmn_data_pre_processor_component.bpmn_data_pre_processor import BPMNDataPreProcessor
 from typing import TYPE_CHECKING
 import json
-from app.find_intention_component.schemas import IntentionAnswer
 from app.sql_post_processing_component.schemas import SQLVerificationResultAnswer
 
 if TYPE_CHECKING:
@@ -70,7 +69,7 @@ class PostProcessingMcpClient:
                                 activity_field=activity_field,
                                 generated_query=current_query,
                                 error_message=current_error_message,
-                                intentions=current_intention,
+                                intentions=intentions,
                                 reasons_of_intentions=current_reasons_list,
                                 hint=current_hint,
                             )
@@ -169,7 +168,7 @@ class PostProcessingMcpClient:
                     )
 
                     print("post processed query after all iterations")
-                    print(answer)
+                    print(final_query)
 
                     return final_query
 

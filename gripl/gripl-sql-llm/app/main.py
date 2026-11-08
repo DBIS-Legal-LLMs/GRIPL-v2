@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from .schemas import AnalysisSQLRequest
+from .schemas import AnalysisSQLRequest, RunConfig
 import os
 from app.database.db import Base, engine
 from app.database.models import *
@@ -59,23 +59,19 @@ app.add_middleware(
 async def analyse(analysis_request: AnalysisSQLRequest = Depends(),
             ):
     try:
-        print("given api keys ")
-        print(json.loads(analysis_request.llmProps_raw).get("apiKey", ""))
-        fill_in_db_models_and_env(
-            json.loads(analysis_request.llmProps_raw).get("modelName", ""),
-            json.loads(analysis_request.llmProps_raw).get("apiKey", ""),
-            json.loads(analysis_request.llmProps_raw).get("baseUrl", ""),
+
+        llm_props = json.loads(analysis_request.llmProps_raw)
+
+        run_config = RunConfig(
+            bpmn_file=await analysis_request.bpmnFile.read(),
+            model_name=llm_props["modelName"],
+            api_key=llm_props["apiKey"],
+            base_url=llm_props["baseUrl"],
         )
 
         pipeline_component = get_pipeline()
 
-        bpmn_file = await analysis_request.bpmnFile.read()
-
-        result = await pipeline_component.get_analysis(bpmn_file)
-
-        sql_execution_component = SQLExecution()
-
-        sql_execution_component.delete_sql("DELETE FROM fallback_llm")
+        result = await pipeline_component.get_analysis(run_config)
 
         return {
             "criticalElements": result
@@ -84,47 +80,9 @@ async def analyse(analysis_request: AnalysisSQLRequest = Depends(),
         print(traceback.format_exc())
         return []
 
-
-def fill_in_db_models_and_env(models: str, api_keys_in_env: str, base_urls: str):
-    def parse_components(s: str):
-        result = {}
-        if not s:
-            return result
-        for part in s.split(';'):
-            if not part or ':' not in part:
-                continue
-            key, values = part.split(':', 1)
-            items = [v.strip() for v in values.split(',') if v.strip() or True]
-
-            result[key] = items
-        return result
-
-    sql_execution_component = SQLExecution()
-
-    models_map = parse_components(models)
-    base_urls_map = parse_components(base_urls)
-
-    for comp_key, model_list in models_map.items():
-        base_url_list = base_urls_map.get(comp_key, [])
-        for idx, model_name in enumerate(model_list):
-            base_url = base_url_list[idx] if idx < len(base_url_list) else ""
-            sql = """
-                INSERT INTO fallback_llm 
-                    (corresponding_comment, name, "order", model_url, env_api_key_name)
-                VALUES (?, ?, ?, ?, ?)
-            """
-            params = (comp_key, model_name, idx + 1, base_url, api_keys_in_env)
-
-            result = sql_execution_component.insert_sql(sql, params)
-            if result and "error" in result:
-                print(f"Fehler beim Einfügen: {result['error']}")
-                return result
-
-
 def get_pipeline(
 ):
     try:
-
 
         prompt_management = PromptManagement()
 
@@ -213,5 +171,5 @@ def get_pipeline(
 
     except Exception:
         print(traceback.format_exc())
-        return PipelineComponent()
+        raise
 

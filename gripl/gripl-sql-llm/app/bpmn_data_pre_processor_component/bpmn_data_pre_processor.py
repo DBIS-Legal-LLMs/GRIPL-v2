@@ -20,7 +20,7 @@ class BPMNDataPreProcessor:
 
 
     def get_only_activity_field_of_bpmn_file(self,
-                                             bpmn_content,
+                                             bpmn_content:bytes,
                                              ):
         try:
             root = ET.fromstring(bpmn_content)
@@ -48,15 +48,11 @@ class BPMNDataPreProcessor:
                                                  activity_field,
                                                  )->str:
         try:
+            element = ET.fromstring(activity_field)
+            return element.get("id", "") or ""
 
-            match = re.search(r'id="(sid-[^"]+)"', activity_field)
-            if match:
-                return match.group(1)
-            return ""
-
-
-        except Exception as e:
-            print(e)
+        except ET.ParseError as e:
+            print(f"Could not parse activity XML: {e}")
             return ""
 
     def get_name_from_activity_field_of_bpmn_file(
@@ -64,15 +60,11 @@ class BPMNDataPreProcessor:
             activity_field,
     ) -> str:
         try:
-            match = re.search(r'name="([^"]*)"', activity_field)
+            element = ET.fromstring(activity_field)
+            return element.get("name", "") or ""
 
-            if match:
-                return match.group(1)
-
-            return ""
-
-        except Exception as e:
-            print(e)
+        except ET.ParseError as e:
+            print(f"Could not parse activity XML: {e}")
             return ""
 
 

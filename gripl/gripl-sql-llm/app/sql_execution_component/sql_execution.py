@@ -1,5 +1,7 @@
 import sqlite3
 from pathlib import Path
+from typing import Any
+
 
 class SQLExecution:
 
@@ -7,20 +9,19 @@ class SQLExecution:
         project_root = Path(__file__).resolve().parents[2]
         self.db_path = project_root / "test.db"
 
+    def get_sql_query_results(
+            self,
+            sql: str,
+            params: tuple = (),
+    ) -> list[dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-    def get_sql_query_results(self, sql):
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-                cursor.execute(sql)
+            cursor.execute(sql, params)
+            rows = cursor.fetchall()
 
-                rows = cursor.fetchall()
-
-                return [dict(row) for row in rows]
-
-        except sqlite3.Error as e:
-            return {"error": str(e)}
+            return [dict(row) for row in rows]
 
     def insert_sql(self, sql, params=None):
 

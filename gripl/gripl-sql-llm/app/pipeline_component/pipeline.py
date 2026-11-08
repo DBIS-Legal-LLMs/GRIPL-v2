@@ -1,6 +1,8 @@
+import sqlite3
 import traceback
 from app.chroma_database_client.chroma_db_client import ChromaDatabaseClient
 from app.find_intention_component.find_intention import FindIntention
+from app.schemas import RunConfig
 from app.sql_execution_component.sql_execution import SQLExecution
 from app.sql_generation_component.sql_generation import SQLGenerator
 from app.sql_post_processing_component.sql_post_processing import SQLPostProcessing
@@ -27,17 +29,19 @@ class PipelineComponent:
         self.post_processing = post_processing
         self.bpmn_data_pre_processor = bpmn_data_pre_processor
 
-    async def get_analysis(self, bpmn_file_content: str):
+    async def get_analysis(self, run_config: RunConfig):
 
         try:
 
             results = []
 
-            total_activities_fields = self.get_only_activity_fields(bpmn_file_content)
+            total_activities_fields = self.get_only_activity_fields(run_config.bpmn_file)
 
             for activity in total_activities_fields:
 
-                current_result = await self.get_sid_and_reason_if_critical(activity)
+                current_result = await self.get_sid_and_reason_if_critical(activity,
+                                                                           run_config
+                                                                           )
 
                 if current_result and current_result.get("id", "") != "" and current_result.get("reason", "") != "":
                     results.append(current_result)
@@ -49,7 +53,7 @@ class PipelineComponent:
             return []
 
 
-    def get_only_activity_fields(self, bpmn_file_content: str):
+    def get_only_activity_fields(self, bpmn_file_content: bytes):
         try:
             return self.bpmn_data_pre_processor.get_only_activity_field_of_bpmn_file(
                 bpmn_content=bpmn_file_content,
@@ -58,88 +62,169 @@ class PipelineComponent:
             print(e)
             return []
 
-    async def get_sid_and_reason_if_critical(self, activity_field: str)->dict[str, str]:
+    async def get_sid_and_reason_if_critical(
+            self,
+            activity_field: str,
+            run_config: RunConfig,
+    ) -> dict[str, str]:
+
+        intentions = self.find_intention.find_intention_of_current_activity_field(
+            activity_field,
+            run_config=run_config,
+        )
+
+        if not intentions:
+            return {}
+
+        intent = intentions[0]
+
+        activity_id = (
+            self.bpmn_data_pre_processor
+            .get_sid_from_activity_field_of_bpmn_file(activity_field)
+        )
+
         try:
-
-            intentions = self.find_intention.find_intention_of_current_activity_field(activity_field)
-
-            if not intentions:
-                return {}
-
-            intent = intentions[0]
-
-            reasons_of_intention = [execution_result.get("reason", "") for execution_result in
-                                    self.sql_execution.get_sql_query_results(f"""
-                                                                            SELECT  r.reason
-                                                                            FROM reason r
-                                                                                     JOIN category_reason_association cra
-                                                                                          ON r.id = cra.reason_id
-                                                                                     JOIN category c
-                                                                                          ON c.id = cra.category_id
-                                                                            WHERE c.name = '{intent}';
-                                                                            """)]
-
-
-            activity_name = self.bpmn_data_pre_processor.get_name_from_activity_field_of_bpmn_file(activity_field)
-            few_shot_examples = self.chroma_db_client.get_top_k_results_only_meta_data(activity_name)
-
-            formated_few_shot_examples = self.format_few_shot_examples(few_shot_examples)
-
-            db_schema = get_db_schema_string()
-
-            generated_query = self.sql_generation.generate_query(
-                activity_field=activity_field,
-                db_schema=db_schema,
-                intentions=intentions,
-                reasons_of_intentions=reasons_of_intention,
-                few_shot_examples=formated_few_shot_examples,
+            reason_rows = self.sql_execution.get_sql_query_results(
+                """
+                SELECT r.reason
+                FROM reason r
+                         JOIN category_reason_association cra
+                              ON r.id = cra.reason_id
+                         JOIN category c
+                              ON c.id = cra.category_id
+                WHERE c.name = ?;
+                """,
+                (intent,),
             )
 
-            print("generated query")
-            print(generated_query)
+        except sqlite3.Error as e:
+            logger.exception("Failed to retrieve reasons for intention.")
 
+            return {
+                "id": activity_id,
+                "reason": "",
+                "error": f"Failed to retrieve intention reasons: {e}",
+            }
 
-            results_of_generated_query = self.sql_execution.get_sql_query_results(generated_query)[0].get("reason", "")
+        reasons_of_intention = [
+            row["reason"]
+            for row in reason_rows
+            if row.get("reason") is not None
+        ]
 
-            error_message = ""
+        activity_name = (
+            self.bpmn_data_pre_processor
+            .get_name_from_activity_field_of_bpmn_file(activity_field)
+        )
 
-            if isinstance(results_of_generated_query, dict) and "error" in results_of_generated_query:
-                error_message = results_of_generated_query["error"]
+        few_shot_examples = (
+            self.chroma_db_client.get_top_k_results_only_meta_data(
+                activity_name,
+                run_config=run_config,
+            )
+        )
 
-            post_processed_query = await self.post_processing.post_process_generated_query(
+        formatted_few_shot_examples = self.format_few_shot_examples(
+            few_shot_examples
+        )
+
+        db_schema = get_db_schema_string()
+
+        generated_query = self.sql_generation.generate_query(
+            activity_field=activity_field,
+            db_schema=db_schema,
+            intentions=intentions,
+            reasons_of_intentions=reasons_of_intention,
+            few_shot_examples=formatted_few_shot_examples,
+            run_config=run_config,
+        )
+
+        print("Generated query:")
+        print(generated_query)
+
+        error_message = ""
+
+        try:
+            generated_results = self.sql_execution.get_sql_query_results(
+                generated_query
+            )
+
+            if not generated_results:
+                error_message = (
+                    "The SQL query executed successfully but returned no rows."
+                )
+
+            elif not generated_results[0].get("reason"):
+                error_message = (
+                    "The SQL query returned no non-empty 'reason' value."
+                )
+
+        except sqlite3.Error as e:
+            error_message = str(e)
+
+            logger.warning(
+                "Generated SQL query failed for activity %s: %s",
+                activity_id,
+                error_message,
+            )
+
+        post_processed_query = (
+            await self.post_processing.post_process_generated_query(
                 db_schema=db_schema,
                 activity_field=activity_field,
                 generated_query=generated_query,
                 error_message=error_message,
                 intentions=intentions,
                 reasons_of_intentions=reasons_of_intention,
+                run_config=run_config,
+            )
+        )
+
+        print("Post-processed query:")
+        print(post_processed_query)
+
+        try:
+            post_processed_results = (
+                self.sql_execution.get_sql_query_results(post_processed_query)
             )
 
-            print("post processed query")
-            print(post_processed_query)
+        except sqlite3.Error as e:
+            logger.exception(
+                "Post-processed SQL query failed for activity %s.",
+                activity_id,
+            )
 
-            results_of_post_processed_query = self.sql_execution.get_sql_query_results(post_processed_query)[0].get("reason", "")
+            return {
+                "id": activity_id,
+                "reason": "",
+                "error": f"Post-processed SQL execution failed: {e}",
+            }
 
-
-            if results_of_post_processed_query:
-                return {
-                    "id": self.bpmn_data_pre_processor.get_sid_from_activity_field_of_bpmn_file(activity_field),
-                    "reason": results_of_post_processed_query ,
-                }
-
+        if not post_processed_results:
             return {}
 
-        except Exception as e:
-            print(e)
-            return {}
+        reason = post_processed_results[0].get("reason")
 
-    def format_few_shot_examples(self, list):
+        if reason:
+            return {
+                "id": activity_id,
+                "reason": str(reason),
+            }
 
-        formated_prompt = "Consider for your generation as a guide. \n"
+        return {}
 
-        for activity_name, metadata in list:
-            formated_prompt += formated_prompt + f"Activity field name:  {activity_name}\n"
-            formated_prompt += formated_prompt + f"SQL query:  {metadata.get('sql', '')}\n"
+    def format_few_shot_examples(self, few_shot_examples) -> str:
 
-        return formated_prompt
+        formatted_examples = [
+            (
+                f"Activity field name: {activity_name}\n"
+                f"SQL query: {metadata.get('sql', '')}"
+            )
+            for activity_name, metadata in few_shot_examples
+        ]
+
+        return (
+                "Consider for your generation as a guide.\n"
+                + "\n\n".join(formatted_examples)
+        )
 

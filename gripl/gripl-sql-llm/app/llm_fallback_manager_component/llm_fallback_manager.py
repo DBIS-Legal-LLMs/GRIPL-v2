@@ -61,27 +61,32 @@ class LLMFallBackManager:
     def get_all_possible_llm_models_of_component(self, component_name: str) -> list:
 
         try:
-            sql = f"""
-                    SELECT
-                                                                            name,
-                                                                            env_api_key_name, 
-                                                                            model_url
-                                                                        FROM fallback_llm
-                                                                        WHERE corresponding_comment = '{component_name}'
-                                                                        ORDER BY "order" ASC;
-            """
+            sql = """
+                  SELECT name, \
+                         env_api_key_name, \
+                         model_url
+                  FROM fallback_llm
+                  WHERE corresponding_comment = ?
+                  ORDER BY "order" ASC; \
+                  """
 
-            return [(execution_result.get("name", ""),
-                     execution_result.get("env_api_key_name", ""),
-                     execution_result.get("model_url", "")
-                     ) for execution_result in
-                    self.sql_execution_component.get_sql_query_results(sql)]
+            results = self.sql_execution_component.get_sql_query_results(
+                sql,
+                (component_name,),
+            )
 
+            return [
+                (
+                    execution_result.get("name", ""),
+                    execution_result.get("env_api_key_name", ""),
+                    execution_result.get("model_url", ""),
+                )
+                for execution_result in results
+            ]
 
-
-        except Exception as e:
-            print(traceback.format_exc())
-            return []
+        except Exception:
+            
+            raise
 
     @retry(
         retry=retry_if_exception_type(InstructorRetryException),
@@ -97,11 +102,11 @@ class LLMFallBackManager:
                                     tools: list | None = None,
                                     ):
         try:
-
+            api_key = self._resolve_api_key(api_key_env_name)
             llm = LLM(
                 model_name=model_name,
                 model_url=model_url,
-                api_key=api_key_env_name,
+                api_key=api_key,
                 schema_output=self.schema_output
             )
 
@@ -125,11 +130,11 @@ class LLMFallBackManager:
 
             for model, env_api_key_name, model_url in models_env_api_key_list:
                 try:
-
+                    api_key = self._resolve_api_key(env_api_key_name)
                     llm = LLM(
                         model_name=model,
                         model_url=model_url,
-                        api_key=os.getenv(env_api_key_name),
+                        api_key=api_key,
                         schema_output=None
                     )
 
@@ -149,3 +154,24 @@ class LLMFallBackManager:
             print("get error in getting embedidng")
             print(traceback.format_exc())
             return []
+
+    def _resolve_api_key(self, api_key_value: str) -> str:
+        """
+        Resolves an environment variable name or accepts an actual API key.
+
+        Local evaluation:
+            "OPEN_ROUTER_API_KEY" -> actual API key from environment
+
+        Web evaluation:
+            actual API key -> actual API key
+        """
+
+        if not api_key_value:
+            raise ValueError("API key is missing.")
+
+        resolved_api_key = os.getenv(api_key_value)
+
+        if resolved_api_key:
+            return resolved_api_key
+
+        return api_key_value

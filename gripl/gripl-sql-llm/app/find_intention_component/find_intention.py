@@ -1,6 +1,7 @@
 from app.logging_component.logger import Logger
 from app.llm_fallback_manager_component.llm_fallback_manager import LLMFallBackManager
 from app.prompt_management_component.prompt_management import PromptManagement
+from app.schemas import RunConfig
 from app.sql_execution_component.sql_execution import SQLExecution
 from pathlib import Path
 import traceback
@@ -26,7 +27,9 @@ class FindIntention:
         self.system_prompt_path = base_dir / "system_prompt.txt"
         self.user_prompt_path = base_dir / "user_prompt.txt"
 
-    def find_intention_of_current_activity_field(self, activity_field: str)->list[str]:
+    def find_intention_of_current_activity_field(self, activity_field: str,
+                                                 run_config: RunConfig,
+                                                 )->list[str]:
         try:
 
             available_intents = self.get_all_intentions()
@@ -54,11 +57,8 @@ class FindIntention:
 
             answer = self.llm_handler.get_answer_with_fallback(
                 messages,
+                run_config,
             ).intents
-
-
-            print("current intention")
-            print(answer)
 
             self.logging_component.log(
                 user_prompt,
