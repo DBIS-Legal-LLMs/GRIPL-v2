@@ -84,13 +84,13 @@ class SQLPostProcessing:
 
             messages = [
                 {
+                    "role": "system",
+                    "content": post_processed_system_prompt,
+                },
+                {
                     "role": "user",
                     "content": post_processed_user_prompt,
                 },
-                {
-                    "role": "system",
-                    "content": post_processed_system_prompt,
-                }
             ]
 
             answer = self.llm_handler.get_answer_with_fallback(
