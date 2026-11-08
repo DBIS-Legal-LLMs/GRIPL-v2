@@ -54,6 +54,8 @@ class SQLPostProcessing:
             )
 
         except Exception:
+            print("e in post_processing")
+            print(traceback.format_exc())
             raise
 
     def current_post_processed_query(self,
@@ -63,7 +65,8 @@ class SQLPostProcessing:
                                      error_message: str,
                                      intentions: list[str],
                                      reasons_of_intentions: list[str],
-                                     hint:str
+                                     hint:str,
+                                     run_config: RunConfig,
                                      ) -> str:
 
         try:
@@ -99,6 +102,7 @@ class SQLPostProcessing:
 
             answer = self.llm_handler.get_answer_with_fallback(
                 messages,
+                run_config=run_config,
             ).final_query
 
             self.logging_component.log(
@@ -112,5 +116,5 @@ class SQLPostProcessing:
         except Exception as e:
             print("e in post_processing")
             print(traceback.format_exc())
-            return ""
+            raise
 

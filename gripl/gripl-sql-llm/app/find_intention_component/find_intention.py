@@ -74,6 +74,7 @@ class FindIntention:
             return answer
 
         except Exception as e:
+            print("error in find intention")
             print(traceback.format_exc())
             raise
 

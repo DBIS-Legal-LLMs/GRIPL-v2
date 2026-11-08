@@ -163,10 +163,11 @@ async def analyse(
         }
 
     except HTTPException:
+        print(traceback.format_exc())
         raise
 
     except Exception:
-
+        print(traceback.format_exc())
         raise HTTPException(
             status_code=500,
             detail="Analysis failed due to an internal server error.",

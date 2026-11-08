@@ -1,0 +1,653 @@
+system_prompt,user_prompt,output
+"<role>
+You are a strict SQL template engine.
+</role>
+
+<instructions>
+Your ONLY task is to fill a fixed SQL template with the provided intent.
+
+FIXED SQL TEMPLATE (DO NOT CHANGE A SINGLE CHARACTER EXCEPT THE PLACEHOLDER):
+------------------------------------------------------------
+SELECT reason.reason
+FROM category
+JOIN category_reason_association ON category.id = category_reason_association.category_id
+JOIN reason ON category_reason_association.reason_id = reason.id
+WHERE category.name = '{INTENT}' AND reason.reason = 'best suitable reason';
+------------------------------------------------------------
+
+CRITICAL RULES:
+1. You MUST output EXACTLY this template. Only replace '{INTENT}' with the actual intent value.
+2. DO NOT select any other columns (no ids, no short_names, no descriptions, no article_number, etc.).
+3. DO NOT add any other JOINs (no gdpr_criteria, no gdpr_articles, no criterion_article_association).
+4. DO NOT add GROUP BY, ORDER BY, LIMIT, or subqueries.
+5. IGNORE all other tables in the provided database schema. Only use the three tables: category, category_reason_association, reason.
+6. Even if these tables are not listed in the schema dump below, you MUST still generate exactly this query structure.
+7. Output ONLY a valid JSON object: {""query"": ""GENERATED_SQL""}.
+8. The generated SQL string must use double quotes only for the JSON wrapper; inside the SQL, use single quotes for the intent value.
+9. ANY deviation from this template will be considered a fatal error.
+10. Add a Where clause for the column reason of the table reason with the best suitable value of the given list reasons of the intention.
+11. If examples are given, take them as a guide.
+</instructions>","DATABASE SCHEMA:
+Table: category
+  - id (Integer, primary key)
+  - name (String(255), unique, not null)
+
+Table: reason
+  - id (Integer, primary key)
+  - reason (Text, not null, unique)
+
+Table: category_reason_association
+  - category_id (Integer, FK -> category.id, primary key)
+  - reason_id (Integer, FK -> reason.id, primary key)
+
+Relationships:
+  - category.reasons <-> reason.categories (many-to-many via category_reason_association)
+
+
+DETECTED INTENT (exact value for category.name):
+['Modification']
+
+Bpmn Activity Field
+
+<ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""sid-11be-ee789fd174af9e196addcb471ade761f"" name=""Überstundenberechtigung erteilen"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>h619-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>lv0z-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+reasons of the intention
+
+['Modifies personal data – updates, corrects, or changes stored data.', 'Modifies personal data – updates, corrects, or changes stored data.\n    ', 'Accesses personal data – updates, corrects, or changes stored data.\n    ']
+
+examples:
+
+Consider for your generation as a guide.
+Activity field name: recognize working time
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Storage' AND r.reason = 'Storage of personal employment related data'
+
+
+Activity field name: Antrag beenden und weiterleiten
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Transferal' AND r.reason = 'Transfers personal data – shares data internally, with third parties, or externally.'
+
+
+Activity field name: modify time schedule
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Modification' AND r.reason = 'Modifies personal data – updates, corrects, or changes stored data.'
+
+
+Activity field name: modify time schedule
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Modification' AND r.reason = 'Modifies personal data – updates, corrects, or changes stored data.'
+
+
+Activity field name: calculate operatorratio at working place
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Usage' AND r.reason = 'Uses personal data – processes data for operational, analytical, or business purposes.'
+","SELECT reason.reason
+FROM category
+JOIN category_reason_association ON category.id = category_reason_association.category_id
+JOIN reason ON category_reason_association.reason_id = reason.id
+WHERE category.name = 'Modification' AND reason.reason = 'Modifies personal data – updates, corrects, or changes stored data.';"
+"<role>
+You are a strict SQL template engine.
+</role>
+
+<instructions>
+Your ONLY task is to fill a fixed SQL template with the provided intent.
+
+FIXED SQL TEMPLATE (DO NOT CHANGE A SINGLE CHARACTER EXCEPT THE PLACEHOLDER):
+------------------------------------------------------------
+SELECT reason.reason
+FROM category
+JOIN category_reason_association ON category.id = category_reason_association.category_id
+JOIN reason ON category_reason_association.reason_id = reason.id
+WHERE category.name = '{INTENT}' AND reason.reason = 'best suitable reason';
+------------------------------------------------------------
+
+CRITICAL RULES:
+1. You MUST output EXACTLY this template. Only replace '{INTENT}' with the actual intent value.
+2. DO NOT select any other columns (no ids, no short_names, no descriptions, no article_number, etc.).
+3. DO NOT add any other JOINs (no gdpr_criteria, no gdpr_articles, no criterion_article_association).
+4. DO NOT add GROUP BY, ORDER BY, LIMIT, or subqueries.
+5. IGNORE all other tables in the provided database schema. Only use the three tables: category, category_reason_association, reason.
+6. Even if these tables are not listed in the schema dump below, you MUST still generate exactly this query structure.
+7. Output ONLY a valid JSON object: {""query"": ""GENERATED_SQL""}.
+8. The generated SQL string must use double quotes only for the JSON wrapper; inside the SQL, use single quotes for the intent value.
+9. ANY deviation from this template will be considered a fatal error.
+10. Add a Where clause for the column reason of the table reason with the best suitable value of the given list reasons of the intention.
+11. If examples are given, take them as a guide.
+</instructions>","DATABASE SCHEMA:
+Table: category
+  - id (Integer, primary key)
+  - name (String(255), unique, not null)
+
+Table: reason
+  - id (Integer, primary key)
+  - reason (Text, not null, unique)
+
+Table: category_reason_association
+  - category_id (Integer, FK -> category.id, primary key)
+  - reason_id (Integer, FK -> reason.id, primary key)
+
+Relationships:
+  - category.reasons <-> reason.categories (many-to-many via category_reason_association)
+
+
+DETECTED INTENT (exact value for category.name):
+['Modification']
+
+Bpmn Activity Field
+
+<ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""sid-11bf-ee789fd174af9e196addcb471ade761f"" name=""Zeitguthaben ändern"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>dnvn-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>dopz-f27a558c2c6ace26a255ac4b248a454f</ns0:outgoing>
+    </ns0:task>
+    
+
+reasons of the intention
+
+['Modifies personal data – updates, corrects, or changes stored data.', 'Modifies personal data – updates, corrects, or changes stored data.\n    ', 'Accesses personal data – updates, corrects, or changes stored data.\n    ']
+
+examples:
+
+Consider for your generation as a guide.
+Activity field name: Antrag beenden und weiterleiten
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Transferal' AND r.reason = 'Transfers personal data – shares data internally, with third parties, or externally.'
+
+
+Activity field name: recognize working time
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Storage' AND r.reason = 'Storage of personal employment related data'
+
+
+Activity field name: modify time schedule
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Modification' AND r.reason = 'Modifies personal data – updates, corrects, or changes stored data.'
+
+
+Activity field name: modify time schedule
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Modification' AND r.reason = 'Modifies personal data – updates, corrects, or changes stored data.'
+
+
+Activity field name: do task
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Collection' AND r.reason = ' Collects personal data – gathers information about natural persons (PersonalID, departmentID, Time schedule)'
+","SELECT reason.reason FROM category JOIN category_reason_association ON category.id = category_reason_association.category_id JOIN reason ON category_reason_association.reason_id = reason.id WHERE category.name = 'Modification' AND reason.reason = 'Modifies personal data – updates, corrects, or changes stored data.'"
+"<role>
+You are a strict SQL template engine.
+</role>
+
+<instructions>
+Your ONLY task is to fill a fixed SQL template with the provided intent.
+
+FIXED SQL TEMPLATE (DO NOT CHANGE A SINGLE CHARACTER EXCEPT THE PLACEHOLDER):
+------------------------------------------------------------
+SELECT reason.reason
+FROM category
+JOIN category_reason_association ON category.id = category_reason_association.category_id
+JOIN reason ON category_reason_association.reason_id = reason.id
+WHERE category.name = '{INTENT}' AND reason.reason = 'best suitable reason';
+------------------------------------------------------------
+
+CRITICAL RULES:
+1. You MUST output EXACTLY this template. Only replace '{INTENT}' with the actual intent value.
+2. DO NOT select any other columns (no ids, no short_names, no descriptions, no article_number, etc.).
+3. DO NOT add any other JOINs (no gdpr_criteria, no gdpr_articles, no criterion_article_association).
+4. DO NOT add GROUP BY, ORDER BY, LIMIT, or subqueries.
+5. IGNORE all other tables in the provided database schema. Only use the three tables: category, category_reason_association, reason.
+6. Even if these tables are not listed in the schema dump below, you MUST still generate exactly this query structure.
+7. Output ONLY a valid JSON object: {""query"": ""GENERATED_SQL""}.
+8. The generated SQL string must use double quotes only for the JSON wrapper; inside the SQL, use single quotes for the intent value.
+9. ANY deviation from this template will be considered a fatal error.
+10. Add a Where clause for the column reason of the table reason with the best suitable value of the given list reasons of the intention.
+11. If examples are given, take them as a guide.
+</instructions>","DATABASE SCHEMA:
+Table: category
+  - id (Integer, primary key)
+  - name (String(255), unique, not null)
+
+Table: reason
+  - id (Integer, primary key)
+  - reason (Text, not null, unique)
+
+Table: category_reason_association
+  - category_id (Integer, FK -> category.id, primary key)
+  - reason_id (Integer, FK -> reason.id, primary key)
+
+Relationships:
+  - category.reasons <-> reason.categories (many-to-many via category_reason_association)
+
+
+DETECTED INTENT (exact value for category.name):
+['Deletion']
+
+Bpmn Activity Field
+
+<ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""sid-11bi-ee789fd174af9e196addcb471ade761f"" name=""Für das Löschen sperren"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>ai18-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>aisz-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+reasons of the intention
+
+['Deletes personal data – removes or anonymizes data from storage.']
+
+examples:
+
+Consider for your generation as a guide.
+Activity field name: Antrag beenden und weiterleiten
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Transferal' AND r.reason = 'Transfers personal data – shares data internally, with third parties, or externally.'
+
+
+Activity field name: Cancel surgery
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Modification' AND r.reason = 'Modifies personal data – updates, corrects, or changes stored data.'
+
+
+Activity field name: do task
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Collection' AND r.reason = ' Collects personal data – gathers information about natural persons (PersonalID, departmentID, Time schedule)'
+
+
+Activity field name: Explain further procedure to patient
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Access' AND r.reason = 'Accesses personal data – retrieves or makes data available to users or systems.'
+
+
+Activity field name: Archieve order
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Storage' AND r.reason = 'Stores personal data – saves information in databases, systems, or files. If the customer is a natural person or the organization has a contact person.'
+","SELECT reason.reason
+FROM category
+JOIN category_reason_association ON category.id = category_reason_association.category_id
+JOIN reason ON category_reason_association.reason_id = reason.id
+WHERE category.name = 'Deletion' AND reason.reason = 'Deletes personal data – removes or anonymizes data from storage.';"
+"<role>
+You are a strict SQL template engine.
+</role>
+
+<instructions>
+Your ONLY task is to fill a fixed SQL template with the provided intent.
+
+FIXED SQL TEMPLATE (DO NOT CHANGE A SINGLE CHARACTER EXCEPT THE PLACEHOLDER):
+------------------------------------------------------------
+SELECT reason.reason
+FROM category
+JOIN category_reason_association ON category.id = category_reason_association.category_id
+JOIN reason ON category_reason_association.reason_id = reason.id
+WHERE category.name = '{INTENT}' AND reason.reason = 'best suitable reason';
+------------------------------------------------------------
+
+CRITICAL RULES:
+1. You MUST output EXACTLY this template. Only replace '{INTENT}' with the actual intent value.
+2. DO NOT select any other columns (no ids, no short_names, no descriptions, no article_number, etc.).
+3. DO NOT add any other JOINs (no gdpr_criteria, no gdpr_articles, no criterion_article_association).
+4. DO NOT add GROUP BY, ORDER BY, LIMIT, or subqueries.
+5. IGNORE all other tables in the provided database schema. Only use the three tables: category, category_reason_association, reason.
+6. Even if these tables are not listed in the schema dump below, you MUST still generate exactly this query structure.
+7. Output ONLY a valid JSON object: {""query"": ""GENERATED_SQL""}.
+8. The generated SQL string must use double quotes only for the JSON wrapper; inside the SQL, use single quotes for the intent value.
+9. ANY deviation from this template will be considered a fatal error.
+10. Add a Where clause for the column reason of the table reason with the best suitable value of the given list reasons of the intention.
+11. If examples are given, take them as a guide.
+</instructions>","DATABASE SCHEMA:
+Table: category
+  - id (Integer, primary key)
+  - name (String(255), unique, not null)
+
+Table: reason
+  - id (Integer, primary key)
+  - reason (Text, not null, unique)
+
+Table: category_reason_association
+  - category_id (Integer, FK -> category.id, primary key)
+  - reason_id (Integer, FK -> reason.id, primary key)
+
+Relationships:
+  - category.reasons <-> reason.categories (many-to-many via category_reason_association)
+
+
+DETECTED INTENT (exact value for category.name):
+['Deletion']
+
+Bpmn Activity Field
+
+<ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""a934-1f26bc8df5723441a7c06602674717dc"" name=""Zeiterfassungsdaten löschen"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>ajjm-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>k5lc-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+reasons of the intention
+
+['Deletes personal data – removes or anonymizes data from storage.']
+
+examples:
+
+Consider for your generation as a guide.
+Activity field name: modify time schedule
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Modification' AND r.reason = 'Modifies personal data – updates, corrects, or changes stored data.'
+
+
+Activity field name: modify time schedule
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Modification' AND r.reason = 'Modifies personal data – updates, corrects, or changes stored data.'
+
+
+Activity field name: Antrag beenden und weiterleiten
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Transferal' AND r.reason = 'Transfers personal data – shares data internally, with third parties, or externally.'
+
+
+Activity field name: Recall patient's data
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Access' AND r.reason = 'Accesses personal data – retrieves or makes data available to users or systems.'
+
+
+Activity field name: recognize working time
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Storage' AND r.reason = 'Storage of personal employment related data'
+","SELECT reason.reason
+FROM category
+JOIN category_reason_association ON category.id = category_reason_association.category_id
+JOIN reason ON category_reason_association.reason_id = reason.id
+WHERE category.name = 'Deletion' AND reason.reason = 'Deletes personal data – removes or anonymizes data from storage.';"
+"<role>
+You are a strict SQL template engine.
+</role>
+
+<instructions>
+Your ONLY task is to fill a fixed SQL template with the provided intent.
+
+FIXED SQL TEMPLATE (DO NOT CHANGE A SINGLE CHARACTER EXCEPT THE PLACEHOLDER):
+------------------------------------------------------------
+SELECT reason.reason
+FROM category
+JOIN category_reason_association ON category.id = category_reason_association.category_id
+JOIN reason ON category_reason_association.reason_id = reason.id
+WHERE category.name = '{INTENT}' AND reason.reason = 'best suitable reason';
+------------------------------------------------------------
+
+CRITICAL RULES:
+1. You MUST output EXACTLY this template. Only replace '{INTENT}' with the actual intent value.
+2. DO NOT select any other columns (no ids, no short_names, no descriptions, no article_number, etc.).
+3. DO NOT add any other JOINs (no gdpr_criteria, no gdpr_articles, no criterion_article_association).
+4. DO NOT add GROUP BY, ORDER BY, LIMIT, or subqueries.
+5. IGNORE all other tables in the provided database schema. Only use the three tables: category, category_reason_association, reason.
+6. Even if these tables are not listed in the schema dump below, you MUST still generate exactly this query structure.
+7. Output ONLY a valid JSON object: {""query"": ""GENERATED_SQL""}.
+8. The generated SQL string must use double quotes only for the JSON wrapper; inside the SQL, use single quotes for the intent value.
+9. ANY deviation from this template will be considered a fatal error.
+10. Add a Where clause for the column reason of the table reason with the best suitable value of the given list reasons of the intention.
+11. If examples are given, take them as a guide.
+</instructions>","DATABASE SCHEMA:
+Table: category
+  - id (Integer, primary key)
+  - name (String(255), unique, not null)
+
+Table: reason
+  - id (Integer, primary key)
+  - reason (Text, not null, unique)
+
+Table: category_reason_association
+  - category_id (Integer, FK -> category.id, primary key)
+  - reason_id (Integer, FK -> reason.id, primary key)
+
+Relationships:
+  - category.reasons <-> reason.categories (many-to-many via category_reason_association)
+
+
+DETECTED INTENT (exact value for category.name):
+['Storage']
+
+Bpmn Activity Field
+
+<ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""c21b-1f26bc8df5723441a7c06602674717dc"" name=""Stammsätze anlegen"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>cxaq-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>k9tj-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+reasons of the intention
+
+['Collects personal health data – gathers health information about natural persons.\nStores personal data – saves information in databases, systems, or files.', 'Stores personal data – saves information in databases, systems, or files.', ' Stores personal data – saves information in databases, systems, or files.', 'Stores personal data – saves information in databases, systems, or files.\n    ', 'Stores personal data – saves information in databases, systems, or files.\nAccesses personal data – retrieves or makes data available to users or systems.', 'Storage of personal employment related data', 'Stores personal data – saves information in databases, systems, or files. If the customer is a natural person or the organization has a contact person.', 'Uses personal data (to decide medication), Stores personal data (in medical records)']
+
+examples:
+
+Consider for your generation as a guide.
+Activity field name: employ new employees
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Collection' AND r.reason = 'Collects personal data – gathers information about natural persons (e.g., name, email).'
+
+
+Activity field name: Antrag beenden und weiterleiten
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Transferal' AND r.reason = 'Transfers personal data – shares data internally, with third parties, or externally.'
+
+
+Activity field name: Aquire patient's core data
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Access' AND r.reason = 'Accesses personal data – retrieves or makes data available to users or systems.'
+
+
+Activity field name: calculate operatorratio at working place
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Usage' AND r.reason = 'Uses personal data – processes data for operational, analytical, or business purposes.'
+
+
+Activity field name: recognize working time
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Storage' AND r.reason = 'Storage of personal employment related data'
+","SELECT reason.reason
+FROM category
+JOIN category_reason_association ON category.id = category_reason_association.category_id
+JOIN reason ON category_reason_association.reason_id = reason.id
+WHERE category.name = 'Storage' AND reason.reason = 'Storage of personal employment related data';"
+"<role>
+You are a strict SQL template engine.
+</role>
+
+<instructions>
+Your ONLY task is to fill a fixed SQL template with the provided intent.
+
+FIXED SQL TEMPLATE (DO NOT CHANGE A SINGLE CHARACTER EXCEPT THE PLACEHOLDER):
+------------------------------------------------------------
+SELECT reason.reason
+FROM category
+JOIN category_reason_association ON category.id = category_reason_association.category_id
+JOIN reason ON category_reason_association.reason_id = reason.id
+WHERE category.name = '{INTENT}' AND reason.reason = 'best suitable reason';
+------------------------------------------------------------
+
+CRITICAL RULES:
+1. You MUST output EXACTLY this template. Only replace '{INTENT}' with the actual intent value.
+2. DO NOT select any other columns (no ids, no short_names, no descriptions, no article_number, etc.).
+3. DO NOT add any other JOINs (no gdpr_criteria, no gdpr_articles, no criterion_article_association).
+4. DO NOT add GROUP BY, ORDER BY, LIMIT, or subqueries.
+5. IGNORE all other tables in the provided database schema. Only use the three tables: category, category_reason_association, reason.
+6. Even if these tables are not listed in the schema dump below, you MUST still generate exactly this query structure.
+7. Output ONLY a valid JSON object: {""query"": ""GENERATED_SQL""}.
+8. The generated SQL string must use double quotes only for the JSON wrapper; inside the SQL, use single quotes for the intent value.
+9. ANY deviation from this template will be considered a fatal error.
+10. Add a Where clause for the column reason of the table reason with the best suitable value of the given list reasons of the intention.
+11. If examples are given, take them as a guide.
+</instructions>","DATABASE SCHEMA:
+Table: category
+  - id (Integer, primary key)
+  - name (String(255), unique, not null)
+
+Table: reason
+  - id (Integer, primary key)
+  - reason (Text, not null, unique)
+
+Table: category_reason_association
+  - category_id (Integer, FK -> category.id, primary key)
+  - reason_id (Integer, FK -> reason.id, primary key)
+
+Relationships:
+  - category.reasons <-> reason.categories (many-to-many via category_reason_association)
+
+
+DETECTED INTENT (exact value for category.name):
+['Modification']
+
+Bpmn Activity Field
+
+<ns0:task xmlns:ns0=""http://www.omg.org/spec/BPMN/20100524/MODEL"" xmlns:ns1=""http://www.signavio.com"" id=""la0c-1f26bc8df5723441a7c06602674717dc"" name=""Überstundenguthaben ändern"">
+      <ns0:extensionElements>
+        <ns1:signavioMetaData metaKey=""bgcolor"" metaValue=""#9CC7FF"" />
+        <ns1:signavioMetaData metaKey=""bordercolor"" metaValue=""#000000"" />
+      </ns0:extensionElements>
+      <ns0:incoming>li1i-1f26bc8df5723441a7c06602674717dc</ns0:incoming>
+      <ns0:outgoing>lm95-1f26bc8df5723441a7c06602674717dc</ns0:outgoing>
+    </ns0:task>
+    
+
+reasons of the intention
+
+['Modifies personal data – updates, corrects, or changes stored data.', 'Modifies personal data – updates, corrects, or changes stored data.\n    ', 'Accesses personal data – updates, corrects, or changes stored data.\n    ']
+
+examples:
+
+Consider for your generation as a guide.
+Activity field name: Antrag beenden und weiterleiten
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Transferal' AND r.reason = 'Transfers personal data – shares data internally, with third parties, or externally.'
+
+
+Activity field name: recognize working time
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Storage' AND r.reason = 'Storage of personal employment related data'
+
+
+Activity field name: Cancel surgery
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Modification' AND r.reason = 'Modifies personal data – updates, corrects, or changes stored data.'
+
+
+Activity field name: Check if more workers from other place available
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Usage' AND r.reason = 'Uses personal data – processes data for operational, analytical, or business purposes.'
+
+
+Activity field name: Check and complement patient's data
+SQL query: 
+        SELECT r.reason 
+        FROM reason r JOIN category_reason_association cra ON r.id = cra.reason_id 
+        JOIN category c ON c.id = cra.category_id 
+        WHERE c.name = 'Modification' AND r.reason = 'Modifies personal data – updates, corrects, or changes stored data.'
+","SELECT reason.reason FROM category JOIN category_reason_association ON category.id = category_reason_association.category_id JOIN reason ON category_reason_association.reason_id = reason.id WHERE category.name = 'Modification' AND reason.reason = 'Modifies personal data – updates, corrects, or changes stored data.'"

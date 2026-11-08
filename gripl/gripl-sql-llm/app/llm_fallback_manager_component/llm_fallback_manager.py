@@ -117,40 +117,30 @@ class LLMFallBackManager:
             print(traceback.format_exc())
             raise
 
-    def get_embedding_of_current_embedding_model(self,
-                                                 documents:list[str]
-                                                 ):
-
+    def get_embedding_of_current_embedding_model(
+            self,
+            documents: list[str],
+            run_config: RunConfig,
+    ):
         try:
+            model_config = run_config.get_model_config(
+                self.llm_component_name
+            )
 
-            models_env_api_key_list = self.get_all_possible_llm_models_of_component(self.llm_component_name)
+            llm = LLM(
+                model_name=model_config.model_name,
+                model_url=model_config.base_url,
+                api_key=run_config.api_key,
+                schema_output=None,
+            )
 
-            for model, env_api_key_name, model_url in models_env_api_key_list:
-                try:
-                    api_key = self._resolve_api_key(env_api_key_name)
-                    llm = LLM(
-                        model_name=model,
-                        model_url=model_url,
-                        api_key=api_key,
-                        schema_output=None
-                    )
+            return llm.get_embeddings_from_llm(
+                texts=documents,
+            )
 
-                    return llm.get_embeddings_from_llm(
-                        texts=documents,
-                    )
+        except Exception:
 
-                except Exception as e:
-                    print(f"Model {model} failed after all retries. Trying next model...")
-                    print("get error in getting embedidng")
-                    print(traceback.format_exc())
-                    continue
-
-            return []
-
-        except Exception as e:
-            print("get error in getting embedidng")
-            print(traceback.format_exc())
-            return []
+            raise
 
     def _resolve_api_key(self, api_key_value: str) -> str:
         """

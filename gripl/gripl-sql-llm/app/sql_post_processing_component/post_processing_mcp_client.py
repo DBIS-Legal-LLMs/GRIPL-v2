@@ -74,6 +74,7 @@ class PostProcessingMcpClient:
                                 intentions=intentions,
                                 reasons_of_intentions=current_reasons_list,
                                 hint=current_hint,
+                                run_config=run_config,
                             )
 
                             current_iteration_user_prompt = sql_post_processing_component.prompt_management.fill_prompt(
@@ -179,6 +180,7 @@ class PostProcessingMcpClient:
         except Exception:
             print("error in mcp client")
             print(traceback.format_exc())
+            raise
 
 
     def convert_mcp_tool_list_to_groq_schema_tool_list(self, mcp_tools: list):
@@ -252,4 +254,4 @@ class PostProcessingMcpClient:
         except Exception as e:
             print("error in tool usage")
             print(traceback.format_exc())
-            return []
+            raise
