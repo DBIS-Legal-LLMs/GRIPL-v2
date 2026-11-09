@@ -41,8 +41,7 @@ class BPMNDataPreProcessor:
             return activities
         except Exception as e:
             print(traceback.format_exc())
-            print(e)
-            return []
+            raise
 
     def get_sid_from_activity_field_of_bpmn_file(self,
                                                  activity_field,
@@ -52,8 +51,8 @@ class BPMNDataPreProcessor:
             return element.get("id", "") or ""
 
         except ET.ParseError as e:
-            print(f"Could not parse activity XML: {e}")
-            return ""
+            print(traceback.format_exc())
+            raise
 
     def get_name_from_activity_field_of_bpmn_file(
             self,
@@ -64,7 +63,7 @@ class BPMNDataPreProcessor:
             return element.get("name", "") or ""
 
         except ET.ParseError as e:
-            print(f"Could not parse activity XML: {e}")
-            return ""
+            print(traceback.format_exc())
+            raise
 
 

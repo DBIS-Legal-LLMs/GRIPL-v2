@@ -25,6 +25,10 @@ from app.config.component_name import (INTENTION_MODEL, SQL_GENERATION_MODEL, PO
 from app.logging_component.logger import Logger
 from fastapi import HTTPException
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 app = FastAPI(
@@ -83,8 +87,6 @@ async def analyse(
                 status_code=400,
                 detail="Invalid LLM configuration JSON.",
             )
-
-
 
         if not isinstance(llm_props, dict):
             raise HTTPException(
@@ -163,11 +165,11 @@ async def analyse(
         }
 
     except HTTPException:
-        print(traceback.format_exc())
+        logger.error(traceback.format_exc())
         raise
 
     except Exception:
-        print(traceback.format_exc())
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
             detail="Analysis failed due to an internal server error.",
@@ -263,7 +265,7 @@ def get_pipeline(
         )
 
     except Exception:
-        print(traceback.format_exc())
+        logger.error(traceback.format_exc())
         raise
 
 def parse_component_configs(raw_value: str, field_name: str) -> dict[str, str]:

@@ -49,6 +49,7 @@ class PipelineComponent:
             return results
 
         except Exception:
+            logger.exception(traceback.format_exc())
             raise
 
 
@@ -58,6 +59,7 @@ class PipelineComponent:
                 bpmn_content=bpmn_file_content,
             )
         except Exception as e:
+            logger.exception(traceback.format_exc())
             raise
 
     async def get_sid_and_reason_if_critical(
@@ -115,6 +117,7 @@ class PipelineComponent:
             .get_name_from_activity_field_of_bpmn_file(activity_field)
         )
 
+
         few_shot_examples = (
             self.chroma_db_client.get_top_k_results_only_meta_data(
                 activity_name,
@@ -136,9 +139,6 @@ class PipelineComponent:
             few_shot_examples=formatted_few_shot_examples,
             run_config=run_config,
         )
-
-        print("Generated query:")
-        print(generated_query)
 
         error_message = ""
 
@@ -178,9 +178,6 @@ class PipelineComponent:
             )
         )
 
-        print("Post-processed query:")
-        print(post_processed_query)
-
         try:
             post_processed_results = (
                 self.sql_execution.get_sql_query_results(post_processed_query)
@@ -200,6 +197,7 @@ class PipelineComponent:
 
         if not post_processed_results:
             return {}
+
 
         reason = post_processed_results[0].get("reason")
 
