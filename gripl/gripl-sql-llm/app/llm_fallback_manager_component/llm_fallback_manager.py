@@ -130,7 +130,7 @@ class LLMFallBackManager:
             llm = LLM(
                 model_name=model_config.model_name,
                 model_url=model_config.base_url,
-                api_key=run_config.api_key,
+                api_key=self._resolve_api_key(run_config.api_key),
                 schema_output=None,
             )
 
