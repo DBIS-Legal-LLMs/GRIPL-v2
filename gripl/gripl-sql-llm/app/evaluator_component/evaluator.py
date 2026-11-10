@@ -2,14 +2,22 @@
 import json
 import logging
 import math
+import os
 from pathlib import Path
 from typing import Any
 
+from app.config.component_name import EMBEDDING_MODEL, VERIFICATION_MODEL, POST_PROCESSING_MODEL, SQL_GENERATION_MODEL, \
+    INTENTION_MODEL
 from app.data_loader_component.data_loader import DataLoader
 from app.pipeline_component.pipeline import PipelineComponent
 from app.logging_component.logger import Logger
+from app.schemas import ComponentLLMConfig, RunConfig
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+)
 
 
 class Evaluator:
@@ -19,7 +27,7 @@ class Evaluator:
         data_loader: DataLoader,
         pipe_line: PipelineComponent,
         logger: Logger,
-        max_samples: int | None = 5,
+        max_samples: int | None = 1,
     ):
         self.data_loader = data_loader
         self.pipe_line = pipe_line
@@ -63,11 +71,43 @@ class Evaluator:
         reason_correct = 0
         reason_total = 0
 
+        api_key = os.environ.get("OPEN_ROUTER_API_KEY")
+
+        models_by_component = {
+            INTENTION_MODEL: ComponentLLMConfig(
+                model_name=os.getenv("INTENTION_LLM_MODEL"),
+                base_url=os.getenv("INTENTION_MODEL_URL"),
+            ),
+            SQL_GENERATION_MODEL: ComponentLLMConfig(
+                model_name=os.getenv("SQL_GENERATION_MODEL"),
+                base_url=os.getenv("SQL_GENERATION_MODEL_URL"),
+            ),
+            POST_PROCESSING_MODEL: ComponentLLMConfig(
+                model_name=os.getenv("POST_PROCESSING_MODEL"),
+                base_url=os.getenv("POST_PROCESSING_MODEL_URL"),
+            ),
+            VERIFICATION_MODEL: ComponentLLMConfig(
+                model_name=os.getenv("VERIFICATION_MODEL"),
+                base_url=os.getenv("VERIFICATION_MODEL_URL"),
+            ),
+            EMBEDDING_MODEL: ComponentLLMConfig(
+                model_name=os.getenv("EMBEDDING_MODEL_MODEL"),
+                base_url=os.getenv("EMBEDDING_MODEL_URL"),
+            ),
+        }
+
+
         for index, row in eval_pd_set.iterrows():
 
             try:
                 # 1. Load BPMN file
                 current_bpmn_file = row["bpmn_xml"]
+
+                run_config = RunConfig(
+                    bpmn_file=current_bpmn_file,
+                    api_key=api_key,
+                    models_by_component=models_by_component,
+                )
 
                 # 2. Extract all activity IDs from BPMN
                 all_activity_ids = self.get_all_activity_ids(
@@ -77,7 +117,7 @@ class Evaluator:
                 # 3. Execute pipeline
                 predicted_critical_elements = (
                     await self.pipe_line.get_analysis(
-                        current_bpmn_file
+                        run_config
                     )
                 )
 
@@ -157,6 +197,8 @@ class Evaluator:
                     index,
                 )
 
+
+        print("after loop ")
         # -----------------------------------------------------
         # Calculate global metrics
         # -----------------------------------------------------
@@ -233,6 +275,8 @@ class Evaluator:
             "category_accuracy": category_accuracy,
             "reason_accuracy": reason_accuracy,
         }
+        print("metrics")
+        print(metrics)
 
         logger.info("========== EVALUATION REPORT ==========")
 

@@ -37,7 +37,7 @@ class PipelineComponent:
 
             total_activities_fields = self.get_only_activity_fields(run_config.bpmn_file)
 
-            for activity in total_activities_fields:
+            for activity in total_activities_fields[:3]:
 
                 current_result = await self.get_sid_and_reason_if_critical(activity,
                                                                            run_config
