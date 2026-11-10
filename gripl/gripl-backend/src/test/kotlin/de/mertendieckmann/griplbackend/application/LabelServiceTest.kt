@@ -55,7 +55,8 @@ class LabelServiceTest {
         val result = service.create(
             CreateLabelRequest(
                 name = "  Contract review  ",
-                description = "  Reviews personal data in contracts  "
+                description = "  Reviews personal data in contracts  ",
+                color = stored.color
             ),
             "user-1"
         )
@@ -83,16 +84,19 @@ class LabelServiceTest {
     }
 
     @Test
-    fun `create rejects a blank description`() {
-        val exception = assertThrows(ResponseStatusException::class.java) {
-            service.create(
-                CreateLabelRequest("Contract review", "   "),
-                "user-1"
-            )
-        }
+    fun `create accepts a blank description`() {
+        val placeholderDescription = "No description provided."
+        val stored = label().copy(description = placeholderDescription)
+        whenever(repository.create("Contract review", placeholderDescription, null, "user-1"))
+            .thenReturn(stored)
 
-        assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
-        verifyNoInteractions(repository)
+        val result = service.create(
+            CreateLabelRequest("Contract review", "   "),
+            "user-1"
+        )
+
+        assertEquals(stored, result)
+        verify(repository).create("Contract review", placeholderDescription, null, "user-1")
     }
 
     @Test
@@ -137,7 +141,7 @@ class LabelServiceTest {
 
         val result = service.update(
             8L,
-            UpdateLabelRequest("  Updated name  ", "  Updated description  "),
+            UpdateLabelRequest("  Updated name  ", "  Updated description  ", updated.color),
             "admin-1"
         )
 
@@ -152,21 +156,42 @@ class LabelServiceTest {
     }
 
     @Test
-    fun `update rejects a blank name or description`() {
-        val invalidRequests = listOf(
-            UpdateLabelRequest("   ", "Description"),
-            UpdateLabelRequest("Name", "   ")
-        )
-
-        invalidRequests.forEach { request ->
-            val exception = assertThrows(ResponseStatusException::class.java) {
-                service.update(8L, request, "admin-1")
-            }
-
-            assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
+    fun `update rejects a blank name`() {
+        val exception = assertThrows(ResponseStatusException::class.java) {
+            service.update(8L, UpdateLabelRequest("   ", "Description"), "admin-1")
         }
 
+        assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
         verifyNoInteractions(repository)
+    }
+
+    @Test
+    fun `update accepts a blank custom label description`() {
+        val placeholderDescription = "No description provided."
+        val updated = label().copy(description = placeholderDescription, updatedBy = "admin-1")
+        whenever(repository.findById(8L)).thenReturn(label())
+        whenever(repository.update(8L, "Name", placeholderDescription, label().color, "admin-1"))
+            .thenReturn(updated)
+
+        val result = service.update(
+            8L,
+            UpdateLabelRequest("Name", color = updated.color),
+            "admin-1"
+        )
+
+        assertEquals(updated, result)
+        verify(repository).update(8L, "Name", placeholderDescription, label().color, "admin-1")
+    }
+
+    @Test
+    fun `update rejects a blank predefined label description`() {
+        whenever(repository.findById(8L)).thenReturn(label(predefined = true))
+
+        val exception = assertThrows(ResponseStatusException::class.java) {
+            service.update(8L, UpdateLabelRequest("Contract review"), "admin-1")
+        }
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
     }
 
     @Test

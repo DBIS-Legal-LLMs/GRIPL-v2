@@ -9,6 +9,6 @@ export interface Label {
 
 export interface LabelWriteRequest {
     name: string;
-    description: string;
+    description?: string;
     color?: string | null;
 }

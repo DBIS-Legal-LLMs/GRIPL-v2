@@ -23,7 +23,7 @@ interface ActiveLabelsPanelProps {
 export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelProps) {
     const {griplRole, isLoading: isAuthLoading, token} = useAuth();
     const {showToast} = useToast();
-    const DEFAULT_CUSTOM_LABEL_COLOR = "#06b6d4";
+    const DEFAULT_CUSTOM_LABEL_COLOR = "#707070";
 
     const categoryColor: Record<GdprCategory, string> = {
         Collection: "#059669",
@@ -88,8 +88,8 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
         event.preventDefault();
         const requestName = name.trim();
         const requestDescription = description.trim();
-        if (!requestName || !requestDescription) {
-            setFormError("Name and description are required.");
+        if (!requestName) {
+            setFormError("Name is required.");
             return;
         }
         setFormError("");
@@ -129,8 +129,8 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
     async function saveEdit(label: Label) {
         const requestName = label.predefined ? label.name : editName.trim();
         const requestDescription = editDescription.trim();
-        if (!requestName || !requestDescription) {
-            setFormError("Name and description are required.");
+        if (!requestName || (label.predefined && !requestDescription)) {
+            setFormError(label.predefined ? "Name and description are required." : "Name is required.");
             return;
         }
         setFormError("");
@@ -260,7 +260,9 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
                                                                 />
                                                                 <p className="font-medium">{label.name}</p>
                                                             </div>
-                                                            <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{label.description}</p>
+                                                            {label.description && (
+                                                                <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{label.description}</p>
+                                                            )}
                                                         </div>
                                                         {(isAdmin || (!label.predefined && canEditCustomLabels)) && (
                                                             <div className="flex shrink-0 gap-1">
@@ -287,7 +289,7 @@ export default function ActiveLabelsPanel({onLabelsChanged}: ActiveLabelsPanelPr
                                             <Input id="new-label-name" value={name} onChange={(event) => setName(event.target.value)} />
                                         </div>
                                         <div className="space-y-1">
-                                            <FormLabel htmlFor="new-label-description">Description</FormLabel>
+                                            <FormLabel htmlFor="new-label-description">Description (optional)</FormLabel>
                                             <Textarea id="new-label-description" rows={2} value={description} onChange={(event) => setDescription(event.target.value)} />
                                         </div>
                                         <div className="space-y-1">

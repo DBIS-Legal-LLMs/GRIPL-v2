@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 
+private const val DEFAULT_LABEL_DESCRIPTION = "No description provided."
+
 /** Validates label changes and coordinates database access. */
 @Service
 class LabelService(
@@ -19,12 +21,12 @@ class LabelService(
     fun findAllActive(): List<Label> =
         labelRepository.findAllActive()
 
-    /** Creates a custom label with a non-blank name and description. */
+    /** Creates a custom label with a non-blank name and an optional description. */
     fun create(request: CreateLabelRequest, userId: String): Label {
         val name = request.name.trim()
-        val description = request.description.trim()
+        val description = request.description.trim().ifBlank { DEFAULT_LABEL_DESCRIPTION }
         val color = request.color?.trim()?.ifBlank { null }
-        validateInput(name, description)
+        validateName(name)
 
         return handleDuplicateName {
             labelRepository.create(name, description, color, userId)
@@ -38,9 +40,9 @@ class LabelService(
         userId: String
     ): Label {
         val name = request.name.trim()
-        val description = request.description.trim()
+        val requestedDescription = request.description.trim()
         val color = request.color?.trim()?.ifBlank { null }
-        validateInput(name, description)
+        validateName(name)
 
         val existingLabel = labelRepository.findById(id)
             ?: throw ResponseStatusException(
@@ -54,6 +56,15 @@ class LabelService(
                 "Active label not found."
             )
         }
+
+        if (existingLabel.predefined && requestedDescription.isBlank()) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Label description must not be blank."
+            )
+        }
+
+        val description = requestedDescription.ifBlank { DEFAULT_LABEL_DESCRIPTION }
 
         if (existingLabel.predefined && name != existingLabel.name) {
             throw ResponseStatusException(
@@ -93,19 +104,12 @@ class LabelService(
         labelRepository.softDelete(id, userId)
     }
 
-    /** Rejects empty or whitespace-only input. */
-    private fun validateInput(name: String, description: String) {
+    /** Rejects an empty or whitespace-only name. */
+    private fun validateName(name: String) {
         if (name.isBlank()) {
             throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
                 "Label name must not be blank."
-            )
-        }
-
-        if (description.isBlank()) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Label description must not be blank."
             )
         }
     }

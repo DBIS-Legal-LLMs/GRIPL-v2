@@ -16,13 +16,13 @@ data class Label(
 /** Input for creating a label, the backend sets all system-managed fields. */
 data class CreateLabelRequest(
     val name: String,
-    val description: String,
+    val description: String = "",
     val color: String? = null
 )
 /** Input for updating a label's name and description. */
 data class UpdateLabelRequest(
     val name: String,
-    val description: String,
+    val description: String = "",
     val color: String? = null
 )
 /** A label assigned to a BPMN element in a test case. */
