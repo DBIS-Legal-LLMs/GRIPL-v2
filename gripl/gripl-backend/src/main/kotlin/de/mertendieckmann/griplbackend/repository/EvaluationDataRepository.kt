@@ -8,11 +8,15 @@ import org.postgresql.util.PGobject
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
+import de.mertendieckmann.griplbackend.model.analysis.GdprProcessingClass
+import de.mertendieckmann.griplbackend.model.dto.ExpectedValue
+import org.springframework.transaction.annotation.Transactional
 
 @Repository
 class EvaluationDataRepository(
     private val jdbc: JdbcTemplate,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val evaluationDataLabelRepository: EvaluationDataLabelRepository
 ) {
 
     private val mapper = RowMapper { rs, _ ->
@@ -25,8 +29,68 @@ class EvaluationDataRepository(
         )
     }
 
+    /**
+     * Adds relational label assignments to the expected values loaded from the
+     * existing JSON column. Values without an assignment keep an empty label list.
+     */
+    private fun attachLabelAssignments(
+        evaluationData: List<EvaluationData>
+    ): List<EvaluationData> {
+        if (evaluationData.isEmpty()) {
+            return emptyList()
+        }
+
+        val assignmentsByTestCase =
+            evaluationDataLabelRepository.findAssignmentsForEvaluationDataIds(
+                evaluationData.map { it.id }
+            )
+
+        return evaluationData.map { testCase ->
+            val assignmentsByElement =
+                assignmentsByTestCase[testCase.id].orEmpty()
+
+            testCase.copy(
+                expectedValues = testCase.expectedValues.map { expectedValue ->
+                    expectedValue.copy(
+                        labels = assignmentsByElement[expectedValue.value].orEmpty()
+                    )
+                }
+            )
+        }
+    }
+
+    
+    /**
+    * JSON representation stored in the existing expected_values column.
+    *
+    * Relational label assignments are deliberately excluded because they belong
+    * in evaluation_data_label. The classification remains for the current
+    * analysis and evaluation implementation.
+    */
+    private data class StoredExpectedValue(
+        val value: String,
+        val explanation: String?,
+        val classification: List<GdprProcessingClass>
+    )
+
+    /** Converts expected values to the legacy JSON format used by evaluation_data. */
+    private fun expectedValuesJson(
+        expectedValues: List<ExpectedValue>
+    ): String {
+        val storedValues = expectedValues.map { expectedValue ->
+            StoredExpectedValue(
+                value = expectedValue.value,
+                explanation = expectedValue.explanation,
+                classification = expectedValue.classification
+            )
+        }
+
+        return objectMapper.writeValueAsString(storedValues)
+    }
+
     fun getAllEvaluationData(): List<EvaluationData> {
-        return jdbc.query("SELECT * FROM evaluation_data", mapper)
+        return attachLabelAssignments(jdbc.query("SELECT * FROM evaluation_data", mapper)
+        )
     }
 
     // ── Owner-scoped access (GRIPL-v2#33) ──────────────────────────────────
@@ -49,7 +113,7 @@ class EvaluationDataRepository(
             if (datasetId != null) append(" AND ed.dataset_id = ?")
         }
         val args = listOfNotNull(ownerUserId, datasetId?.toLong()).toTypedArray()
-        return jdbc.query(sql, mapper, *args)
+        return attachLabelAssignments(jdbc.query(sql, mapper, *args))
     }
 
     fun getEvaluationDataByIdForOwner(id: Long, ownerUserId: String): EvaluationData? {
@@ -58,7 +122,7 @@ class EvaluationDataRepository(
             JOIN dataset d ON ed.dataset_id = d.id
             WHERE ed.id = ? AND d.owner_user_id = ?
         """.trimIndent()
-        return jdbc.query(sql, mapper, id, ownerUserId).firstOrNull()
+        return attachLabelAssignments(jdbc.query(sql, mapper, id, ownerUserId)).firstOrNull()
     }
 
     fun getEvaluationDataByIdsForOwner(ids: List<Int>, ownerUserId: String): List<EvaluationData> {
@@ -69,7 +133,7 @@ class EvaluationDataRepository(
             JOIN dataset d ON ed.dataset_id = d.id
             WHERE ed.id IN ($inSql) AND d.owner_user_id = ?
         """.trimIndent()
-        return jdbc.query(sql, mapper, ownerUserId)
+        return attachLabelAssignments(jdbc.query(sql, mapper, ownerUserId))
     }
 
     fun getEvaluationDataByDatasetIdsOrAllForOwner(datasetIds: List<Int>, ownerUserId: String): List<EvaluationData> {
@@ -82,7 +146,7 @@ class EvaluationDataRepository(
             JOIN dataset d ON ed.dataset_id = d.id
             WHERE ed.dataset_id IN ($inSql) AND d.owner_user_id = ?
         """.trimIndent()
-        return jdbc.query(sql, mapper, ownerUserId)
+        return attachLabelAssignments(jdbc.query(sql, mapper, ownerUserId))
     }
 
     fun countEvaluationDataForDatasetsAndOwner(datasetIds: List<Long>, ownerUserId: String): Int {
@@ -102,9 +166,10 @@ class EvaluationDataRepository(
     // the gap GRIPL-v2#40 closed for the *ForOwner variants above).
 
     fun getEvaluationDataById(id: Long): EvaluationData? {
-        return jdbc.query("SELECT * FROM evaluation_data WHERE id = ?", mapper, id).firstOrNull()
+        return attachLabelAssignments(jdbc.query("SELECT * FROM evaluation_data WHERE id = ?", mapper, id)).firstOrNull()
     }
 
+    @Transactional
     fun insertEvaluationData(data: EvaluationDataWithOptionalId): Int? {
         val sql = """
             INSERT INTO evaluation_data (name, bpmn_xml, expected_values, dataset_id)
@@ -112,10 +177,13 @@ class EvaluationDataRepository(
             RETURNING id
         """.trimIndent()
 
-        val json  = objectMapper.writeValueAsString(data.expectedValues)
-        val value = PGobject().apply { type = "jsonb"; this.value = json }
+        val json = expectedValuesJson(data.expectedValues)
+        val value = PGobject().apply {
+            type = "jsonb"
+            this.value = json
+        }
 
-        return jdbc.queryForObject(
+        val evaluationDataId = jdbc.queryForObject(
             sql,
             Int::class.java,
             data.name,
@@ -123,22 +191,76 @@ class EvaluationDataRepository(
             value,
             data.datasetId
         )!!
+
+        evaluationDataLabelRepository.replaceProvidedAssignments(
+            evaluationDataId.toLong(),
+            data.expectedValues
+        )
+
+        evaluationDataLabelRepository.addLegacyPredefinedAssignments(
+            evaluationDataId.toLong(),
+            data.expectedValues
+        )
+
+        return evaluationDataId
     }
 
-    /** Inserts a test case and keeps the given timestamps (Postgres text format) if present. */
-    fun insertImportedEvaluationData(data: EvaluationDataWithOptionalId, createdAt: String?, updatedAt: String?): Long {
+    /**
+    * Inserts an imported test case and preserves its timestamps when available.
+    */
+    @Transactional
+    fun insertImportedEvaluationData(
+        data: EvaluationDataWithOptionalId,
+        createdAt: String?,
+        updatedAt: String?
+    ): Long {
         val sql = """
-            INSERT INTO evaluation_data (name, bpmn_xml, expected_values, dataset_id, created_at, updated_at)
-            VALUES (?, ?, ?::jsonb, ?, COALESCE(?::timestamptz, now()), COALESCE(?::timestamptz, now()))
+            INSERT INTO evaluation_data (
+                name,
+                bpmn_xml,
+                expected_values,
+                dataset_id,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                ?,
+                ?,
+                ?::jsonb,
+                ?,
+                COALESCE(?::timestamptz, now()),
+                COALESCE(?::timestamptz, now())
+            )
             RETURNING id
         """.trimIndent()
 
-        val value = PGobject().apply { type = "jsonb"; this.value = objectMapper.writeValueAsString(data.expectedValues) }
+        val value = PGobject().apply {
+            type = "jsonb"
+            this.value = expectedValuesJson(data.expectedValues)
+        }
 
-        return jdbc.queryForObject(
-            sql, Long::class.java,
-            data.name, data.bpmnXml, value, data.datasetId, createdAt, updatedAt
+        val evaluationDataId = jdbc.queryForObject(
+            sql,
+            Long::class.java,
+            data.name,
+            data.bpmnXml,
+            value,
+            data.datasetId,
+            createdAt,
+            updatedAt
         )!!
+
+        evaluationDataLabelRepository.replaceProvidedAssignments(
+            evaluationDataId,
+            data.expectedValues
+        )
+
+        evaluationDataLabelRepository.addLegacyPredefinedAssignments(
+            evaluationDataId,
+            data.expectedValues
+        )
+
+        return evaluationDataId
     }
 
     /**
@@ -162,27 +284,55 @@ class EvaluationDataRepository(
         return jdbc.query(sql, rowMapper, ownerUserId)
     }
 
-    fun updateEvaluationData(data: EvaluationData, ownerUserId: String): Int {
+    /**
+    * Updates a test case and its explicitly supplied relational label assignments.
+    */
+    @Transactional
+    fun updateEvaluationData(
+        data: EvaluationData,
+        ownerUserId: String
+    ): Int {
         val sql = """
             UPDATE evaluation_data
-            SET name = ?, bpmn_xml = ?, expected_values = ?::jsonb, updated_at = CURRENT_TIMESTAMP
+            SET name = ?,
+                bpmn_xml = ?,
+                expected_values = ?::jsonb,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-              AND dataset_id IN (SELECT id FROM dataset WHERE owner_user_id = ?)
+            AND dataset_id IN (
+                SELECT id
+                FROM dataset
+                WHERE owner_user_id = ?
+            )
         """.trimIndent()
 
-        return jdbc.update(sql) { ps ->
+        val updatedRows = jdbc.update(sql) { ps ->
             ps.setString(1, data.name)
             ps.setString(2, data.bpmnXml)
 
-            val json     = objectMapper.writeValueAsString(data.expectedValues)
             val pgObject = PGobject().apply {
-                type  = "jsonb"
-                value = json
+                type = "jsonb"
+                value = expectedValuesJson(data.expectedValues)
             }
+
             ps.setObject(3, pgObject)
             ps.setLong(4, data.id)
             ps.setString(5, ownerUserId)
         }
+
+        if (updatedRows == 1) {
+            evaluationDataLabelRepository.replaceProvidedAssignments(
+                data.id,
+                data.expectedValues
+            )
+
+            evaluationDataLabelRepository.addLegacyPredefinedAssignments(
+                data.id,
+                data.expectedValues
+            )
+        }
+
+        return updatedRows
     }
 
     /** Renames a test case; only matches if its parent dataset is owned by [ownerUserId] (0 rows otherwise). */

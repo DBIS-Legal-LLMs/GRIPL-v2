@@ -1,7 +1,7 @@
 "use client"
 
 import React, {useEffect, useRef, useState} from "react"
-import {Download, PlusCircle, RotateCcw, RotateCw, ZoomIn, ZoomOut} from "lucide-react"
+import {Download, LockKeyhole, PlusCircle, RotateCcw, RotateCw, ZoomIn, ZoomOut} from "lucide-react"
 import {downloadBpmnXml} from "@/lib/download-bpmn"
 import ExportFileNameDialog from "@/components/export-file-name-dialog"
 import {Button} from "@/components/ui/button";
@@ -38,6 +38,8 @@ interface BpmnEditorProps {
   bpmnXml: string
   highlightedActivityIds?: string[]
   highlightedActivityCategories?: Record<string, GdprCategory[]>
+  /** Map of activity id -> hex colors for custom label highlighting */
+  highlightedActivityLabelColors?: Record<string, string[]>
   onNew?: () => void
   onDiagramChanged: (xml: string) => void
   cards?: BpmnToolCard[]
@@ -52,7 +54,7 @@ interface BpmnEditorProps {
 }
 
 export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActivityIds = [], onNew, onDiagramChanged, cards = [],
-                                     highlightedActivityCategories = {}, editorClassName, disableEditing, onEvent, onModelerChanged,
+                                     highlightedActivityCategories = {}, highlightedActivityLabelColors = {}, editorClassName, disableEditing, onEvent, onModelerChanged,
                                      exportFileName, askForExportFileName }: BpmnEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const modelerRef = useRef<any>(null)
@@ -108,8 +110,8 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
 
   useEffect(() => {
     if (!modelerRef.current || !isLoaded || !highlightedActivityIds) return
-    highlightActivities(modelerRef.current, highlightedActivityIds, highlightedActivityCategories)
-  }, [highlightedActivityIds, highlightedActivityCategories, isLoaded])
+    highlightActivities(modelerRef.current, highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors)
+  }, [highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors, isLoaded])
 
   async function handleFileLoaded(content: string) {
     onDiagramChanged(content)
@@ -187,7 +189,7 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
         }
 
         if (highlightedActivityIds) {
-          highlightActivities(modeler, highlightedActivityIds, highlightedActivityCategories)
+          highlightActivities(modeler, highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors)
         }
       } catch (err) {
         console.error("Error while importing BPMN XML", err)
@@ -198,7 +200,30 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
     }
   }
 
-  function highlightActivities(modeler: any, activityIds: string[], categoryMap: Record<string, GdprCategory[]>) {
+  function hexToRgba(hex: string, alpha: number): string {
+    const clean = hex.replace("#", "");
+    const bigint = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function mixColors(colors: string[], alpha: number): string {
+    if (colors.length === 0) return "rgba(239, 68, 68, 0.45)";
+    if (colors.length === 1) return hexToRgba(colors[0], alpha);
+    // Average multiple label colors for a visually distinct blend.
+    const rgb = colors.map((hex) => {
+      const clean = hex.replace("#", "");
+      const bigint = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
+      return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+    });
+    const sums = rgb.reduce(([r, g, b], [rr, gg, bb]) => [r + rr, g + gg, b + bb], [0, 0, 0]);
+    const avg = sums.map((v) => Math.round(v / colors.length));
+    return `rgba(${avg[0]}, ${avg[1]}, ${avg[2]}, ${alpha})`;
+  }
+
+  function highlightActivities(modeler: any, activityIds: string[], categoryMap: Record<string, GdprCategory[]>, labelColorMap: Record<string, string[]>) {
     try {
       const canvas = modeler.get("canvas")
       const elementRegistry = modeler.get("elementRegistry")
@@ -213,13 +238,28 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
         return
       }
 
+      // Remove previously injected custom label styles so colors update cleanly.
+      const existingCustomStyle = document.getElementById("bpmn-custom-label-highlight-styles");
+      if (existingCustomStyle) {
+        existingCustomStyle.remove();
+      }
+      const customStyles: string[] = [];
+
       activityIds.forEach((id) => {
         const element = elementRegistry.get(id)
         if (element) {
           const categories = categoryMap[id] || []
+          const labelColors = labelColorMap[id] || []
 
           if (categories.length === 0) {
-            canvas.addMarker(id, "highlight-privacy")
+            if (labelColors.length > 0) {
+              const className = `highlight-custom-label-${id}`;
+              canvas.addMarker(id, className);
+              const fill = mixColors(labelColors, labelColors.length === 1 ? 0.45 : 0.55);
+              customStyles.push(`.${className} .djs-visual > :nth-child(1) { fill: ${fill} !important; }`);
+            } else {
+              canvas.addMarker(id, "highlight-privacy")
+            }
             return
           }
 
@@ -232,6 +272,13 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
         }
       })
 
+      if (customStyles.length > 0) {
+        const styleElement = document.createElement("style");
+        styleElement.id = "bpmn-custom-label-highlight-styles";
+        styleElement.textContent = customStyles.join("\n");
+        document.head.appendChild(styleElement);
+      }
+
       if (!styleElementRef.current) {
         const styleElement = document.createElement("style")
         styleElement.textContent = `
@@ -242,7 +289,7 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
              a darker patch. We only set fill, never stroke or opacity, so the
              element outline and the label text keep their normal colour. */  
         .highlight-privacy .djs-visual > :nth-child(1) {
-            fill: rgba(239, 68, 68, 0.45) !important;
+            fill: rgba(148, 163, 184, 0.45) !important;
           }
           .highlight-gdpr-collection .djs-visual > :nth-child(1) {
             fill: rgba(16, 185, 129, 0.45) !important;
@@ -437,20 +484,23 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
             }, {} as Record<string, BpmnToolCard[]>)
           ).map(([position, positionCards]) => (
             <div
-                key={`bpmn-editor-position-${position}`}
-                className={`absolute z-50 gap-4
-                  ${position === "bottom-left" ? "left-4 bottom-4 flex-flex-col items-start" : ""}
-                  ${position === "bottom-right" ? "right-4 bottom-14 flex flex-col items-end" : ""}
-                  ${position === "top-right" ? "right-4 top-4 flex flex-col items-end" : ""}
-                  ${position === "right-center" ? "right-4 top-1/2 transform -translate-y-1/2 flex flex-col" : ""}
-                  ${position === "bottom-center" ? "left-1/2 transform -translate-x-1/2 bottom-4 flex flex-row items-end" : ""}
-                  ${position === "top-center" ? "left-1/2 transform -translate-x-1/2 top-4 flex flex-row items-start" : ""}
-                `}
+              key={`bpmn-editor-position-${position}`}
+              className={`absolute z-50
+                ${position === "top-right" ? "right-4 top-4 flex max-h-[calc(100%_-_2rem)] flex-col items-end gap-0 overflow-y-auto overscroll-contain bg-background/30 backdrop-blur-md" : ""}
+                ${position === "bottom-left" ? "left-4 bottom-4 flex-flex-col items-start gap-4" : ""}
+                ${position === "bottom-right" ? "right-4 bottom-14 flex flex-col items-end gap-4" : ""}
+                ${position === "right-center" ? "right-4 top-1/2 transform -translate-y-1/2 flex flex-col gap-4" : ""}
+                ${position === "bottom-center" ? "left-1/2 transform -translate-x-1/2 bottom-4 flex flex-row items-end gap-4" : ""}
+                ${position === "top-center" ? "left-1/2 transform -translate-x-1/2 top-4 flex flex-row items-start gap-4" : ""}
+              `}
             >
               {positionCards.map((card, index) => (
-                  <div key={`card-${position}-${index}`}>
-                    {card.content}
-                  </div>
+                <div
+                  key={`card-${position}-${index}`}
+                  className={position === "top-right" ? "mb-4 last:mb-0" : undefined}
+                >
+                  {card.content}
+                </div>
               ))}
             </div>
           ))}
@@ -467,4 +517,3 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
       </div>
   )
 }
-

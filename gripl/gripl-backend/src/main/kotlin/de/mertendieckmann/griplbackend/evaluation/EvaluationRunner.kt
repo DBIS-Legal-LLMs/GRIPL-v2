@@ -328,6 +328,17 @@ private suspend fun evaluateEntryOrFailFast(
         perClassMetrics = perClassMetrics
     )
 
+    val expectedDisplayIds =
+        if (isMultiLabelEvaluation) {
+            expectedValues
+                .filter { scopeIds == null || it.value in scopeIds }
+                .filter { it.classification.isNotEmpty() }
+                .map { it.value }
+                .distinct()
+        } else {
+            expectedActivityIds
+        }
+
     val testCaseReport = TestCaseReport(
         testCaseId = entry.id,
         testCaseName = entry.name,
@@ -343,7 +354,7 @@ private suspend fun evaluateEntryOrFailFast(
         falseNegativeIds = classificationIds.falseNegativeIds,
         expectedNamesWithIds = getNamesWithIds(
             bpmnModel,
-            expectedActivityIds,
+            expectedDisplayIds,
             labelOverrides
         ),
         actualNamesWithIds = getNamesWithIds(

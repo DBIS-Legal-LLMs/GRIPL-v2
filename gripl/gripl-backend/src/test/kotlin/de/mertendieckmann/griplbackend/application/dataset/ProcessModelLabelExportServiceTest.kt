@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.isNull
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -145,7 +146,9 @@ class ProcessModelLabelExportServiceTest {
         whenever(repository.filterOwnedIds(listOf(1L), "user-1")).thenReturn(listOf(1L))
         whenever(repository.getByIdAndOwner(1, "user-1")).thenReturn(model(1, "Onboarding", result))
         val imported = ImportedDataset("1", 42, "LLM pre-labels – Process Analysis 2026-11-03", 1)
-        whenever(datasetTransferService.importCsv(any(), any(), eq("user-1"))).thenReturn(listOf(imported))
+        whenever(
+            datasetTransferService.importCsv(any(), any(), eq("user-1"), isNull(), isNull())
+        ).thenReturn(listOf(imported))
         val date = LocalDate.of(2026, 11, 3)
 
         val created = service.createDataset("user-1", listOf(1L), date)
@@ -153,7 +156,7 @@ class ProcessModelLabelExportServiceTest {
         assertEquals(imported, created.dataset)
         val datasetCsv = argumentCaptor<String>()
         val evaluationDataCsv = argumentCaptor<String>()
-        verify(datasetTransferService).importCsv(datasetCsv.capture(), evaluationDataCsv.capture(), eq("user-1"))
+        verify(datasetTransferService).importCsv(datasetCsv.capture(), evaluationDataCsv.capture(), eq("user-1"), isNull(), isNull())
         val export = service.exportAsZip("user-1", listOf(1L), date)
         assertEquals(export.summary, created.summary)
         val zip = readZip(export.zip)

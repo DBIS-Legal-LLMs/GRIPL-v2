@@ -58,6 +58,87 @@ UPDATE dataset SET owner_user_id = '<your auth-service user id>' WHERE owner_use
 The evaluation-run code paths still read all datasets regardless of owner;
 role-based gating for those is GRIPL-v2#40.
 
+### Global labels
+
+Labels are global within one GRIPL installation. The predefined GDPR labels
+remain available for the existing multiclass analysis and evaluation. Researchers
+and admins can create custom labels, only admins can edit or delete(archive) labels.
+
+Flyway migration `V15` creates the `labels` table and inserts the predefined GDPR labels. Migration `V16` creates the `evaluation_data_label` assignment table and migrates existing predefined label assignments.
+
+| Endpoint | Purpose | Allowed roles |
+|---|---|---|
+| `GET /labels` | Returns all active labels available for new assignments. | `researcher`, `admin` |
+| `POST /labels` | Creates a custom label. Request body: `name`, `description`. | `researcher`, `admin` |
+| `PATCH /labels/{id}` | Updates a label's name and description. Predefined label names must remain unchanged. | `admin` |
+| `DELETE /labels/{id}` | Archives a custom label. Labels are never hard-deleted. | `admin` |
+
+A duplicate active label name returns `409 Conflict`. Archived labels are no
+longer returned by `GET /labels` and cannot be assigned to new BPMN elements,
+but they remain visible on existing test cases.
+
+#### Test case label assignments
+
+`GET /dataset/testcase/{id}` now returns relational label assignments for every
+expected value:
+
+```json
+{
+  "value": "Activity_A",
+  "explanation": "Collects personal data.",
+  "classification": ["COLLECTION"],
+  "labels": [
+    {
+      "id": 1,
+      "name": "COLLECTION",
+      "description": "…",
+      "predefined": true,
+      "deletedAt": null
+    },
+    {
+      "id": 12,
+      "name": "Contract review",
+      "description": "…",
+      "predefined": false,
+      "deletedAt": null
+    }
+  ]
+}
+```
+
+When creating or updating a test case, send `labelIds` in each entry of
+`expectedValues`. `labels` is response-only.
+
+```json
+{
+  "value": "Activity_A",
+  "explanation": "Collects personal data.",
+  "classification": ["COLLECTION"],
+  "labelIds": [1, 12]
+}
+```
+
+During the transition, predefined labels are stored both as `labelIds` and as
+their existing enum values in `classification`, so analysis and evaluation
+continue to work. Custom labels are stored only through `labelIds` and are not
+yet used by analysis or evaluation.
+
+#### Dataset transfer
+
+Dataset ZIP exports now contain:
+
+```text
+dataset.csv
+evaluation_data.csv
+labels.csv
+evaluation_data_label.csv
+```
+
+The two additional files preserve custom label definitions and their BPMN
+element assignments. During import, exported label IDs are resolved to the
+target database's local label IDs; unknown custom labels are created. Older ZIP
+files containing only `dataset.csv` and `evaluation_data.csv` remain supported.
+
 ## Running Locally with Maven
 
 You can run the backend locally using **Maven**. Make sure Maven is installed on your system.
