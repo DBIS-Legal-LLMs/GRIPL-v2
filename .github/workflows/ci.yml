@@ -66,6 +66,8 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
+      - name: Create database for label integration tests
+        run: docker exec "${{ job.services.postgres.id }}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE gripl_labels_test;"
       - name: Run the tests
         run: ./mvnw -B -ntp test
 
