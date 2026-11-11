@@ -10,7 +10,13 @@ from app.bpmn_data_pre_processor_component.bpmn_data_pre_processor import BPMNDa
 from app.database.utils import get_db_schema_string
 import logging
 
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
+
 
 class PipelineComponent:
 
@@ -78,6 +84,8 @@ class PipelineComponent:
 
         intent = intentions[0]
 
+        logger.info(f"intention: {intent}")
+
         activity_id = (
             self.bpmn_data_pre_processor
             .get_sid_from_activity_field_of_bpmn_file(activity_field)
@@ -96,6 +104,8 @@ class PipelineComponent:
                 """,
                 (intent,),
             )
+
+            logger.info("reason_rows:  %s", reason_rows)
 
         except sqlite3.Error as e:
             logger.exception("Failed to retrieve reasons for intention.")
@@ -125,6 +135,8 @@ class PipelineComponent:
             )
         )
 
+        logger.info("few_shot_examples:  %s", few_shot_examples)
+
         formatted_few_shot_examples = self.format_few_shot_examples(
             few_shot_examples
         )
@@ -139,6 +151,8 @@ class PipelineComponent:
             few_shot_examples=formatted_few_shot_examples,
             run_config=run_config,
         )
+
+        logger.info("generated_query:  %s", generated_query)
 
         error_message = ""
 
@@ -177,6 +191,8 @@ class PipelineComponent:
                 run_config=run_config,
             )
         )
+
+        logger.info("post_processed_query:  %s", post_processed_query)
 
         try:
             post_processed_results = (

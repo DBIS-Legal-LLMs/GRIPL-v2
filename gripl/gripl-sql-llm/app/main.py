@@ -72,14 +72,13 @@ async def analyse(
     analysis_request: AnalysisSQLRequest = Depends(),
 ):
     try:
-        print("in analyse")
+
         if not analysis_request.llmProps_raw:
             raise HTTPException(
                 status_code=400,
                 detail="LLM configuration is missing.",
             )
-        print("analysis request")
-        print(vars(analysis_request))
+
         try:
             llm_props = json.loads(analysis_request.llmProps_raw)
         except json.JSONDecodeError:

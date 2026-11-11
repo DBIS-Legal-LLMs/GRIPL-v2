@@ -4,7 +4,9 @@ import traceback
 from dotenv import load_dotenv
 import os
 from app.llm_fallback_manager_component.llm_fallback_manager import LLMFallBackManager
-from app.schemas import RunConfig
+
+from app.config.component_name import EMBEDDING_MODEL
+from app.schemas import RunConfig, ComponentLLMConfig
 
 load_dotenv()
 
@@ -35,7 +37,24 @@ class ChromaDatabaseClient:
     def fill_collection(self,documents: list[str] ):
         collection = self.get_collection()
 
-        embeddings = self.embedding_model_handler.get_embedding_of_current_embedding_model(documents)
+        models_by_component = {
+            EMBEDDING_MODEL: ComponentLLMConfig(
+                model_name= os.getenv("EMBEDDING_MODEL_MODEL"),
+                base_url=os.getenv("EMBEDDING_MODEL_URL"),
+            )
+
+        }
+
+        run_config = RunConfig(
+            bpmn_file=None,
+            api_key=os.environ.get("OPEN_ROUTER_API_KEY"),
+            models_by_component=models_by_component,
+        )
+
+        embeddings = self.embedding_model_handler.get_embedding_of_current_embedding_model(
+            documents=documents,
+            run_config=run_config,
+        )
 
         ids = [
             str(i)
@@ -64,8 +83,7 @@ class ChromaDatabaseClient:
 
         except Exception as e:
             print(traceback.format_exc())
-            print(e)
-            return []
+            raise
 
     def fill_collection_with_meta_data(self, document_with_metadata: list[dict]):
         try:
@@ -76,14 +94,29 @@ class ChromaDatabaseClient:
 
             only_metadata = [item.get("meta_data") for item in document_with_metadata]
 
+            models_by_component = {
+                EMBEDDING_MODEL: ComponentLLMConfig(
+                    model_name=os.getenv("EMBEDDING_MODEL_MODEL"),
+                    base_url=os.getenv("EMBEDDING_MODEL_URL"),
+                )
 
+            }
+
+            run_config = RunConfig(
+                bpmn_file=None,
+                api_key=os.environ.get("OPEN_ROUTER_API_KEY"),
+                models_by_component=models_by_component,
+            )
 
             for start in range(0, len(only_documents), self.batch_size):
 
                 batch = only_documents[start:start + self.batch_size]
 
 
-                embeddings = self.embedding_model_handler.get_embedding_of_current_embedding_model(batch)
+                embeddings = self.embedding_model_handler.get_embedding_of_current_embedding_model(
+                    documents=batch,
+                    run_config=run_config,
+                )
 
                 ids = [
                         str(i)
@@ -101,6 +134,7 @@ class ChromaDatabaseClient:
 
         except Exception as e:
             print(traceback.format_exc())
+            raise
 
     def get_top_k_results_only_meta_data(
             self,

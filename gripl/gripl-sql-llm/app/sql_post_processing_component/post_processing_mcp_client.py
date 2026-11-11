@@ -156,7 +156,6 @@ class PostProcessingMcpClient:
                                 current_query = verification_answer.final_query
 
                         except Exception:
-                            print("error in one iteration")
                             print(traceback.format_exc())
                             verification_component_messages = messages_backup
                             continue
@@ -172,13 +171,9 @@ class PostProcessingMcpClient:
                         final_query,
                     )
 
-                    print("post processed query after all iterations")
-                    print(final_query)
-
                     return final_query
 
         except Exception:
-            print("error in mcp client")
             print(traceback.format_exc())
             raise
 
@@ -252,6 +247,5 @@ class PostProcessingMcpClient:
 
             return tool_messages
         except Exception as e:
-            print("error in tool usage")
             print(traceback.format_exc())
             raise

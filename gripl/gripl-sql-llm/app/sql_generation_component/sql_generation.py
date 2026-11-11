@@ -71,6 +71,5 @@ class SQLGenerator:
             return answer
 
         except Exception:
-            print("error in generating query")
             print(traceback.format_exc())
             raise

@@ -54,7 +54,6 @@ class SQLPostProcessing:
             )
 
         except Exception:
-            print("e in post_processing")
             print(traceback.format_exc())
             raise
 
@@ -114,7 +113,6 @@ class SQLPostProcessing:
             return answer
 
         except Exception as e:
-            print("e in post_processing")
             print(traceback.format_exc())
             raise
 
