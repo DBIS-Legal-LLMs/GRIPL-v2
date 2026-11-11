@@ -373,4 +373,4 @@ for index, example in enumerate(data_to_fill, start=1):
 # Insert the 21 synthetic examples into the activity_example collection.
 chroma_db_client.fill_collection_with_meta_data(data_to_fill)
 
-print(f"Inserted {len(data_to_fill)} synthetic few-shot examples.")
+

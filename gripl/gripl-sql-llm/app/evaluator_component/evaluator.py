@@ -198,7 +198,6 @@ class Evaluator:
                 )
 
 
-        print("after loop ")
         # -----------------------------------------------------
         # Calculate global metrics
         # -----------------------------------------------------
@@ -275,8 +274,7 @@ class Evaluator:
             "category_accuracy": category_accuracy,
             "reason_accuracy": reason_accuracy,
         }
-        print("metrics")
-        print(metrics)
+
 
         logger.info("========== EVALUATION REPORT ==========")
 
