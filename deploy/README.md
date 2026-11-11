@@ -163,11 +163,22 @@ First-start chores per environment:
 merge into dev/main ──► CI builds the images ──► ghcr.io/dbis-legal-llms/<name>:dev|prod
                                                           │
          timer on the server, every ~3 min, per stack ◄───┘  update-stack.sh:
-           git fetch (compose definition) → docker compose pull → docker compose up -d --wait
+           git fetch (compose definition) → docker compose pull (one service at a time)
+           → dry run → backup, when something running is about to be replaced
+           → docker compose up -d --wait
 ```
 
 * Nothing connects *into* the server for deployments.
-* A registry outage or a failing pull leaves the running containers untouched.
+* A registry outage or a failing pull leaves the running containers untouched. Images are pulled
+  one at a time (three attempts each): pulled in parallel, images that share layers make containerd fail
+  with `failed commit on ref layer-sha256...`.
+* **Backup before every update that replaces something.** A dry run of `up` decides whether anything changes;
+  if so, Postgres (GRIPL) and MongoDB (auth-service) are dumped to
+  `/srv/gripl/backups/<env>/<app>/<timestamp>-before-update/` (newest 5 kept, `BACKUP_KEEP`, `BACKUP_DIR`), and on
+  prod the Neo4j and RAG volumes are archived when the RAG service is about to be replaced (`BACKUP_VOLUMES=1|0`).
+  The dumps are read back once to prove they are usable. **If the backup fails, nothing is updated.** A migration that
+  a new backend applies cannot be undone by going back to the old image, so this is how you get the data back.
+  These backups are on the same server; they do not replace an off-server copy (SERVER-SETUP.md, part 11).
 * `up -d` only recreates containers whose image or configuration changed.
 * A container that never becomes healthy makes the run fail (visible with
   `journalctl -u 'dbis-update@*'`); the previous image is not rolled back
@@ -210,6 +221,25 @@ RAG_INTERNAL_URL=http://gripl-rag:8081
 AUTH_SERVICE_INTERNAL_URL=http://auth-service:8000
 ```
 
+This is implemented in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (GRIPL-v2) and in
+auth-service's own `.github/workflows/ci.yml`:
+
+* every push and pull request runs the tests (GRIPL: backend tests against a Postgres service
+  container, frontend type check; auth-service: pytest) and builds every image
+* only a push to `dev` builds and publishes (`:dev`, `:sha-<commit>`, and `:X.Y.Z` when the push is a release); `:prod` is set by the promote workflow after the `dev` → `main` merge, without a build; pull requests
+  build but publish nothing
+* layers are cached in the registry (`:buildcache` tag), because the RAG image is several GB
+* third-party actions are pinned to commits; the workflows only get the permissions they need
+
+After the **first** publish, each of the four packages has to be made **public** once, otherwise
+the server cannot pull it without a login. New packages are created **private**; a package
+inherits the access permissions of its repository, but not its visibility. In the organisation's
+*Packages* page open the package, then *Package settings → Danger Zone → Change visibility →
+Public*. GitHub does not allow switching a public package back to private (deleting it is the
+way back), so only do this for images that contain nothing secret. These do not: they are built
+from the public repositories by CI, and no `.env` or key ever enters an image. A manual re-run
+of the pipeline is possible via *Actions → CI → Run workflow*.
+
 ## HTTPS
 
 Port 80 only redirects to HTTPS; every site lives on 443. Until the project has a
@@ -249,8 +279,9 @@ What is in place:
   the university network because it holds a copy of prod's users and data.
 * **Rate limits per client IP** on `/auth/login` (20/min) and `/auth/register`
   (5/min), see `traefik/dynamic/middlewares.yml`.
-* **`/rag/*` is blocked** (403). The RAG service has no authentication and runs on the
-  project's own LLM key; the browser never needs it.
+* **`/rag/*` is blocked** (403), except `/rag/api/pdf/` (the sandbox's PDF viewer). The RAG
+  service has no authentication and runs on the project's own LLM key; the PDF routes only serve
+  the corpus's public source documents and match names against existing files (no path input).
 * **API docs are off** (`API_DOCS_ENABLED=false`): the backend serves Swagger without a
   login, and auth-service's `/docs`/`/redoc` are blocked.
 * Security headers (no sniffing, no framing, referrer policy); logs are rotated
@@ -288,6 +319,10 @@ Known gaps (application level, not solved by this folder):
 
 * **Memory.** Prod and dev together should idle at roughly 4–6 GB. Each container has
   an upper limit (`MEM_*` in `.env`) so one environment cannot starve the other.
+* **CORS.** The browser sends an `Origin` header with every write (upload, saving settings, delete), and the
+  backend answers 403 with an empty body unless the origin is in `APP_CORS_ALLOWED_ORIGINS` (set from
+  `PUBLIC_SCHEME` and `GRIPL_HOST` in the compose file). Symptom when it is wrong: all reads work, every write
+  fails with 403 and nothing shows up in the logs. Change the host name of a stack and this follows by itself.
 * **Database versions are pinned** (`postgres:15.18`, `neo4j:5.26.30-community`,
   `mongo:7.0.25`). A floating tag such as `postgres:15` would make the updater upgrade
   and restart a database whenever the registry publishes a new patch release. Bump the

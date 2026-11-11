@@ -29,6 +29,7 @@ const val AUTHENTICATED_GRIPL_ROLE_ATTRIBUTE = "griplRole"
 
 private val PUBLIC_PATH_PREFIXES = listOf(
     "/actuator/health",
+    "/actuator/info",
     "/swagger-ui",
     "/v3/api-docs",
     "/thesis/pdf",

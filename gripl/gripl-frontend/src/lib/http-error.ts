@@ -1,3 +1,6 @@
+const PASSWORD_POLICY_MESSAGE =
+    "Your password does not meet the requirements. It must be at least 8 characters long and include an uppercase letter, a lowercase letter, a digit, and a special character.";
+
 // Walk an error payload and return the deepest human-readable message.
 // Handles flat ({message}), nested ({error: {message}}), and bodies whose
 // message field is *itself* a stringified JSON error (common when one service
@@ -18,11 +21,29 @@ function digMessage(value: unknown, depth = 0): string | undefined {
         return trimmed || undefined;
     }
 
+    if (Array.isArray(value)) {
+        const messages = value
+            .map((item) => digMessage(item, depth + 1))
+            .filter((message): message is string => Boolean(message));
+        return messages.length > 0 ? messages.join("; ") : undefined;
+    }
+
     if (value && typeof value === "object") {
         const obj = value as Record<string, unknown>;
-        const candidate = obj.message ?? obj.error ?? obj.detail ?? obj.title;
+        if (obj.type === "PASSWORD_POLICY") {
+            return digMessage(obj.message ?? obj.msg, depth + 1) ?? PASSWORD_POLICY_MESSAGE;
+        }
+        if (Array.isArray(obj.loc) && obj.loc.includes("password")) {
+            return PASSWORD_POLICY_MESSAGE;
+        }
+
+        const candidate = obj.message ?? obj.error ?? obj.detail ?? obj.title ?? obj.msg;
         if (candidate !== undefined) {
-            return digMessage(candidate, depth + 1);
+            const message = digMessage(candidate, depth + 1);
+            if (message) return message;
+        }
+        if (obj.errors !== undefined) {
+            return digMessage(obj.errors, depth + 1);
         }
     }
 

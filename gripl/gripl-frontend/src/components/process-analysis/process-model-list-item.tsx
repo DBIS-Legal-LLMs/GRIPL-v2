@@ -4,7 +4,8 @@ import Link from "next/link"
 import {Card, CardHeader, CardTitle} from "@/components/ui/card"
 import {Button} from "@/components/ui/button"
 import {Spinner} from "@/components/ui/spinner"
-import {CheckCircle2, Download, Trash2, XCircle} from "lucide-react"
+import {Badge} from "@/components/ui/badge"
+import {AlertTriangle, CheckCircle2, Download, Trash2, XCircle} from "lucide-react"
 import {ProcessModelListItem as ProcessModelListItemDto} from "@/models/dto/ProcessModel"
 
 interface ProcessModelListItemProps {
@@ -26,9 +27,18 @@ export default function ProcessModelListItem({model, selected, onSelectChange, o
                     <Spinner size="small" className="h-3.5 w-3.5"/> Analyzing...
                 </span>
             case "DONE":
-                return <span className="flex items-center gap-1.5 text-xs text-emerald-600">
-                    <CheckCircle2 className="h-4 w-4"/>
-                    {model.criticalElementCount ?? 0}/{model.totalElements ?? 0} Elements critical
+                return <span className="flex items-center gap-2">
+                    {model.analysisOutdated && <Badge
+                        variant="outline"
+                        className="gap-1 border-amber-500 text-amber-600 dark:text-amber-400"
+                        title="The model was changed after this analysis — re-run it to update the results"
+                    >
+                        <AlertTriangle className="h-3 w-3"/> Outdated
+                    </Badge>}
+                    <span className="flex items-center gap-1.5 text-xs text-emerald-600">
+                        <CheckCircle2 className="h-4 w-4"/>
+                        {model.criticalElementCount ?? 0}/{model.totalElements ?? 0} Elements critical
+                    </span>
                 </span>
             case "ERROR":
                 return <span className="flex items-center gap-1.5 text-xs text-destructive" title={model.errorMessage ?? undefined}>

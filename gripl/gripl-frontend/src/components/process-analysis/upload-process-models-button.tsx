@@ -8,6 +8,7 @@ import {useToast} from "@/components/ui/toast"
 import {Spinner} from "@/components/ui/spinner"
 import {ProcessModelListItem} from "@/models/dto/ProcessModel"
 import {authenticatedFetch} from "@/lib/authenticated-fetch"
+import {extractErrorDetails} from "@/lib/http-error"
 
 interface UploadProcessModelsButtonProps {
     onUploaded: (models: ProcessModelListItem[]) => void
@@ -29,7 +30,7 @@ export default function UploadProcessModelsButton({onUploaded}: UploadProcessMod
         })
 
         if (!response.ok) {
-            throw new Error(`Failed to upload '${file.name}': ${response.statusText}`)
+            throw new Error(`Failed to upload '${file.name}': ${await extractErrorDetails(response)}`)
         }
 
         return await response.json() as ProcessModelListItem

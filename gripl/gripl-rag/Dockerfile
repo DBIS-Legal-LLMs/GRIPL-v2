@@ -37,9 +37,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY app/ ./app/
 COPY scripts/ ./scripts/
-# Pre-extracted GDPR/EDPB corpus read by scripts/ingest.py. The local compose files
-# still bind-mount ./data over this; the server stacks rely on the baked-in copy.
-COPY data/extracted/ ./data/extracted/
+# The GDPR/EDPB corpus: the extracted text read by scripts/ingest.py and the source PDFs
+# streamed to the sandbox's PDF viewer (about 30 MB, public documents). The local compose
+# files still bind-mount ./data over this; the server stacks rely on the baked-in copy.
+COPY data/ ./data/
+
+# build version (set by CI)
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+LABEL org.opencontainers.image.version=$APP_VERSION
 
 # Expose the port uvicorn will listen on
 EXPOSE 8081
