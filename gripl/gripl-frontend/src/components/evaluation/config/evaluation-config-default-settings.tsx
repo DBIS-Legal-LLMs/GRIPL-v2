@@ -304,37 +304,15 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
                                             value={config.model}
                                             onChange={(e) => handleModelChange(component.key, index, e.target.value)}
                                         />
-                                        <Input
-                                            placeholder="API-Key Name (Env-Variable)"
-                                            value={config.apiKeyName}
-                                            onChange={(e) => handleApiKeyNameChange(component.key, index, e.target.value)}
-                                        />
+
                                         <Input
                                             placeholder="Base URL (optional)"
                                             value={config.baseUrl}
                                             onChange={(e) => handleBaseUrlChange(component.key, index, e.target.value)}
                                         />
-                                        {index > 0 && (
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => removeConfig(component.key, index)}
-                                                aria-label="Eintrag entfernen"
-                                            >
-                                                Entfernen
-                                            </Button>
-                                        )}
+
                                     </div>
                                 ))}
-
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => addConfig(component.key)}
-                                    className="mt-1"
-                                >
-                                    Weitere Konfiguration hinzufügen
-                                </Button>
                             </div>
                         ))}
                     </div>
