@@ -1,6 +1,5 @@
 export type ModelConfig = {
     model: string;
-    apiKeyName: string;
     baseUrl: string;
 };
 

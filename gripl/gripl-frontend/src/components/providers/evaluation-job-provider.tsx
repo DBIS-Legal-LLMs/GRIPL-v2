@@ -142,11 +142,11 @@ export function EvaluationJobProvider({children}: { children: ReactNode }) {
     }, []);
 
     const [sqlLlmConfigs, setSqlLlmConfigs] = useState<Record<LLMComponentKey, ModelConfig[]>>({
-        INTENTION_MODEL: [{model: "", apiKeyName: "", baseUrl: ""}],
-        SQL_GENERATION_MODEL: [{model: "", apiKeyName: "", baseUrl: ""}],
-        POST_PROCESSING_MODEL: [{model: "", apiKeyName: "", baseUrl: ""}],
-        VERIFICATION_MODEL: [{model: "", apiKeyName: "", baseUrl: ""}],
-        EMBEDDING_MODEL: [{model: "", apiKeyName: "", baseUrl: ""}],
+        INTENTION_MODEL: [{model: "",  baseUrl: ""}],
+        SQL_GENERATION_MODEL: [{model: "",  baseUrl: ""}],
+        POST_PROCESSING_MODEL: [{model: "", baseUrl: ""}],
+        VERIFICATION_MODEL: [{model: "",  baseUrl: ""}],
+        EMBEDDING_MODEL: [{model: "",  baseUrl: ""}],
     });
 
     const startEvaluation = useCallback(async () => {

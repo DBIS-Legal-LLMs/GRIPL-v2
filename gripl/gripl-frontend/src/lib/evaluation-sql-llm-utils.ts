@@ -4,35 +4,30 @@ import { MultiEvaluationRequest } from "@/models/dto/MultiEvaluationRequest";
 
 export function flattenSqlLlmConfigs(
     configs: Record<LLMComponentKey, ModelConfig[]>
-): { modelsString: string; apiKeyNamesString: string; baseUrlsString: string } {
+): { modelsString: string; baseUrlsString: string } {
     const modelParts: string[] = [];
-    const apiKeyParts: string[] = [];
     const baseUrlParts: string[] = [];
 
     LLM_COMPONENTS.forEach(component => {
         const compConfigs = configs[component.key] || [];
         const compModels: string[] = [];
-        const compApiKeys: string[] = [];
         const compBaseUrls: string[] = [];
 
         compConfigs.forEach(cfg => {
             const modelName = cfg.model.trim();
             if (!modelName) return;
             compModels.push(modelName);
-            compApiKeys.push(cfg.apiKeyName.trim());
             compBaseUrls.push(cfg.baseUrl.trim());
         });
 
         if (compModels.length > 0) {
             modelParts.push(`${component.key}:${compModels.join(',')}`);
-            apiKeyParts.push(`${component.key}:${compApiKeys.join(',')}`);
             baseUrlParts.push(`${component.key}:${compBaseUrls.join(',')}`);
         }
     });
 
     return {
         modelsString: modelParts.join(';'),
-        apiKeyNamesString: apiKeyParts.join(';'),
         baseUrlsString: baseUrlParts.join(';'),
     };
 }
@@ -45,7 +40,7 @@ export function buildEvaluationPayload(
         return request;
     }
 
-    const { modelsString, apiKeyNamesString, baseUrlsString } = flattenSqlLlmConfigs(sqlLlmConfigs);
+    const { modelsString, baseUrlsString } = flattenSqlLlmConfigs(sqlLlmConfigs);
 
     if (!request.models?.length) {
         console.warn("[SQL-LLM] useSQLLM aktiv, aber keine Models im Request.");
@@ -64,7 +59,6 @@ export function buildEvaluationPayload(
         llmProps: {
             ...firstModel.llmProps,
             modelName: modelsString,
-            apiKey: apiKeyNamesString,
             baseUrl: baseUrlsString,
         },
     };

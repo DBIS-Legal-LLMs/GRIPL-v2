@@ -86,16 +86,6 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
         });
     };
 
-    const handleApiKeyNameChange = (componentKey: LLMComponentKey, index: number, value: string) => {
-        setModelConfigs((prev) => {
-            const updated = {...prev};
-            updated[componentKey] = updated[componentKey].map((config, i) =>
-                i === index ? {...config, apiKeyName: value} : config
-            );
-            return updated;
-        });
-    };
-
     const handleBaseUrlChange = (componentKey: LLMComponentKey, index: number, value: string) => {
         setModelConfigs((prev) => {
             const updated = {...prev};
@@ -109,7 +99,8 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
     const addConfig = (componentKey: LLMComponentKey) => {
         setModelConfigs((prev) => ({
             ...prev,
-            [componentKey]: [...prev[componentKey], {model: '', apiKeyName: '', baseUrl: ''}],
+            [componentKey]: [...prev[componentKey], {model: '',
+                baseUrl: ''}],
         }));
     };
 
