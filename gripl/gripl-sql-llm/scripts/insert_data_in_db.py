@@ -259,151 +259,81 @@ criteria_data = [
 
 reason_mapping = {
 
-    "Collects personal data – gathers information about natural persons.": [
+    # Collection
+    "Personal data are collected from individuals or other sources and entered into a process. This may include capturing names, contact details, addresses, identification numbers or other personal information through forms, registrations, applications, questionnaires or manual data entry.": [
         "Collection"
     ],
 
-    " Collects personal data – gathers information about natural persons (PersonalID, departmentID, Time schedule)": [
+    "Personal data are gathered as part of registration or application procedures, for example when registering customers, patients, employees, students or members and collecting the information required to create or process their records.": [
         "Collection"
     ],
 
-    "Collects personal data – gathers information about natural persons (e.g., name, email).": [
-        "Collection"
-    ],
-
-    "Collects personal data – gathers information about natural persons (speech).": [
-        "Collection"
-    ],
-
-    "Collects personal health data – gathers health information about natural persons.": [
-        "Collection"
-    ],
-
-    "Collects personal health data – gathers health information about natural persons.\nStores personal data – saves information in databases, systems, or files.": [
-        "Collection",
+    # Storage
+    "Personal data are recorded and retained in databases, information systems, documents or physical files. This includes creating customer records, patient files, personnel records, student records or other repositories containing information about identifiable individuals.": [
         "Storage"
     ],
 
-    "Patient transport data is filled into a form which includes personal data such as weight, height, name, age etc": [
-        "Collection"
-    ],
-
-    "Stores personal data – saves information in databases, systems, or files.": [
+    "Personal data are saved and maintained as part of an ongoing business or administrative process. This includes retaining records, case information, appointments, orders, applications or other personal information for later processing or reference.": [
         "Storage"
     ],
 
-    " Stores personal data – saves information in databases, systems, or files.": [
-        "Storage"
-    ],
-
-    "Stores personal data – saves information in databases, systems, or files.\n    ": [
-        "Storage"
-    ],
-
-    "Stores personal data – saves information in databases, systems, or files.\nAccesses personal data – retrieves or makes data available to users or systems.": [
-        "Storage",
-        "Access"
-    ],
-
-    "Storage of personal employment related data": [
-        "Storage"
-    ],
-
-    "Stores personal data – saves information in databases, systems, or files. If the customer is a natural person or the organization has a contact person.": [
-        "Storage"
-    ],
-
-    "Uses personal data – processes data for operational, analytical, or business purposes.": [
+    # Usage
+    "Personal data are used to perform operational, administrative or business activities. This includes processing customer information, handling orders, managing appointments, providing services or carrying out tasks that require information about identifiable individuals.": [
         "Usage"
     ],
 
-    "ses personal data – processes data for operational, analytical, or business purposes.": [
+    "Personal data are analysed or evaluated to assess characteristics, behaviour, performance or circumstances of individuals. This includes profiling, scoring, customer segmentation, credit assessment, employee evaluation, recruitment decisions or automated decision-making.": [
         "Usage"
     ],
 
-    "Uses personal data – processes data for operational, analytical, or business purposes\n": [
+    "Personal data belonging to special categories are processed for a specific purpose. Examples include handling medical information, diagnoses, prescriptions, biometric identifiers, genetic information, disability information or other sensitive personal information.": [
         "Usage"
     ],
 
-    "Uses personal data – processes data for operational, analytical, or business purposes. If the customer is a natural person or the organization has a contact person.": [
+    "Personal data are used in direct communication with individuals or during audio and video interactions. This includes sending emails, messages or notifications, participating in calls, recording conversations or communicating through other channels using personal contact information.": [
         "Usage"
     ],
 
-    "Uses personal data – processes data for operational, analytical, or business purposes. If the customer is a natural person or a n organization with a contact person. If the customer is a natural person or a n organization with a contact person.": [
-        "Usage"
-    ],
-
-    "Uses personal data – processes data for operational, analytical, or business purposes": [
-        "Usage"
-    ],
-
-    "Uses personal data (to decide medication), Stores personal data (in medical records)": [
-        "Usage",
-        "Storage"
-    ],
-
-    "Uses personal data – processes data for operational, analytical, or business purposes.\nCollects personal health data – gathers health information about natural persons.": [
-        "Usage",
-        "Collection"
-    ],
-
-    "Transfers personal data – shares data internally, with third parties, or externally": [
+    # Transferal
+    "Personal data are transmitted, disclosed or shared with other participants, departments, systems or external recipients. This includes sending information to business partners, service providers, authorities, customers or other organisations involved in a process.": [
         "Transferal"
     ],
 
-    "Transfers personal data – shares data internally, with third parties, or externally.": [
+    "Documents, reports or other information containing personal data are generated, printed or transmitted to another recipient. Examples include shipping labels, prescriptions, payroll reports, order confirmations, tax documents or reports containing personal information.": [
         "Transferal"
     ],
 
-    "ransfers personal data – shares data internally, with third parties, or externally.": [
+    "Personal financial data are processed or transmitted as part of financial transactions. This includes handling bank account or payment information, initiating payments, executing payroll, processing reimbursements, insurance payouts or collecting fees associated with identifiable individuals.": [
         "Transferal"
     ],
 
-    "Submit personal data to another institution (court)": [
-        "Transferal"
-    ],
-
-    "Modifies personal data – updates, corrects, or changes stored data.": [
+    # Modification
+    "Existing personal data are changed, corrected, updated or supplemented. This includes modifying contact details, correcting inaccurate records, updating customer or employee information or enriching existing records with additional personal information.": [
         "Modification"
     ],
 
-    "Modifies personal data – updates, corrects, or changes stored data.\n    ": [
-        "Modification"
-    ],
-
-    "Accesses personal data – updates, corrects, or changes stored data.\n    ": [
-        "Modification"
-    ],
-
-    "Deletes personal data – removes or anonymizes data from storage.": [
+    # Deletion
+    "Personal data are erased or destroyed from databases, information systems, documents or other storage locations. This includes removing records, deleting files or permanently eliminating personal information that is no longer required.": [
         "Deletion"
     ],
 
-    "Accesses personal data – retrieves or makes data available to users or systems": [
+    "Personal data are anonymised or pseudonymised to reduce their direct identifiability. This includes removing identifying information or replacing direct identifiers with pseudonyms while applying measures to prevent direct attribution to an individual.": [
+        "Deletion"
+    ],
+
+    # Access
+    "Personal data are retrieved, queried, read or viewed by a participant or information system. This includes searching records, consulting customer or patient information, accessing stored documents or retrieving data required to perform a process activity.": [
         "Access"
     ],
 
-    "Accesses personal data – retrieves or makes data available to users or systems.": [
+    "Personal data are collected or processed for logging, monitoring or tracking purposes. This includes recording user activities, monitoring system access, tracking attendance, processing location information or collecting IP addresses and device identifiers.": [
         "Access"
     ],
 
-    "ccesses personal data – retrieves or makes data available to users or systems.": [
-        "Access"
-    ],
-
-    "Needs access to patients medical test results which include personal medical data": [
-        "Access"
-    ],
-
-    "Access customer's financial data": [
-        "Access"
-    ],
-
-    "Precise information, including patient age, gender, Accesses personal data – retrieves or makes data available to users or systems.": [
+    "Consent and data subject requests concerning personal data are managed or documented. This includes recording consent, handling requests for access or rectification, restricting processing, responding to objections or documenting the legal basis for processing.": [
         "Access"
     ]
 }
-
 
 
 try:
