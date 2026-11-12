@@ -1,0 +1,19 @@
+# --- API / Web server ---
+fastapi
+uvicorn
+
+# --- Database ---
+SQLAlchemy
+alembic
+
+# --- LLM / Structured output ---
+instructor
+
+# --- MCP ---
+mcp>=1.30,<2
+
+# --- Vector database / embeddings ---
+chromadb
+
+# --- Data processing ---
+pandas

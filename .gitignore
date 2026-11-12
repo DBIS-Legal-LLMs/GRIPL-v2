@@ -27,3 +27,23 @@ extra/*
 # CI workflows and their scripts are tracked; everything else in .github stays ignored
 !.github/workflows/
 !.github/scripts/
+
+gripl/gripl-sql-llm/test.db
+gripl/gripl-sql-llm/venv/
+
+# IDE
+gripl/gripl-sql-llm/.idea/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Generated files
+gripl/gripl-sql-llm/system_demo/*.mp4
+gripl/gripl-sql-llm/app/chroma_database_client/embeddings/
+
+# Generated log CSVs
+gripl/gripl-sql-llm/app/logging_component/*.csv
+gripl/gripl-sql-llm/app/eval/*.csv
+
+

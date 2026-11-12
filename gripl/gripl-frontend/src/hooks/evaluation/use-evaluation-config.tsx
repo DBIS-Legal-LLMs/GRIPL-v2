@@ -48,6 +48,9 @@ export function useEvaluationConfig(
     const [ragMode, setRagMode] = useState<string>("hybrid");
     const [evaluateRag, setEvaluateRag] = useState<boolean>(true);
 
+    // SQL LLM configuration
+    const [useSQLLM, setuseSQLLM] = useState<boolean>(false);
+
     // Evaluation scope: score activities only vs. all BPMN elements
     const [activitiesOnly, setActivitiesOnly] = useState<boolean>(false);
 
@@ -106,11 +109,12 @@ export function useEvaluationConfig(
             useRag,
             ragMode,
             evaluateRag: useRag && evaluateRag,
+            useSQLLM,
             activitiesOnly,
         };
 
         onMultiConfigChanged(multi);
-    }, [models, selectedDatasets, selectedTestCaseIds, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, useRag, ragMode, evaluateRag, activitiesOnly, onMultiConfigChanged]);
+    }, [models, selectedDatasets, selectedTestCaseIds, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, useRag, ragMode, evaluateRag,useSQLLM, activitiesOnly, onMultiConfigChanged]);
 
     function addModel() {
         setModels((prev) => [...prev, newModelRow(prev.length + 1)]);
@@ -155,6 +159,7 @@ export function useEvaluationConfig(
         useRag,
         ragMode,
         evaluateRag,
+        useSQLLM,
         activitiesOnly,
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
@@ -168,6 +173,7 @@ export function useEvaluationConfig(
         setUseRag,
         setRagMode,
         setEvaluateRag,
+        setuseSQLLM,
         setActivitiesOnly,
         addModel,
         removeModel,

@@ -19,6 +19,7 @@ export function useYamlImportExport(props: {
     useRag: boolean;
     ragMode: string;
     evaluateRag: boolean;
+    useSQLLM: boolean;
     activitiesOnly: boolean;
     setDefaultEndpointChoice: (v: "preset" | "custom") => void;
     setDefaultPresetEndpoint: (v: string) => void;
@@ -31,6 +32,7 @@ export function useYamlImportExport(props: {
     setUseRag: (v: boolean) => void;
     setRagMode: (v: string) => void;
     setEvaluateRag: (v: boolean) => void;
+    setuseSQLLM: (v: boolean) => void;
     setActivitiesOnly: (v: boolean) => void;
 }) {
     const {
@@ -44,6 +46,7 @@ export function useYamlImportExport(props: {
         useRag,
         ragMode,
         evaluateRag,
+        useSQLLM,
         activitiesOnly,
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
@@ -56,6 +59,7 @@ export function useYamlImportExport(props: {
         setUseRag,
         setRagMode,
         setEvaluateRag,
+        setuseSQLLM,
         setActivitiesOnly,
     } = props;
 
@@ -118,6 +122,7 @@ export function useYamlImportExport(props: {
         if (typeof cfg?.ragMode === "string" && cfg.ragMode) setRagMode(cfg.ragMode);
         if (typeof cfg?.evaluateRag === "boolean") setEvaluateRag(cfg.evaluateRag);
         if (typeof cfg?.activitiesOnly === "boolean") setActivitiesOnly(cfg.activitiesOnly);
+        if(typeof  cfg?.useSQLLM === "boolean") setuseSQLLM(cfg.useSQLLM);
 
         if (modelItems.length > 0) {
             const next: ModelRowState[] = modelItems.map((model: any, idx: number) => {
@@ -201,6 +206,7 @@ export function useYamlImportExport(props: {
             useRag,
             ragMode,
             evaluateRag: useRag && evaluateRag,
+            useSQLLM,
             activitiesOnly,
         };
     }

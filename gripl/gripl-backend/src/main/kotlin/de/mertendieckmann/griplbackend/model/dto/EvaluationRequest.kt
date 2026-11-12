@@ -11,8 +11,9 @@ data class EvaluationRequest(
     val useRag: Boolean = false,
     val ragMode: RagMode = RagMode.HYBRID,
     val evaluateRag: Boolean = true,
+    val useSQLLM: Boolean = false,
     val activitiesOnly: Boolean = false
 ) {
     override fun toString(): String =
-        "EvaluationRequest(evaluationEndpoint=$evaluationEndpoint, useRag=$useRag, ragMode=$ragMode, evaluateRag=$evaluateRag, activitiesOnly=$activitiesOnly, llmProps=${llmProps?.copy(apiKey = llmProps?.apiKey?.let { "\"****\"" })})"
+        "EvaluationRequest(evaluationEndpoint=$evaluationEndpoint, useRag=$useRag, useSQLLM=$useSQLLM ragMode=$ragMode, evaluateRag=$evaluateRag, activitiesOnly=$activitiesOnly, llmProps=${llmProps?.copy(apiKey = llmProps?.apiKey?.let { "\"****\"" })})"
 }

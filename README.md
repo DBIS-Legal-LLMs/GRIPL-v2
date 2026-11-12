@@ -87,6 +87,9 @@ docker compose --env-file .env.prod \
 
 See [`gripl/gripl-backend/README.md`](gripl/gripl-backend/README.md) (Maven, CLI commands, needs a Postgres instance — Flyway applies pending migrations automatically on startup) and [`gripl/gripl-frontend/README.md`](gripl/gripl-frontend/README.md). `gripl-rag` needs its own dependencies (`gripl/gripl-rag/requirements.txt`) plus a running Neo4j; on Linux it additionally needs system packages `libgl1`/`libglib2.0-0` for PyMuPDF/LightRAG (the Docker image installs these automatically).
 
+
+See [gripl/gripl-sql-llm/README.md](gripl/gripl-sql-llm/README.md) for prerequisites before using this service.
+
 ## Quick Start (Already Installed)
 
 Everything above already done once (`.env.local` filled in, images built) — just bringing the local stack back up:

@@ -1,0 +1,16 @@
+Validate the following SQL query.
+
+Activity field:
+{activity_field}
+
+Database schema:
+{db_schema}
+
+Current intention:
+{intention}
+
+Current reasons:
+{reasons_of_intentions}
+
+Current SQL query:
+{generated_query}
