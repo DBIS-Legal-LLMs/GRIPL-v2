@@ -107,7 +107,7 @@ python -m pip install -r requirements.txt
 
 # Configuration before local or online in GRIPL
 
-Before running the evaluation, the LLM models and API keys
+Before running the evaluation offline , you must set in .env the models and urls of each component. Look at the .env.example file
 must be configured.
 
 ## Configure LLM Models
@@ -120,24 +120,12 @@ app/evaluator_component/evaluator.py
 
 In this file, configure the models used by the individual components.
 
-For each component, configure:
 
-- Model name
-- OpenRouter API URL
-- Environment variable name of the API key, the env file in `gripl-sql-llm` directory:
 
 The environment variable name must match the name defined
 in the `.env` file in `gripl-sql-llm` directory
 
-Example:
 
-```python
-model = "your-model-name"
-
-model_url = "https://openrouter.ai/api/v1"
-
-env_api_key_name = "OPEN_ROUTER_API_KEY"
-```
 
 The actual configuration depends on the individual component.
 
