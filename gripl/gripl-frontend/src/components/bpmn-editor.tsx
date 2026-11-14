@@ -289,7 +289,7 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
              a darker patch. We only set fill, never stroke or opacity, so the
              element outline and the label text keep their normal colour. */  
         .highlight-privacy .djs-visual > :nth-child(1) {
-            fill: rgba(148, 163, 184, 0.45) !important;
+            fill: rgba(239, 68, 68, 0.45) !important;
           }
           .highlight-gdpr-collection .djs-visual > :nth-child(1) {
             fill: rgba(16, 185, 129, 0.45) !important;
