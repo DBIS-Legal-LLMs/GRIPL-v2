@@ -314,10 +314,10 @@ export default function LabelingEditor({ className, evaluationData }: LabelingEd
                     bpmnXml={diagram}
                     cards={cards}
                     highlightedActivityIds={criticalActivities.map(critical => critical.value)}
-                    highlightedActivityCategories={highlightedActivityCategoryMap}
-                    highlightedActivityLabelColors={highlightedActivityLabelColors}
+                    highlightedActivityCategories={isMulticlass ? highlightedActivityCategoryMap : undefined}
+                    highlightedActivityLabelColors={isMulticlass ? highlightedActivityLabelColors : undefined}
                     onDiagramChanged={handleDiagramChanged}
-                    editorClassName={isLabelMode ? "border border-destructive" : ""}
+                    editorClassName={`${isLabelMode ? "border border-destructive" : ""} ${isMulticlass ? "bpmn-multiclass-highlights" : ""}`}
                     disableEditing={isLabelMode}
                     onEvent={handleEditorEvent}
                 />
