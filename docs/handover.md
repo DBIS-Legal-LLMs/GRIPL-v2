@@ -46,3 +46,5 @@ The successor should be able to do each of these alone, with the page named:
 2. Roll prod back ([deploy-to-prod.md](deploy-to-prod.md)).
 3. Restore a backup ([server-operations.md](server-operations.md)); practise it on dev.
 4. Change a user's role ([users-and-roles.md](users-and-roles.md)).
+5. Renew the HTTPS certificate ([server-operations.md](server-operations.md#renew-the-https-certificate)); the next date is in that section.
+6. Say what a rebuild of the server needs, and where the off-server copies are ([rebuild-server.md](rebuild-server.md)).
