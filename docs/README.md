@@ -32,6 +32,7 @@ Nothing is deployed by hand: CI builds the images, and a timer on the server pul
 | [users-and-roles.md](users-and-roles.md) | create a superuser, change a user's role, register an application, reset an OpenRouter key, change the token lifetime |
 | [server-operations.md](server-operations.md) | look at logs, switch the updater off, change its interval, make or restore a backup |
 | [move-dev-to-prod.md](move-dev-to-prod.md) | switch the dev users and their data over to prod (one time) |
+| [handover.md](handover.md) | hand the system over to a successor: access, secrets, what to check |
 | [troubleshooting.md](troubleshooting.md) | find the cause of a symptom |
 
 Deployment internals (stack layout, Traefik, security, why things are built the way they are) are in
