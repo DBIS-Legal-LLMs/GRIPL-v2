@@ -5,8 +5,11 @@
 - Work on a feature branch, open a pull request into **`dev`**. CI runs the backend tests, the frontend type check and
   builds all images (nothing is published from a pull request).
 - **`main`** only ever receives `dev` (see [deploy-to-prod.md](deploy-to-prod.md)). Do not push or open feature PRs against it.
-- Merge feature PRs into `dev` with **Squash and merge**: the PR title becomes the commit message, which is what the
-  version is computed from. Merge `dev` into `main` with a **merge commit**, never a squash.
+- Merge feature PRs into `dev` with **Squash and merge**: the PR title becomes the one commit on `dev`, and that commit is what the
+  version is computed from (with a plain merge, every commit inside the PR would count instead). A PR with several `fix:` commits
+  still makes one release, because a release is one merge, not one commit.
+- Merge `dev` into `main` with **Create a merge commit**, never a squash: the commits on `dev` keep their identity, and the
+  promote workflow finds the release tag in `main`'s history.
 
 ## Commit messages and PR titles
 
