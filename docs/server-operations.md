@@ -56,7 +56,17 @@ journalctl -u 'dbis-update@*' -n 30                                             
 The stacks are `<env>/gripl` and `<env>/auth`, so switching prod off for a while means both `prod/gripl` and `prod/auth`. The log shows only
 your own runs unless you are in the `adm` or `systemd-journal` group; the service runs as the user it was set up for.
 
-Run one update now, by hand: `/srv/gripl/bin/update-stack.sh /srv/gripl/<env>/gripl`.
+### Update now, by hand
+
+When the timer only runs at night (see below) and a promoted version should be live earlier, run the updater yourself, once per
+stack. It does exactly what the timer does: refresh the checkout, pull, back up, recreate what changed.
+
+```bash
+/srv/gripl/bin/update-stack.sh /srv/gripl/prod/gripl
+/srv/gripl/bin/update-stack.sh /srv/gripl/prod/auth
+```
+
+Look at the last lines of its output: `applied changes` lists what was restarted, `BACKUP FAILED` means nothing was touched.
 
 ### Change how often it runs
 
@@ -77,6 +87,26 @@ sudo systemctl restart "dbis-update@$(systemd-escape --path /srv/gripl/<env>/gri
 ```
 
 For all stacks at once use `sudo systemctl edit dbis-update@.timer`.
+
+### Update once a night (prod)
+
+Prod should not restart during the day. This replaces the 3-minute interval by a run at 03:00 for both prod stacks;
+`Persistent=true` makes a run that was missed because the server was down happen at the next boot.
+
+```bash
+for s in gripl auth; do
+  unit="dbis-update@$(systemd-escape --path /srv/gripl/prod/$s).timer"
+  sudo mkdir -p "/etc/systemd/system/$unit.d"
+  printf '[Timer]\nOnBootSec=\nOnUnitActiveSec=\nOnCalendar=\nOnCalendar=*-*-* 03:00:00\nPersistent=true\n' | sudo tee "/etc/systemd/system/$unit.d/override.conf" >/dev/null
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now "$unit"
+done
+systemctl list-timers 'dbis-update@*'
+```
+
+The list must show the prod timers with a `NEXT` of 03:00 tomorrow. Nothing is paused for the backup: the databases are dumped while they run, and
+a container is only restarted when its image or configuration changed. A restart takes seconds to a minute; when the RAG image
+changes on prod, the knowledge graph is stopped for the copy of its volumes, which takes a few minutes longer.
 
 ### Update the updater itself
 

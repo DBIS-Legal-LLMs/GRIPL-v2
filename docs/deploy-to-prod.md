@@ -19,8 +19,8 @@ Only after the version has been tested on dev and approved.
    - points `:prod` at them (no rebuild),
    - marks that GitHub Release as the normal, **Latest** release, and clears the pre-release flag of every older version,
    - warns if there are commits after the tag that are **not** in the images (`chore:`, `docs:`, non-conventional ones).
-5. The prod timer on the server pulls `:prod` within a few minutes and restarts what changed, after taking a backup
-   ([server-operations.md](server-operations.md)).
+5. The prod timers on the server pull `:prod` at the next scheduled run (nightly at 03:00) and restart what changed, after taking a
+   backup. To have the version live right away, run the updater by hand ([server-operations.md](server-operations.md), "Update now, by hand").
 
 Implemented in: `.github/workflows/promote.yml`.
 
@@ -45,7 +45,7 @@ on prod shows `prod-vX.Y.Z`.
 Two ways, use the first one if the schema did not change.
 
 **A. Promote an older version (no server access needed).** GitHub -> Actions -> **Promote** -> *Run workflow*, branch `main`,
-enter the version, e.g. `1.3.0`. It points `:prod` at that version again, and the timer pulls it. The commit warning in
+enter the version, e.g. `1.3.0`. It points `:prod` at that version again, and the timer pulls it at its next run (to roll back at once, run the updater by hand, see [server-operations.md](server-operations.md)). The commit warning in
 the run is expected here.
 
 **B. Pin a version on the server.** In `/srv/gripl/prod/gripl/.env` set `IMAGE_TAG=1.3.0` (the file ships with
