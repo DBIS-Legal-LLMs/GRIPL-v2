@@ -249,8 +249,8 @@ the warning for the people who work with it regularly: install `traefik/certs/ca
 as a trusted CA on their machine (it is a small private CA created by the script;
 keep `ca.key` on the server), or accept the warning.
 
-Rotating the certificate (before it expires after 13 months): run the script again.
-It keeps the CA, so installed copies stay valid.
+The certificate is valid for 397 days; how to check and renew it is in
+[`docs/server-operations.md`](../docs/server-operations.md#renew-the-https-certificate).
 
 ### A real certificate later
 
