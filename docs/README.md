@@ -28,7 +28,7 @@ Nothing is deployed by hand: CI builds the images, and a timer on the server pul
 | Page | Read it when you want to ... |
 |---|---|
 | [develop-and-release.md](develop-and-release.md) | write commits and PRs, understand versions and releases, add a database migration |
-| [deploy-to-prod.md](deploy-to-prod.md) | put a tested version on prod, check it, or roll prod back |
+| [deploy-to-prod.md](deploy-to-prod.md) | put a tested version on prod, promote a specific version, check it, or roll prod back |
 | [users-and-roles.md](users-and-roles.md) | create a superuser, change a user's role, register an application, reset an OpenRouter key, change the token lifetime |
 | [server-operations.md](server-operations.md) | look at logs, switch the updater off, change its interval, make or restore a backup, renew the HTTPS certificate |
 | [rebuild-server.md](rebuild-server.md) | replace the virtual machine or start over, and restore the data |
