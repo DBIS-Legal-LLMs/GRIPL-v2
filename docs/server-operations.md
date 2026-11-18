@@ -197,3 +197,36 @@ To avoid paying twice, copy an already ingested knowledge graph from the other e
 ```
 
 Prod is only read. Dev keeps its own token signing key and `SECRETS_ENCRYPTION_KEY`; stored OpenRouter keys are not copied.
+
+## Renew the HTTPS certificate
+
+Traefik serves a self-signed certificate until the project has a domain. It lives in `/srv/gripl/traefik/certs/`: `tls.crt` and `tls.key`
+are what Traefik serves, `ca.crt` is the public CA that people install in their browser, `ca.key` is the CA's secret key and never leaves the
+server. The script issues a server certificate that is valid for **397 days** (the longest lifetime browsers accept), so it has to be renewed
+**at the latest 397 days after the last run**. The first one was issued on 2026-10-16 and runs out on **2027-11-17**; renew it well before,
+for example in October 2027, and put that date in a calendar.
+
+Check how long the certificate is still valid:
+
+```bash
+openssl x509 -in /srv/gripl/traefik/certs/tls.crt -noout -enddate
+```
+
+`openssl x509 -in /srv/gripl/traefik/certs/tls.crt -noout -checkend 2592000` prints whether it expires within 30 days. To see what Traefik
+really serves, from any machine: `openssl s_client -connect gripl.134.60.71.167.nip.io:443 -servername gripl.134.60.71.167.nip.io </dev/null 2>/dev/null | openssl x509 -noout -enddate`.
+
+Renew it (this keeps the CA and issues a new `tls.crt` and `tls.key`; Traefik reads them at start, so it has to be restarted, which
+interrupts open connections for a second):
+
+```bash
+cd /srv/gripl/traefik && repo/deploy/traefik/make-selfsigned-cert.sh 134.60.71.167.nip.io 134.60.71.167 && docker compose restart traefik
+```
+
+Run the `openssl ... -enddate` command again; the date must be about 13 months away. Nothing has to be done on the users' machines: the
+installed `ca.crt` stays valid and the browser accepts the new certificate by itself. The CA was created on 2026-10-16 and is valid for
+five years, until **2031-10-15**. Plan a new CA by then ([rebuild-server.md](rebuild-server.md) says what that means for users).
+
+If the certificate expires, the site still works but every browser stops with "Your connection is not private" (`NET::ERR_CERT_DATE_INVALID`)
+even where the CA is installed; users can click through the warning, scripts and API clients fail. Renewing fixes it at once.
+
+Implemented in: `deploy/traefik/make-selfsigned-cert.sh`; the certificate is configured in `deploy/traefik/dynamic/tls.yml`.
