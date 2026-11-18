@@ -86,9 +86,21 @@ jobs:
             docker buildx imagetools create --tag "$IMAGE_PREFIX/$img:prod" "$IMAGE_PREFIX/$img:${{ steps.v.outputs.version }}"
           done
       - name: Mark the release as the one on prod
+        # The promoted version becomes a normal release and the Latest one. Every older version that is still a
+        # pre-release is part of what prod now runs, so it becomes a normal release too (not Latest).
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "v${{ steps.v.outputs.version }}" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName,isPrerelease \
+            --jq '.[] | select(.isPrerelease) | .tagName' |
+          while read -r tag; do
+            v=${tag#v}
+            [ "$v" != "$VERSION" ] && [ "$(printf '%s\n%s\n' "$v" "$VERSION" | sort -V | head -n1)" = "$v" ] || continue
+            echo "v$v is older than v$VERSION: no longer a pre-release"
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest=false
+          done
       - name: Summary
         run: |
           {

@@ -7,12 +7,17 @@ export interface EvaluationData {
 }
 
 import {GdprCategory} from "@/models/GdprCategory";
+import {Label} from "@/models/dto/Label";
 
 export interface ExpectedValues {
     value: string
     classification: GdprCategory[]
     /** Free-text gold-standard explanation authored by a researcher during labeling. */
     explanation?: string
+    /** Response-only assignments; archived assignments are retained until explicitly removed. */
+    labels?: Label[]
+    /** Write-only assignment IDs sent when saving a test case. */
+    labelIds?: number[]
 }
 
 export interface EvaluationDataMeta {

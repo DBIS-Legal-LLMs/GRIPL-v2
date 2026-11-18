@@ -1,6 +1,6 @@
 # GRIPL Labeling Guide
 
-**Version:** 1.0  **Stand:** Oktober 2026
+**Version:** 1.1  **Stand:** November 2026
 
 Dieser Guide beschreibt, wie BPMN Elemente für die Ground Truth von GRIPL gelabelt werden. Ziel ist, dass verschiedene Labeler zu möglichst gleichen Ergebnissen kommen und jede Entscheidung nachvollziehbar bleibt.
 
@@ -276,6 +276,18 @@ Prozesse aus Produktion, Lager und Wartung verarbeiten meist Maschinen oder Best
 - **Tool:** Gelabelt wird mit **GRIPL v2**.
 - **Kalibrierung:** Es gibt keine Kalibrierungsrunde. Grundlage für alle Entscheidungen ist ausschließlich dieser Guide.
 
+### Eigene Labels im Labeling Tool
+
+Für die in diesem Guide beschriebene DSGVO-Klassifikation gelten weiterhin die sieben vordefinierten Verarbeitungsklassen aus Abschnitt 2. Eigene Labels können ergänzend verwendet werden, etwa um projektspezifische Merkmale zu markieren.
+
+1. Öffne im Labeling Tool einen Test Case und klappe die Label-Liste auf. Als Researcher oder Admin kannst du dort über **Create label** ein eigenes Label anlegen. Gib einen Namen ein und wähle eine Farbe. Die Beschreibung ist optional.
+2. Wähle im BPMN-Modell ein Element aus und weise ihm das Label zu. Du kannst einem Element mehrere Labels zuweisen. Speichere deine Änderungen über **Save Test Case**.
+
+Eigene Labels stehen in allen Datasets derselben GRIPL-Installation zur Verfügung. Nur Admins können eigene Labels bearbeiten oder archivieren. Ein archiviertes Label bleibt bei bestehenden Zuordnungen sichtbar, kann aber keinem weiteren Element zugewiesen werden.
+
+**Auswertung:** In der binären Evaluation zählt ein Element mit einem eigenen Label als relevant. In der Multiclass-Evaluation zählen nur die vordefinierten Verarbeitungsklassen. Hat ein Element ausschließlich eigene Labels, hat es dort keine erwartete Verarbeitungsklasse.
+
+
 ---
 
 ## 8. Umgang mit Uneinigkeit
@@ -343,6 +355,7 @@ Auch im Feld `reason` dürfen keine echten Namen oder Firmenangaben stehen. Dort
 | Version | Datum | Änderung |
 | --- | --- | --- |
 | 1.0 | 01.10.2026 | Erste Fassung |
+| 1.1 | 11.11.2026 | Anleitung für eigene Labels ergänzt |
 
 ---
 

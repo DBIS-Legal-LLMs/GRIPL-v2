@@ -7,10 +7,8 @@ and **dev** (branch `dev`).
 > **The server is reachable from the internet on ports 80 and 443.** Everything
 > published there must be protected; see [Security](#security).
 >
-> Status: the files in this folder are tested locally with real containers
-> (routing, prod/dev isolation, protections, updater, dev copy). They have **not**
-> been run on the server yet; the server still needs Docker and the one-time steps
-> below.
+> This file explains how the deployment is built. For day-to-day tasks (releasing, promoting to prod, backups,
+> users and roles) see [`docs/README.md`](../docs/README.md).
 
 ## The idea in one picture
 
@@ -59,6 +57,7 @@ and **dev** (branch `dev`).
 | `scripts/init-stack.sh` | creates a stack directory on the server |
 | `scripts/update-stack.sh` | pulls new images and applies them (run by a timer) |
 | `scripts/clone-prod-to-dev.sh` | overwrites the GRIPL dev databases with a copy of prod |
+| `scripts/clone-dev-to-prod.sh` | one-time cutover: copies the GRIPL dev data into an empty prod (see `docs/move-dev-to-prod.md`) |
 | `systemd/` | timer + service templates that run the updater |
 
 auth-service has its own `deploy/` folder in its repo (same structure, plus its own
@@ -298,6 +297,20 @@ Known gaps (application level, not solved by this folder):
 * The login cookie (`gripl_token`) is readable by JavaScript and has no `Secure` flag.
 * Rate limits count per client IP, so many users behind one university NAT address
   share a budget.
+
+## Database migrations
+
+Flyway applies the migrations in `gripl/gripl-backend/src/main/resources/db/migration` when a new backend
+starts, on dev and on prod. Going back to the old image does not undo them, which is why the updater takes a
+backup first. The pull request check `Migrations` (`.github/workflows/migrations.yml`) enforces the rules:
+
+* an existing `V*.sql` is never edited, renamed or deleted (Flyway stores a checksum of each applied file and the
+  backend would not start); add a new migration instead
+* a new migration has a higher version than the newest one on the target branch (Flyway does not apply them out
+  of order); if two pull requests both add `V17`, the second one has to be renumbered
+* statements that can lose data (`DROP TABLE/COLUMN`, `TRUNCATE`, `DELETE FROM`, a column type change, a rename)
+  only produce a **warning**. Treat it as the reminder to run the migration on dev against a copy of prod's data
+  (`clone-prod-to-dev.sh`) before a release with it is approved.
 
 ## Dev as a copy of prod
 

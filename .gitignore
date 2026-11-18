@@ -21,7 +21,7 @@ __pycache__/
 rag_working_dir/
 gripl/gripl-rag/.env
 
-extra/*
+extra/
 .github/*
 
 # CI workflows and their scripts are tracked; everything else in .github stays ignored
