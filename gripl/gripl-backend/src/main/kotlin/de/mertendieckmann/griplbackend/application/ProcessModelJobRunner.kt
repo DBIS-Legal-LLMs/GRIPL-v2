@@ -1,6 +1,7 @@
 package de.mertendieckmann.griplbackend.application
 
 import de.mertendieckmann.griplbackend.application.analyzer.AnalysisService
+import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.CustomAnalysisResponseType
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelAnalysisOptions
@@ -14,9 +15,11 @@ import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import tools.jackson.module.kotlin.readValue
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 
+internal const val INTERRUPTED_MESSAGE = "Interrupted by application restart, queue the analysis again"
 private const val PROMPT_ENGINEERING_ENDPOINT = "/gdpr/analysis/prompt-engineering"
 private const val MULTICLASS_ENDPOINT = "/gdpr/analysis/multiclass"
 private const val CUSTOM_ENDPOINT_PREFIX = "/gdpr/analysis/custom/"
@@ -24,8 +27,11 @@ private const val CUSTOM_ENDPOINT_PREFIX = "/gdpr/analysis/custom/"
 /**
  * Runs process-model analyses one at a time on a single background thread.
  * Postgres (process_model.status) is the durable source of truth; the in-memory
- * queue only ever carries ids, never parameters, so a still-QUEUED row can be
- * faithfully resumed after a restart from analysis_options alone.
+ * queue only ever carries ids, never parameters. The caller's OpenRouter API key
+ * is the exception to "persist the parameters": it lives only in memory
+ * ([apiKeys]) and is never written to analysis_options, so a job that is still
+ * QUEUED or RUNNING when the application restarts is set to ERROR and has to be
+ * queued again by the user.
  */
 @Service
 class ProcessModelJobRunner(
@@ -37,6 +43,8 @@ class ProcessModelJobRunner(
     private val objectMapper = jacksonObjectMapper()
     private val queue = LinkedBlockingQueue<Long>()
     private val inFlight = mutableSetOf<Long>()
+    /** The caller's OpenRouter key per queued process model id; removed when the job ends. */
+    private val apiKeys = ConcurrentHashMap<Long, String>()
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "process-model-job-runner").apply { isDaemon = true }
     }
@@ -47,36 +55,28 @@ class ProcessModelJobRunner(
 
     @EventListener(ApplicationReadyEvent::class)
     fun recoverOnStartup() {
-        val resetCount = repository.resetStaleRunningToError("Interrupted by application restart")
+        // The queue and the API keys were in memory only, so nothing that was queued or running can continue.
+        val resetCount = repository.resetInterruptedToError(INTERRUPTED_MESSAGE)
         if (resetCount > 0) {
-            log.warn { "Reset $resetCount process model(s) stuck in RUNNING to ERROR after restart" }
-        }
-
-        val queuedIds = repository.getIdsByStatus(ProcessModelStatus.QUEUED)
-        synchronized(inFlight) {
-            queuedIds.forEach { id ->
-                inFlight.add(id)
-                queue.offer(id)
-            }
-        }
-        if (queuedIds.isNotEmpty()) {
-            log.info { "Resumed ${queuedIds.size} queued process model job(s) after restart" }
+            log.warn { "Reset $resetCount queued or running process model(s) to ERROR after restart" }
         }
     }
 
     fun enqueue(request: EnqueueAnalysisRequest): List<Long> {
         val options = ProcessModelAnalysisOptions(
-            llmProps = request.llmProps,
+            llmProps = request.llmProps?.copy(apiKey = null),
             useRag = request.useRag,
             ragMode = request.ragMode,
             activitiesOnly = request.activitiesOnly
         )
         val optionsJson = objectMapper.writeValueAsString(options)
+        val apiKey = request.llmProps?.apiKey?.takeIf { it.isNotBlank() }
 
         val enqueued = mutableListOf<Long>()
         synchronized(inFlight) {
             request.ids.forEach { id ->
                 if (inFlight.add(id)) {
+                    apiKey?.let { apiKeys[id] = it }
                     repository.markQueued(id, request.endpoint, optionsJson)
                     queue.offer(id)
                     enqueued.add(id)
@@ -95,6 +95,7 @@ class ProcessModelJobRunner(
                 log.error(e) { "Unexpected error processing process model $id" }
                 repository.markError(id, e.message ?: "Unknown error")
             } finally {
+                apiKeys.remove(id)
                 synchronized(inFlight) { inFlight.remove(id) }
             }
         }
@@ -112,6 +113,7 @@ class ProcessModelJobRunner(
         val options: ProcessModelAnalysisOptions = model.analysisOptionsJson
             ?.let { objectMapper.readValue(it) }
             ?: ProcessModelAnalysisOptions()
+        val llmProps = (options.llmProps ?: LlmConfig.Companion.LlmPropsOverride()).copy(apiKey = apiKeys[id])
         val endpoint = model.analysisEndpoint ?: PROMPT_ENGINEERING_ENDPOINT
 
         try {
@@ -119,7 +121,7 @@ class ProcessModelJobRunner(
                 PROMPT_ENGINEERING_ENDPOINT -> {
                     val result = analysisService.analyzePromptEngineering(
                         bpmnXml = model.bpmnXml,
-                        llmPropsOverride = options.llmProps,
+                        llmPropsOverride = llmProps,
                         useRag = options.useRag ?: false,
                         ragMode = options.ragMode ?: RagMode.HYBRID,
                         activitiesOnly = options.activitiesOnly ?: false
@@ -129,7 +131,7 @@ class ProcessModelJobRunner(
                 MULTICLASS_ENDPOINT -> {
                     val result = analysisService.analyzeMulticlass(
                         bpmnXml = model.bpmnXml,
-                        llmPropsOverride = options.llmProps,
+                        llmPropsOverride = llmProps,
                         useRag = options.useRag ?: false,
                         ragMode = options.ragMode ?: RagMode.HYBRID,
                         activitiesOnly = options.activitiesOnly ?: false
@@ -149,7 +151,7 @@ class ProcessModelJobRunner(
                             val result = analysisService.analyzeCustomBinary(
                                 bpmnXml = model.bpmnXml,
                                 promptText = customEndpoint.promptText,
-                                llmPropsOverride = options.llmProps,
+                                llmPropsOverride = llmProps,
                                 useRag = customEndpoint.ragEnabled,
                                 ragMode = customEndpoint.ragMode ?: RagMode.HYBRID,
                                 activitiesOnly = options.activitiesOnly ?: false
@@ -160,7 +162,7 @@ class ProcessModelJobRunner(
                             val result = analysisService.analyzeCustomMulticlass(
                                 bpmnXml = model.bpmnXml,
                                 promptText = customEndpoint.promptText,
-                                llmPropsOverride = options.llmProps,
+                                llmPropsOverride = llmProps,
                                 useRag = customEndpoint.ragEnabled,
                                 ragMode = customEndpoint.ragMode ?: RagMode.HYBRID,
                                 activitiesOnly = options.activitiesOnly ?: false

@@ -126,6 +126,13 @@ the RAG service is replaced, `neo4j-data.tar.gz` and `rag-working-dir.tar.gz`. T
 backup fails, nothing is updated and the log says `BACKUP FAILED`. These backups are on the same server, so they protect against a bad
 update, not against losing the machine: copy important ones elsewhere (`scp`).
 
+**Old backups still contain OpenRouter keys.** Until migration `V20` (GRIPL#62), the key of a user who started an analysis was stored in plain
+text in `process_model.analysis_options`. A backup or dump made before the release with `V20` still holds those keys, and so does a copy
+made by `clone-prod-to-dev.sh` earlier. They are gone from the live databases once `V20` has run, and the automatic backups roll out of the
+newest 5. To get rid of them sooner, delete the older folders in `/srv/gripl/backups/<env>/gripl/` by hand, and delete dumps you copied elsewhere.
+Treat a key as exposed if someone who should not see it could have read a backup, and have its owner replace it at OpenRouter. Restoring such a
+dump is safe: the backend runs `V20` again when it starts.
+
 ### Make a backup of one system by hand
 
 Only the stack you name is touched. Replace `<env>`; the files land in your home folder.
