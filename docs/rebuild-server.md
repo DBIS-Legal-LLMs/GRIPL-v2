@@ -20,10 +20,10 @@ dumps, of every `.env`/`rag.env` and of `traefik/certs/`.
 ## Rebuild
 
 1. Ask the university's server administrators for a new Ubuntu VM with the same network access. If the IP address changes, all host names
-   change with it (`<ip>.nip.io`): set the new `GRIPL_HOST` and base domain in the `.env` files and create a new CA and certificate; everybody
-   has to install the new `ca.crt`.
+   change with it (`<ip>.nip.io`): set the new `GRIPL_HOST` and base domain in the `.env` files. The old CA only accepts the old names (name
+   constraints), so delete `traefik/certs/` and run the certificate script again; everybody has to install the new `ca.crt`.
 2. Do the **One-time setup** in [`deploy/README.md`](../deploy/README.md) up to and including the `init-stack.sh` calls and the certificate. If you
-   have the old `traefik/certs/` folder, put it back instead of running the certificate script, so installed CAs stay valid.
+   have the old `traefik/certs/` folder and the names are the same, put it back instead of running the certificate script, so installed CAs stay valid.
 3. Put the saved `.env` and `rag.env` files into the stack folders instead of filling in the examples.
 4. Restore the data **before** the applications start. Start only the databases, restore into them with the commands of
    [server-operations.md](server-operations.md#restore-a-backup), then start everything:

@@ -4,7 +4,7 @@
 #   update-stack.sh /srv/gripl/prod/gripl
 #
 # Meant to run every few minutes from a systemd timer (deploy/systemd) or cron
-# as the `deploy` user. It is idempotent: when nothing changed, `compose pull` and
+# as the account that owns /srv/gripl. It is idempotent: when nothing changed, `compose pull` and
 # `compose up -d` do nothing and the stack keeps running untouched.
 #
 # Before it changes anything that is running it takes a backup (a new backend image can apply
