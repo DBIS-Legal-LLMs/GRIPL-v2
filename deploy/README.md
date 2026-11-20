@@ -292,7 +292,8 @@ Known gaps (application level, not solved by this folder):
 * A registered user with the default role can run analyses with RAG, which uses the
   project's LLM key. Decide whether registration should stay open on prod, and set a
   spending limit on the OpenRouter key either way.
-* The login cookie (`gripl_token`) is readable by JavaScript and has no `Secure` flag.
+* The access-token cookie (`gripl_token`) is readable by JavaScript, because the app attaches it to its requests; the refresh-token
+  cookie (`gripl_refresh`) is `HttpOnly`. Both are `Secure` when the request reached the frontend over HTTPS (Traefik's forwarded protocol).
 * Rate limits count per client IP, so many users behind one university NAT address
   share a budget.
 
