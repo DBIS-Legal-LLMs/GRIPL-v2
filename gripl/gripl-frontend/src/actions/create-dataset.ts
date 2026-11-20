@@ -1,15 +1,12 @@
 "use server"
 
-import {cookies} from "next/headers";
-import {AUTH_COOKIE_NAME} from "@/lib/auth-cookie";
+import {authenticatedServerFetch} from "@/lib/authenticated-server-fetch";
 
 export default async function createDataset(name: string, description: string): Promise<number> {
-    const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
-    const result = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/dataset`, {
+    const result = await authenticatedServerFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/dataset`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            ...(token ? {Authorization: `Bearer ${token}`} : {}),
         },
         body: JSON.stringify({ name, description }),
     })

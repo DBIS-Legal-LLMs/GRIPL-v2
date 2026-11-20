@@ -1,16 +1,21 @@
 "use client"
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { clearClientToken, readClientToken, writeClientToken } from "@/lib/auth-cookie";
+import { usePathname, useRouter } from "next/navigation";
+import { clearClientToken, readClientToken } from "@/lib/auth-cookie";
+import { refreshSession, SESSION_ENDED_EVENT, TOKEN_CHANGED_EVENT } from "@/lib/client-session";
 import { extractErrorDetails } from "@/lib/http-error";
-import { decodeGriplRole, isTokenExpired } from "@/lib/gripl-role";
+import { decodeGriplRole, isTokenExpired, msUntilRefresh } from "@/lib/gripl-role";
 
-// Login/register are proxied to auth-service through the /auth/* rewrite (see
+// Registration is proxied to auth-service through the /auth/* rewrite (see
 // next.config.ts) — the browser only ever talks to this origin, and
 // auth-service issues the RS256 JWT that both gripl-backend and RAGulate verify.
-const AUTH_LOGIN_URL = "/auth/login";
+// Login and logout go through our own route handlers instead (app/api/session), because they
+// also have to set and clear the httpOnly refresh cookie that JavaScript must not touch.
 const AUTH_REGISTER_URL = "/auth/register";
+const SESSION_LOGIN_URL = "/api/session/login";
+const SESSION_LOGOUT_URL = "/api/session/logout";
+
 
 // Display-only, kept alongside the token cookie so the sidebar can show who is
 // logged in after a reload without decoding it out of the (username-less) JWT.
@@ -79,37 +84,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [username, setUsername] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
+    const pathname = usePathname();
+
+    const endSession = useCallback(() => {
+        clearClientToken();
+        writeStoredUsername(null);
+        setToken(null);
+        setUsername(null);
+    }, []);
 
     useEffect(() => {
         const stored = readClientToken();
         if (stored && isTokenExpired(stored)) {
-            clearClientToken();
-            writeStoredUsername(null);
-            setToken(null);
-            setUsername(null);
+            // normally middleware.ts renewed it before the page loaded; try once more, then give up
+            void refreshSession().then((renewed) => {
+                if (!renewed) endSession();
+            });
+            setUsername(readStoredUsername());
         } else {
             setToken(stored);
             setUsername(readStoredUsername());
         }
         setIsLoading(false);
+    }, [endSession]);
+
+    // a refresh happened somewhere (authenticated-fetch.ts, the timer below): the new cookie carries the current role
+    useEffect(() => {
+        const onTokenChanged = () => setToken(readClientToken());
+        window.addEventListener(TOKEN_CHANGED_EVENT, onTokenChanged);
+        return () => window.removeEventListener(TOKEN_CHANGED_EVENT, onTokenChanged);
     }, []);
 
-    const login = useCallback(async (usernameOrEmail: string, password: string) => {
-        const body = new URLSearchParams();
-        body.set("grant_type", "password");
-        body.set("username", usernameOrEmail);
-        body.set("password", password);
+    // auth-service rejected the refresh token: the session is over
+    useEffect(() => {
+        const onSessionEnded = () => {
+            endSession();
+            if (pathname !== "/login") {
+                router.push(`/login?from=${encodeURIComponent(pathname)}`);
+            }
+        };
+        window.addEventListener(SESSION_ENDED_EVENT, onSessionEnded);
+        return () => window.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
+    }, [endSession, pathname, router]);
 
-        const res = await fetch(AUTH_LOGIN_URL, {
+    useEffect(() => {
+        // renew before expiry even without requests, so a user who is just reading keeps a current token and
+        // sees a role change within one token lifetime
+        const delay = token ? msUntilRefresh(token) : null;
+        if (delay === null) return;
+        const timer = setTimeout(() => void refreshSession(), delay);
+        return () => clearTimeout(timer);
+    }, [token]);
+
+    const login = useCallback(async (usernameOrEmail: string, password: string) => {
+        const res = await fetch(SESSION_LOGIN_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: usernameOrEmail, password }),
         });
         if (!res.ok) {
             throw new Error(await extractErrorDetails(res));
         }
+        // the route handler has already set the cookies; this is only the state for the UI
         const data = (await res.json()) as { access_token: string; user?: { username?: string } };
-        writeClientToken(data.access_token);
         setToken(data.access_token);
 
         const resolvedUsername = data.user?.username ?? null;
@@ -131,12 +168,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [login]);
 
     const logout = useCallback(() => {
-        clearClientToken();
-        writeStoredUsername(null);
-        setToken(null);
-        setUsername(null);
+        // revoke the session on the server and clear its cookies; the UI is logged out whatever that answers
+        void fetch(SESSION_LOGOUT_URL, { method: "POST", credentials: "same-origin" }).catch(() => undefined);
+        endSession();
         router.push("/login");
-    }, [router]);
+    }, [endSession, router]);
 
     const userId = token ? decodeSubject(token) : null;
     const griplRole = token ? decodeGriplRole(token) : null;
