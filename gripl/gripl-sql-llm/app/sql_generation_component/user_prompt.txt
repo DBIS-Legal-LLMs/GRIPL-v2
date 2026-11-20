@@ -1,0 +1,17 @@
+DATABASE SCHEMA:
+{db_schema}
+
+DETECTED INTENT (exact value for category.name):
+{intent}
+
+Bpmn Activity Field
+
+{activity_field}
+
+reasons of the intention
+
+{reasons_of_intentions}
+
+examples:
+
+{few_shot_examples}
