@@ -222,6 +222,10 @@ interrupts open connections for a second):
 cd /srv/gripl/traefik && repo/deploy/traefik/make-selfsigned-cert.sh 134.60.71.167.nip.io 134.60.71.167 && docker compose restart traefik
 ```
 
+The CA is limited by X.509 name constraints to the server's base domain and IP, so it can only vouch for this server. For that reason the
+script checks the new certificate against the existing CA and stops with an error, changing nothing, if they do not fit together (the
+domain or IP changed, or the CA expired); the fix is a new CA, see [rebuild-server.md](rebuild-server.md).
+
 Run the `openssl ... -enddate` command again; the date must be about 13 months away. Nothing has to be done on the users' machines: the
 installed `ca.crt` stays valid and the browser accepts the new certificate by itself. The CA was created on 2026-10-16 and is valid for
 five years, until **2031-10-15**. Plan a new CA by then ([rebuild-server.md](rebuild-server.md) says what that means for users).
