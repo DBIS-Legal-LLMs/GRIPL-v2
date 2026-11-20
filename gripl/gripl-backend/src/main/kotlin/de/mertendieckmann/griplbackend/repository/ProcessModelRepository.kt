@@ -167,9 +167,10 @@ class ProcessModelRepository(
         )
     }
 
-    fun resetStaleRunningToError(message: String): Int {
+    /** Queued and running jobs cannot survive a restart: the queue and the user's API key were in memory only. */
+    fun resetInterruptedToError(message: String): Int {
         return jdbc.update(
-            "UPDATE process_model SET status = 'ERROR', error_message = ?, updated_at = now() WHERE status = 'RUNNING'",
+            "UPDATE process_model SET status = 'ERROR', error_message = ?, updated_at = now() WHERE status IN ('RUNNING', 'QUEUED')",
             message
         )
     }
