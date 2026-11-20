@@ -169,6 +169,9 @@ docker compose start gripl-backend
 # accounts and roles
 cd /srv/gripl/<env>/auth && docker compose stop auth-service
 docker compose exec -T auth-mongo sh -c 'mongorestore --quiet --archive --drop --nsInclude "auth_db.*" -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin' < /path/to/mongo.archive
+# a restore also brings back refresh tokens that were revoked since the backup: drop them (users log in again);
+# auth-service recreates the collection and its indexes when it starts
+docker compose exec -T auth-mongo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin auth_db --eval "db.refresh_tokens.drop()"'
 docker compose start auth-service
 ```
 ```bash
