@@ -86,6 +86,16 @@ class ProcessModelControllerOwnershipTest {
         verify(repository, never()).deleteIfNotRunning(any(), any())
     }
 
+    private companion object {
+        val NEW_BPMN = """
+            <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+              <bpmn:process id="Process_1" isExecutable="false">
+                <bpmn:startEvent id="Start_1"/>
+              </bpmn:process>
+            </bpmn:definitions>
+        """.trimIndent()
+    }
+
     private fun bpmnFilePart(xml: String) = mock<FilePart>().also {
         whenever(it.content()).thenReturn(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(xml.toByteArray())))
     }
@@ -100,7 +110,7 @@ class ProcessModelControllerOwnershipTest {
         whenever(repository.getByIdAndOwner(5, "attacker")).thenReturn(null)
 
         val ex = assertThrows(ResponseStatusException::class.java) {
-            controller.updateProcessModel(5, bpmnFilePart("<new/>"), formField("3"), exchangeAs("attacker")).block()
+            controller.updateProcessModel(5, bpmnFilePart(NEW_BPMN), formField("3"), exchangeAs("attacker")).block()
         }
 
         assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
@@ -112,7 +122,7 @@ class ProcessModelControllerOwnershipTest {
         whenever(repository.getByIdAndOwner(5, "user-1")).thenReturn(model(ProcessModelStatus.RUNNING))
 
         val ex = assertThrows(ResponseStatusException::class.java) {
-            controller.updateProcessModel(5, bpmnFilePart("<new/>"), formField("3"), exchangeAs("user-1")).block()
+            controller.updateProcessModel(5, bpmnFilePart(NEW_BPMN), formField("3"), exchangeAs("user-1")).block()
         }
 
         assertEquals(HttpStatus.CONFLICT, ex.statusCode)
@@ -124,7 +134,7 @@ class ProcessModelControllerOwnershipTest {
         whenever(repository.getByIdAndOwner(5, "user-1")).thenReturn(model(ProcessModelStatus.DONE, bpmnVersion = 4))
 
         val ex = assertThrows(ResponseStatusException::class.java) {
-            controller.updateProcessModel(5, bpmnFilePart("<new/>"), formField("3"), exchangeAs("user-1")).block()
+            controller.updateProcessModel(5, bpmnFilePart(NEW_BPMN), formField("3"), exchangeAs("user-1")).block()
         }
 
         assertEquals(HttpStatus.CONFLICT, ex.statusCode)
@@ -136,10 +146,10 @@ class ProcessModelControllerOwnershipTest {
     fun `losing the race against another save between check and update is reported as that conflict`() {
         whenever(repository.getByIdAndOwner(5, "user-1"))
             .thenReturn(model(ProcessModelStatus.DONE), model(ProcessModelStatus.DONE, bpmnVersion = 4))
-        whenever(repository.updateBpmnXmlIfUnchanged(5, "user-1", "<new/>", 3)).thenReturn(false)
+        whenever(repository.updateBpmnXmlIfUnchanged(5, "user-1", NEW_BPMN, 3)).thenReturn(false)
 
         val ex = assertThrows(ResponseStatusException::class.java) {
-            controller.updateProcessModel(5, bpmnFilePart("<new/>"), formField("3"), exchangeAs("user-1")).block()
+            controller.updateProcessModel(5, bpmnFilePart(NEW_BPMN), formField("3"), exchangeAs("user-1")).block()
         }
 
         assertEquals(HttpStatus.CONFLICT, ex.statusCode)
@@ -149,7 +159,7 @@ class ProcessModelControllerOwnershipTest {
     @Test
     fun `updating with a non-numeric version is a 400`() {
         val ex = assertThrows(ResponseStatusException::class.java) {
-            controller.updateProcessModel(5, bpmnFilePart("<new/>"), formField("latest"), exchangeAs("user-1")).block()
+            controller.updateProcessModel(5, bpmnFilePart(NEW_BPMN), formField("latest"), exchangeAs("user-1")).block()
         }
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
@@ -160,22 +170,22 @@ class ProcessModelControllerOwnershipTest {
         whenever(repository.getByIdAndOwner(5, "user-1"))
             .thenReturn(
                 model(ProcessModelStatus.DONE),
-                model(ProcessModelStatus.DONE, "<new/>", bpmnVersion = 4).copy(analysisOutdated = true)
+                model(ProcessModelStatus.DONE, NEW_BPMN, bpmnVersion = 4).copy(analysisOutdated = true)
             )
-        whenever(repository.updateBpmnXmlIfUnchanged(5, "user-1", "<new/>", 3)).thenReturn(true)
+        whenever(repository.updateBpmnXmlIfUnchanged(5, "user-1", NEW_BPMN, 3)).thenReturn(true)
 
-        val response = controller.updateProcessModel(5, bpmnFilePart("<new/>"), formField("3"), exchangeAs("user-1")).block()
+        val response = controller.updateProcessModel(5, bpmnFilePart(NEW_BPMN), formField("3"), exchangeAs("user-1")).block()
 
         assertEquals(HttpStatus.OK, response?.statusCode)
-        assertEquals("<new/>", response?.body?.bpmnXml)
+        assertEquals(NEW_BPMN, response?.body?.bpmnXml)
         assertEquals(true, response?.body?.analysisOutdated)
         assertEquals(4, response?.body?.bpmnVersion)
-        verify(repository).updateBpmnXmlIfUnchanged(5, "user-1", "<new/>", 3)
+        verify(repository).updateBpmnXmlIfUnchanged(5, "user-1", NEW_BPMN, 3)
     }
 
     @Test
     fun `uploading with a file name longer than the name column is a 400 instead of a database error`() {
-        val file = bpmnFilePart("<bpmn/>").also { whenever(it.filename()).thenReturn("a".repeat(300) + ".bpmn") }
+        val file = bpmnFilePart(NEW_BPMN).also { whenever(it.filename()).thenReturn("a".repeat(300) + ".bpmn") }
 
         val ex = assertThrows(ResponseStatusException::class.java) {
             controller.uploadProcessModel(file, null, exchangeAs("user-1")).block()
@@ -186,16 +196,61 @@ class ProcessModelControllerOwnershipTest {
     }
 
     @Test
+    fun `uploading a file that is not BPMN is a 400 and stores nothing`() {
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.uploadProcessModel(bpmnFilePart("<not-bpmn />"), formField("broken.bpmn"), exchangeAs("user-1")).block()
+        }
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        verify(repository, never()).create(any(), any(), any())
+    }
+
+    @Test
+    fun `uploading a file that is not even XML is a 400 and stores nothing`() {
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.uploadProcessModel(bpmnFilePart("not xml at all"), formField("broken.bpmn"), exchangeAs("user-1")).block()
+        }
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("The uploaded file is not valid BPMN XML.", ex.reason)
+        verify(repository, never()).create(any(), any(), any())
+    }
+
+    @Test
+    fun `saving a diagram that is not BPMN is a 400 and updates nothing`() {
+        whenever(repository.getByIdAndOwner(5, "user-1")).thenReturn(model(ProcessModelStatus.DONE))
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            controller.updateProcessModel(5, bpmnFilePart("<not-bpmn />"), formField("3"), exchangeAs("user-1")).block()
+        }
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        verify(repository, never()).updateBpmnXmlIfUnchanged(any(), any(), any(), any())
+    }
+
+    @Test
+    fun `uploading without a name keeps the file name including its extension`() {
+        val file = bpmnFilePart(NEW_BPMN).also { whenever(it.filename()).thenReturn("Onboarding.bpmn") }
+        whenever(repository.create("Onboarding.bpmn", NEW_BPMN, "user-1")).thenReturn(5)
+        whenever(repository.getByIdAndOwner(5, "user-1")).thenReturn(model(ProcessModelStatus.PENDING).copy(name = "Onboarding.bpmn"))
+
+        val response = controller.uploadProcessModel(file, null, exchangeAs("user-1")).block()
+
+        assertEquals(HttpStatus.CREATED, response?.statusCode)
+        verify(repository).create("Onboarding.bpmn", NEW_BPMN, "user-1")
+    }
+
+    @Test
     fun `uploading stores the trimmed name`() {
-        whenever(repository.create("Onboarding", "<bpmn/>", "user-1")).thenReturn(5)
+        whenever(repository.create("Onboarding", NEW_BPMN, "user-1")).thenReturn(5)
         whenever(repository.getByIdAndOwner(5, "user-1")).thenReturn(model(ProcessModelStatus.PENDING).copy(name = "Onboarding"))
 
         val response = controller.uploadProcessModel(
-            bpmnFilePart("<bpmn/>"), formField("  Onboarding "), exchangeAs("user-1")
+            bpmnFilePart(NEW_BPMN), formField("  Onboarding "), exchangeAs("user-1")
         ).block()
 
         assertEquals(HttpStatus.CREATED, response?.statusCode)
-        verify(repository).create("Onboarding", "<bpmn/>", "user-1")
+        verify(repository).create("Onboarding", NEW_BPMN, "user-1")
     }
 
     @Test

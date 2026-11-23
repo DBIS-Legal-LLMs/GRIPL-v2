@@ -5,7 +5,10 @@ import tools.jackson.module.kotlin.readValue
 import org.springframework.core.env.Environment
 import org.springframework.core.io.buffer.DataBufferUtils
 import org.springframework.http.codec.multipart.FilePart
+import de.mertendieckmann.griplbackend.application.BpmnExtractor
 import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
+import org.camunda.bpm.model.xml.ModelParseException
+import org.camunda.bpm.model.xml.ModelValidationException
 import org.springframework.http.ContentDisposition
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -43,6 +46,23 @@ object ControllerUtils {
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Malformed custom analysis endpoint '$endpoint'")
         if (repository.getByIdAndOwner(id, ownerUserId) == null) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "No custom analysis endpoint found for id $id")
+        }
+    }
+
+    private val bpmnExtractor = BpmnExtractor()
+
+    /**
+     * Reuses the existing Camunda-based BPMN parser from [BpmnExtractor], so a model that passes
+     * here can also be analyzed. Invalid XML or invalid BPMN models are rejected with a 400
+     * before they are stored.
+     */
+    fun requireValidBpmn(bpmnXml: String) {
+        try {
+            bpmnExtractor.extractBpmnElements(bpmnXml)
+        } catch (exception: ModelParseException) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "The uploaded file is not valid BPMN XML.", exception)
+        } catch (exception: ModelValidationException) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "The uploaded file is not a valid BPMN model.", exception)
         }
     }
 

@@ -42,7 +42,8 @@ class ProcessModelController(
 
     @Operation(
         summary = "Upload a process model",
-        description = "Upload a BPMN XML document (file part **bpmnFile**) to be added to the persisted process model list."
+        description = "Upload a BPMN XML document (file part **bpmnFile**) to be added to the persisted process model list. " +
+            "Files that are not valid BPMN are rejected with 400."
     )
     @PostMapping("", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
     fun uploadProcessModel(
@@ -55,6 +56,7 @@ class ProcessModelController(
 
         return ControllerUtils.getBpmnXmlMono(file).flatMap { bpmnXml ->
             Mono.fromCallable {
+                ControllerUtils.requireValidBpmn(bpmnXml)
                 val id = repository.create(name, bpmnXml, userId)
                 repository.getByIdAndOwner(id, userId)!!.toListItemDto()
             }.subscribeOn(Schedulers.boundedElastic())
@@ -90,7 +92,7 @@ class ProcessModelController(
         summary = "Update a process model",
         description = "Replaces the BPMN XML (file part **bpmnFile**) of a process model, unless it is currently being analyzed. " +
             "**bpmnVersion** must be the version the edit is based on (from GET); if the diagram was saved elsewhere " +
-            "since, the request fails with 409 instead of overwriting it. " +
+            "since, the request fails with 409 instead of overwriting it. Invalid BPMN is rejected with 400. " +
             "An existing analysis result is kept, flagged as **analysisOutdated**, until the model is analyzed again."
     )
     @PutMapping("/{id}", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
@@ -109,6 +111,7 @@ class ProcessModelController(
                 val model = repository.getByIdAndOwner(id, userId)
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No process model found for id $id")
                 model.requireSavableAt(expectedVersion)
+                ControllerUtils.requireValidBpmn(bpmnXml)
                 if (!repository.updateBpmnXmlIfUnchanged(id, userId, bpmnXml, expectedVersion)) {
                     // Something changed between the check above and the update — report what.
                     val current = repository.getByIdAndOwner(id, userId)

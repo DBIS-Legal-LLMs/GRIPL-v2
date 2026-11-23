@@ -30,13 +30,13 @@ export default function BulkBpmnUploadButton({dataset}: BulkBpmnUploadButtonProp
     }
 
     async function uploadFile(file: File) {
-        const name = file.name.replace(/\.(bpmn|xml)$/i, "") || file.name;
         const formData = new FormData();
 
         // Reuses the request format from CreateTestCaseButton so every file
         // becomes a normal, initially unlabeled test case in this dataset.
+        // The test case is named after the file, extension included, like in Process Analysis.
         formData.append("bpmnFile", file, file.name);
-        formData.append("name", name);
+        formData.append("name", file.name);
         formData.append(
             "expectedValues",
             new Blob([JSON.stringify([])], {type: "application/json"}),

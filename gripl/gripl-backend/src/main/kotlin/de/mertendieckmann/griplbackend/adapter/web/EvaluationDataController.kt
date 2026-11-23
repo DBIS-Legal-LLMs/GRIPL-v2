@@ -20,9 +20,7 @@ import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
-import de.mertendieckmann.griplbackend.application.BpmnExtractor
-import org.camunda.bpm.model.xml.ModelParseException
-import org.camunda.bpm.model.xml.ModelValidationException
+import de.mertendieckmann.griplbackend.adapter.web.utils.ControllerUtils.requireValidBpmn
 
 @RestController
 @RequestMapping("/dataset/testcase")
@@ -33,30 +31,6 @@ class EvaluationDataController(
     private val previewGenerator: PreviewGenerator
 ) {
     private val log = KotlinLogging.logger { }
-
-    private val bpmnExtractor = BpmnExtractor()
-
-    /**
-    * Reuses the existing Camunda-based BPMN parser from [BpmnExtractor].
-    * Invalid XML or invalid BPMN models are rejected before they are stored.
-    */
-    private fun validateBpmnFile(bpmnXml: String) {
-        try {
-            bpmnExtractor.extractBpmnElements(bpmnXml)
-        } catch (exception: ModelParseException) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "The uploaded file is not valid BPMN XML.",
-                exception
-            )
-        } catch (exception: ModelValidationException) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "The uploaded file is not a valid BPMN model.",
-                exception
-            )
-        }
-    }
 
     // GRIPL-v2#33: every endpoint below is scoped to the authenticated user via
     // the test case's parent dataset. A test case must belong to a dataset the
@@ -116,7 +90,7 @@ class EvaluationDataController(
             }
 
         return bpmnXmlMono.flatMap { bpmnXml ->
-            validateBpmnFile(bpmnXml)
+            requireValidBpmn(bpmnXml)
 
             val evaluationData = EvaluationDataWithOptionalId(
                 name = name,
@@ -209,7 +183,7 @@ class EvaluationDataController(
             }
 
         return bpmnXmlMomo.flatMap { bpmnXml ->
-            validateBpmnFile(bpmnXml)
+            requireValidBpmn(bpmnXml)
             
             val affectedRows = evaluationDataRepository.updateEvaluationData(
                 EvaluationData(
