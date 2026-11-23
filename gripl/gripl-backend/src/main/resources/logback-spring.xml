@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Spring Boot's own console logging, plus a file with the WARN and ERROR lines of the day:
+  <LOG_DIR>/gripl-backend-errors-YYYY-MM-DD.log, one file per day, the last 30 days, at most 200 MB of
+  older files. INFO lines (e.g. the language model request/response dumps) never reach the file.
+  LOG_DIR is an environment variable (or system property), default ./logs. Only standard logback
+  elements are used, so the file can also be loaded without Spring (see ErrorLogFileTest).
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <property name="ERROR_LOG_DIR" value="${LOG_DIR:-logs}"/>
+
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
+        <!-- no <file>: today's file is the one named by the pattern, so it needs no renaming at midnight -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${ERROR_LOG_DIR}/gripl-backend-errors-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [%t] %-40.40logger{39} : %m%n%wEx</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </root>
+</configuration>
