@@ -7,12 +7,14 @@ import de.mertendieckmann.griplbackend.model.dto.ProcessModel
 import de.mertendieckmann.griplbackend.model.dto.ProcessModelStatus
 import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import de.mertendieckmann.griplbackend.repository.ProcessModelRepository
+import dev.langchain4j.exception.InvalidRequestException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.timeout
@@ -74,13 +76,49 @@ class ProcessModelJobRunnerTest {
         assertEquals(key, used.firstValue.apiKey)
         assertEquals("some/model", used.firstValue.modelName)
 
-        verify(repository, timeout(5000)).markError(7L, "boom")
+        verify(repository, timeout(5000)).markError(eq(7L), any())
         val keys = ProcessModelJobRunner::class.java.getDeclaredField("apiKeys").apply { isAccessible = true }
             .get(runner) as ConcurrentHashMap<*, *>
         // markError runs before the worker's finally block, so give it the moment it needs
         val deadline = System.currentTimeMillis() + 5000
         while (keys.isNotEmpty() && System.currentTimeMillis() < deadline) Thread.sleep(10)
         assertTrue(keys.isEmpty())
+    }
+
+    @Test
+    fun `a rejected model is stored as a readable message without the provider's raw body`() {
+        whenever(analysisService.analyzePromptEngineering(any(), any(), any(), any(), any())).thenThrow(
+            InvalidRequestException("""{"error":{"message":"gpt-3.5-turbo is not a valid model ID","code":400},"user_id":"user_2abc"}""")
+        )
+        whenever(repository.getById(7L)).thenAnswer { modelWith(storedOptions()) }
+
+        runner.enqueue(request)
+
+        verify(repository, timeout(5000)).markError(7L, "OpenRouter rejected the request: gpt-3.5-turbo is not a valid model ID")
+    }
+
+    @Test
+    fun `an unexpected exception is stored as a generic message that does not leak its text`() {
+        whenever(analysisService.analyzePromptEngineering(any(), any(), any(), any(), any())).thenThrow(RuntimeException("jdbc:postgresql://db/gripl password=hunter2"))
+        whenever(repository.getById(7L)).thenAnswer { modelWith(storedOptions()) }
+
+        runner.enqueue(request)
+
+        val message = argumentCaptor<String>()
+        verify(repository, timeout(5000)).markError(eq(7L), message.capture())
+        assertFalse(message.firstValue.contains("hunter2"), message.firstValue)
+    }
+
+    @Test
+    fun `a deleted custom endpoint is reported with its own explanation`() {
+        val custom = request.copy(endpoint = "/gdpr/analysis/custom/42")
+        whenever(repository.getById(7L)).thenAnswer {
+            modelWith(storedOptions()).copy(analysisEndpoint = custom.endpoint)
+        }
+
+        runner.enqueue(custom)
+
+        verify(repository, timeout(5000)).markError(7L, "Custom analysis endpoint 42 no longer exists")
     }
 
     @Test

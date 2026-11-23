@@ -13,6 +13,8 @@ import dev.langchain4j.service.output.OutputParsingException
 import io.github.oshai.kotlinlogging.KLogger
 import tools.jackson.databind.JsonNode
 import tools.jackson.module.kotlin.jacksonObjectMapper
+import org.camunda.bpm.model.xml.ModelParseException
+import org.camunda.bpm.model.xml.ModelValidationException
 import java.net.ConnectException
 import java.net.UnknownHostException
 import java.net.http.HttpTimeoutException
@@ -20,6 +22,7 @@ import java.util.UUID
 
 /** Stable machine-readable codes the frontend can switch on. Existing codes of the API (e.g. BPMN_PARSE_ERROR) are unchanged. */
 enum class FailureCode(val httpStatus: Int) {
+    ANALYSIS_ENDPOINT_INVALID(400),
     LLM_REQUEST_REJECTED(400),
     LLM_CREDITS_EXHAUSTED(402),
 
@@ -139,6 +142,8 @@ object FailureMapper {
         is UnresolvedModelServerException, is ConnectException, is UnknownHostException -> Failure(
             FailureCode.LLM_UNAVAILABLE, "$PROVIDER could not be reached. Please try again in a moment.", httpStatus, body
         )
+        is ModelParseException -> Failure("BPMN_PARSE_ERROR", 400, "The BPMN XML could not be parsed.")
+        is ModelValidationException -> Failure("BPMN_VALIDATION_ERROR", 400, "The BPMN XML is not a valid BPMN model.")
         is OutputParsingException -> Failure(
             FailureCode.LLM_BAD_OUTPUT,
             "The model's answer could not be read as the expected JSON. Try again or choose another model.",
