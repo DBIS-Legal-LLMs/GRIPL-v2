@@ -23,6 +23,8 @@ import java.util.UUID
 /** Stable machine-readable codes the frontend can switch on. Existing codes of the API (e.g. BPMN_PARSE_ERROR) are unchanged. */
 enum class FailureCode(val httpStatus: Int) {
     ANALYSIS_ENDPOINT_INVALID(400),
+    EVALUATION_ENDPOINT_FAILED(502),
+    EVALUATION_TIMEOUT(504),
     LLM_REQUEST_REJECTED(400),
     LLM_CREDITS_EXHAUSTED(402),
 
@@ -82,18 +84,17 @@ object FailureMapper {
         val chain = causeChain(e)
         chain.firstNotNullOfOrNull { (it as? ServiceFailureException)?.failure }?.let { return it }
 
-        val httpStatus = chain.firstNotNullOfOrNull { (it as? HttpException)?.statusCode() }
-        val detail = upstreamDetail(chain)
-        val body = chain.firstNotNullOfOrNull { (it as? HttpException)?.message ?: it.message }
-            ?.let { sanitize(it, MAX_BODY_LENGTH) }
+        val http = chain.firstNotNullOfOrNull { it as? HttpException }
+        val httpStatus = http?.statusCode()
 
         // langchain4j has no exception type of its own for 402
-        if (httpStatus == 402) return fromStatus(httpStatus, detail, body)
+        if (httpStatus == 402) return fromStatus(httpStatus, upstreamDetail(http), bodyOf(http))
 
         for (t in chain) {
-            fromException(t, httpStatus, detail, body)?.let { return it }
+            // the provider's explanation is the message of the exception that was recognized, not of a wrapper around it
+            fromException(t, httpStatus, upstreamDetail(t), bodyOf(t))?.let { return it }
         }
-        if (httpStatus != null) return fromStatus(httpStatus, detail, body)
+        if (httpStatus != null) return fromStatus(httpStatus, upstreamDetail(http), bodyOf(http))
 
         return Failure(
             FailureCode.INTERNAL_ERROR,
@@ -184,11 +185,11 @@ object FailureMapper {
 
     private fun suffix(detail: String?): String = if (detail.isNullOrBlank()) "" else ": $detail"
 
+    private fun bodyOf(t: Throwable?): String? = t?.message?.let { sanitize(it, MAX_BODY_LENGTH) }
+
     /** The provider's own explanation: the `error.message` of its JSON body, or the plain text of the exception. */
-    private fun upstreamDetail(chain: List<Throwable>): String? {
-        val raw = chain.firstNotNullOfOrNull { (it as? HttpException)?.message }
-            ?: chain.firstNotNullOfOrNull { it.message?.takeIf { m -> m.isNotBlank() } }
-            ?: return null
+    private fun upstreamDetail(t: Throwable?): String? {
+        val raw = t?.message?.takeIf { it.isNotBlank() } ?: return null
         val text = jsonErrorMessage(raw) ?: raw
         return sanitize(text).trimEnd('.').takeIf { it.isNotBlank() }
     }

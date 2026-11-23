@@ -1,6 +1,10 @@
 package de.mertendieckmann.griplbackend.evaluation.service
 
 import de.mertendieckmann.griplbackend.application.analyzer.AnalysisService
+import de.mertendieckmann.griplbackend.application.failure.Failure
+import de.mertendieckmann.griplbackend.application.failure.FailureCode
+import de.mertendieckmann.griplbackend.application.failure.FailureMapper
+import de.mertendieckmann.griplbackend.application.failure.ServiceFailureException
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.CustomAnalysisResponseType
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRequest
@@ -70,14 +74,13 @@ class HttpEvaluator(
                 withContext(Dispatchers.IO) { evaluateInProcess(bpmnXml, evaluationRequest) }
             }
         } catch (e: TimeoutCancellationException) {
-            throw RuntimeException(
-                "Evaluation call to endpoint '$endpoint' timed out after $EVALUATION_CALL_TIMEOUT",
-                e
-            )
+            throw timedOut(endpoint, e)
         } catch (e: CancellationException) {
             throw e
+        } catch (e: ServiceFailureException) {
+            throw e
         } catch (e: Exception) {
-            throw RuntimeException("Failed to evaluate BPMN XML at endpoint '$endpoint': ${e.message}", e)
+            throw RuntimeException("Failed to evaluate BPMN XML at endpoint '$endpoint'", e)
         }
     }
 
@@ -108,11 +111,11 @@ class HttpEvaluator(
             )
             endpoint.startsWith(CUSTOM_ENDPOINT_PREFIX) -> {
                 val id = endpoint.removePrefix(CUSTOM_ENDPOINT_PREFIX).toLongOrNull()
-                    ?: throw IllegalArgumentException("Malformed custom analysis endpoint '$endpoint'")
+                    ?: throw invalidEndpoint("Malformed custom analysis endpoint '$endpoint'")
                 // Ownership was already checked where the evaluation request came in
                 // (EvaluationController); this runs with no user context.
                 val custom = customAnalysisEndpointRepository.getById(id)
-                    ?: throw IllegalArgumentException("No custom analysis endpoint found for id $id")
+                    ?: throw invalidEndpoint("No custom analysis endpoint found for id $id")
                 when (custom.responseType) {
                     CustomAnalysisResponseType.BINARY -> binaryResult(
                         analysisService.analyzeCustomBinary(
@@ -136,7 +139,7 @@ class HttpEvaluator(
                     )
                 }
             }
-            else -> throw IllegalArgumentException("Unknown analysis endpoint '$endpoint'")
+            else -> throw invalidEndpoint("Unknown analysis endpoint '$endpoint'")
         }
     }
 
@@ -195,15 +198,29 @@ class HttpEvaluator(
                 binaryResult(analysisResponse)
             }
         } catch (e: TimeoutCancellationException) {
-            throw RuntimeException(
-                "Evaluation call to endpoint '$absoluteEndpoint' timed out after $EVALUATION_CALL_TIMEOUT",
-                e
-            )
+            throw timedOut(absoluteEndpoint, e)
         } catch (e: WebClientResponseException) {
-            throw RuntimeException(
-                "Failed to evaluate BPMN XML at endpoint '$absoluteEndpoint': " + e.responseBodyAsString,
+            // The body of an external service is not shown to the user; it is in the log through the cause.
+            throw ServiceFailureException(
+                Failure(
+                    FailureCode.EVALUATION_ENDPOINT_FAILED,
+                    "The analysis endpoint '$absoluteEndpoint' answered with status ${e.statusCode.value()}.",
+                    upstreamStatus = e.statusCode.value(),
+                    upstreamBody = FailureMapper.sanitize(e.responseBodyAsString, 1000)
+                ),
                 e
             )
         }
     }
+
+    private fun invalidEndpoint(message: String) =
+        ServiceFailureException(Failure(FailureCode.ANALYSIS_ENDPOINT_INVALID, message))
+
+    private fun timedOut(endpoint: String, cause: Throwable) = ServiceFailureException(
+        Failure(
+            FailureCode.EVALUATION_TIMEOUT,
+            "The analysis of one test case at endpoint '$endpoint' took longer than $EVALUATION_CALL_TIMEOUT and was stopped."
+        ),
+        cause
+    )
 }

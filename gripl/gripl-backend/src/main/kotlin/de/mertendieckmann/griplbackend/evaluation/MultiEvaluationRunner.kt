@@ -1,15 +1,25 @@
 package de.mertendieckmann.griplbackend.evaluation
 
+import de.mertendieckmann.griplbackend.application.failure.FailureMapper
+import de.mertendieckmann.griplbackend.application.failure.logFailure
 import de.mertendieckmann.griplbackend.model.dto.EvaluationMetadataReport
+import de.mertendieckmann.griplbackend.model.dto.EvaluationReportError
+import de.mertendieckmann.griplbackend.model.dto.EvaluationReportFatal
+import de.mertendieckmann.griplbackend.model.dto.EvaluationReportModelError
+import de.mertendieckmann.griplbackend.model.dto.TestCaseReport
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRequest
 import de.mertendieckmann.griplbackend.model.dto.ModelReportEnvelope
 import de.mertendieckmann.griplbackend.model.dto.MultiEvaluationRequest
 import de.mertendieckmann.griplbackend.repository.DatasetRepository
 import de.mertendieckmann.griplbackend.repository.EvaluationDataRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import org.springframework.http.HttpStatus
+import org.springframework.web.server.ResponseStatusException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
@@ -21,8 +31,21 @@ class MultiEvaluationRunner(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun runAll(request: MultiEvaluationRequest, ownerUserId: String): Flow<ModelReportEnvelope> = flow {
-        require(request.models.isNotEmpty()) { "models must not be empty" }
+    /**
+     * Failures never end the stream silently: a test case that fails is reported as an error event, a model whose
+     * test cases all failed as a model error event, and anything that stops the whole run as a last fatal event.
+     */
+    fun runAll(request: MultiEvaluationRequest, ownerUserId: String): Flow<ModelReportEnvelope> {
+        if (request.models.isEmpty()) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Select at least one model to evaluate")
+        return runAllModels(request, ownerUserId).catch { e ->
+            if (e is CancellationException) throw e
+            val requestId = FailureMapper.newRequestId()
+            val failure = log.logFailure("Evaluation run", e, mapOf("userId" to ownerUserId), requestId)
+            emit(ModelReportEnvelope("", EvaluationReportFatal(failure.message, failure.code, requestId), 1))
+        }
+    }
+
+    private fun runAllModels(request: MultiEvaluationRequest, ownerUserId: String): Flow<ModelReportEnvelope> = flow {
 
         val baseSeed = request.seed ?: (System.currentTimeMillis() * (Math.random() * 10) % Int.MAX_VALUE).toInt()
         val repetitions = request.repetitions.coerceAtLeast(1)
@@ -49,11 +72,50 @@ class MultiEvaluationRunner(
                     activitiesOnly = request.activitiesOnly
                 )
 
+                var succeeded = 0
+                var failed = 0
+                var firstError: EvaluationReportError? = null
+
                 singleRunner.run(singleRequest, ownerUserId)
                     .map { event -> ModelReportEnvelope(model.label, event, runNumber) }
-                    .collect { wrapped -> emit(wrapped) }
+                    .collect { wrapped ->
+                        when (val report = wrapped.report) {
+                            is TestCaseReport -> succeeded++
+                            is EvaluationReportError -> {
+                                failed++
+                                if (firstError == null) firstError = report
+                            }
+                            else -> {}
+                        }
+                        emit(wrapped)
+                    }
 
-                log.info { "Run $runNumber - Finished model '${model.label}'" }
+                val firstFailure = firstError
+                if (firstFailure != null && succeeded == 0) {
+                    val requestId = FailureMapper.newRequestId()
+                    log.error {
+                        "Run $runNumber - all $failed test case(s) failed for model '${model.label}' " +
+                            "[code=${firstFailure.code}, requestId=$requestId, userId=$ownerUserId, endpoint=$effectiveEndpoint, " +
+                            "model=${model.llmProps?.modelName}]: ${firstFailure.errorMessage}"
+                    }
+                    emit(
+                        ModelReportEnvelope(
+                            model.label,
+                            EvaluationReportModelError(
+                                totalTestCases = failed,
+                                failedTestCases = failed,
+                                errorMessage = "All $failed test cases failed: ${firstFailure.errorMessage}",
+                                code = firstFailure.code,
+                                requestId = requestId
+                            ),
+                            runNumber
+                        )
+                    )
+                } else if (firstFailure != null) {
+                    log.warn { "Run $runNumber - $failed of ${succeeded + failed} test case(s) failed for model '${model.label}'" }
+                }
+
+                log.info { "Run $runNumber - Finished model '${model.label}': $succeeded succeeded, $failed failed" }
             }
         }
     }
