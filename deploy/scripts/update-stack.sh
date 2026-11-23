@@ -27,6 +27,10 @@ name="$(basename "$(dirname "$PWD")")/$(basename "$PWD")"
 log() { printf '%s [%s] %s\n' "$(date -Is)" "$name" "$*"; }
 env_value() { sed -n "s/^$1=//p" .env 2>/dev/null | tail -n1; }
 
+# the backend writes its daily error files here (bind-mounted by the compose file); make it ours,
+# Docker would create it as root
+mkdir -p logs
+
 [ -f compose.yaml ] || { log "no compose.yaml here - was this directory created with init-stack.sh?"; exit 2; }
 
 # never run two updates of the same stack at once
