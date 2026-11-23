@@ -154,4 +154,30 @@ class FailureMapperTest {
         assertNotNull(a)
         assertTrue(a != FailureMapper.newRequestId())
     }
+
+    @Test
+    fun `the cause types are listed without their messages`() {
+        val e = RuntimeException("secret process content", OutputParsingException("more secret content", IllegalStateException("x")))
+
+        assertEquals("RuntimeException > OutputParsingException > IllegalStateException", FailureMapper.causeTypes(e))
+    }
+
+    @Test
+    fun `an unreadable model answer is logged without the text that quotes it`() {
+        val appender = ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>().apply { start() }
+        val logger = org.slf4j.LoggerFactory.getLogger("failure-log-test") as ch.qos.logback.classic.Logger
+        logger.addAppender(appender)
+        try {
+            val kLogger = io.github.oshai.kotlinlogging.KotlinLogging.logger("failure-log-test")
+            kLogger.logFailure("Analysis", OutputParsingException("answer: Collect customer data", RuntimeException("Source: Collect customer data")), mapOf("processModelId" to 7))
+        } finally {
+            logger.detachAppender(appender)
+        }
+
+        val event = appender.list.single()
+        assertTrue(event.formattedMessage.contains("code=LLM_BAD_OUTPUT"))
+        assertTrue(event.formattedMessage.contains("processModelId=7"))
+        assertFalse(event.formattedMessage.contains("customer"))
+        assertEquals(null, event.throwableProxy, "no exception, its messages quote the answer")
+    }
 }

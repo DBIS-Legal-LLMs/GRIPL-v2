@@ -118,6 +118,9 @@ object FailureMapper {
         return if (cleaned.length > maxLength) cleaned.take(maxLength - 1).trimEnd() + "…" else cleaned
     }
 
+    /** The exception types of the cause chain, without their messages, e.g. `RuntimeException > OutputParsingException`. */
+    fun causeTypes(e: Throwable): String = causeChain(e).joinToString(" > ") { it.javaClass.simpleName }
+
     fun newRequestId(): String = UUID.randomUUID().toString().replace("-", "").take(8)
 
     private fun causeChain(e: Throwable): List<Throwable> {
@@ -189,13 +192,18 @@ object FailureMapper {
 
     private fun suffix(detail: String?): String = if (detail.isNullOrBlank()) "" else ": $detail"
 
-    private fun bodyOf(t: Throwable?): String? = t?.message?.let { sanitize(it, MAX_BODY_LENGTH) }
+    /**
+     * What is logged of the provider's answer: its own message, not the whole body (an error body can quote the
+     * input), and nothing at all of an answer that could not be read, as that is the model's output.
+     */
+    private fun bodyOf(t: Throwable?): String? =
+        if (t is OutputParsingException) null else upstreamDetail(t, MAX_BODY_LENGTH)
 
     /** The provider's own explanation: the `error.message` of its JSON body, or the plain text of the exception. */
-    private fun upstreamDetail(t: Throwable?): String? {
+    private fun upstreamDetail(t: Throwable?, maxLength: Int = MAX_MESSAGE_LENGTH): String? {
         val raw = t?.message?.takeIf { it.isNotBlank() } ?: return null
         val text = jsonErrorMessage(raw) ?: raw
-        return sanitize(text).trimEnd('.').takeIf { it.isNotBlank() }
+        return sanitize(text, maxLength).trimEnd('.').takeIf { it.isNotBlank() }
     }
 
     private fun jsonErrorMessage(raw: String): String? {
@@ -227,6 +235,12 @@ fun KLogger.logFailure(
         failure.upstreamStatus?.let { add("upstreamStatus=$it") }
         failure.upstreamBody?.let { add("upstreamBody=\"$it\"") }
     }
-    error(e) { "$operation failed [${fields.joinToString(", ")}]: ${failure.message}" }
+    val line = "$operation failed [${fields.joinToString(", ")}]: ${failure.message}"
+    if (failure.code == FailureCode.LLM_BAD_OUTPUT.name) {
+        // The exception messages of an unreadable answer quote the answer, i.e. content of the user's process: log the types only.
+        error { "$line (cause: ${FailureMapper.causeTypes(e)})" }
+    } else {
+        error(e) { line }
+    }
     return failure
 }

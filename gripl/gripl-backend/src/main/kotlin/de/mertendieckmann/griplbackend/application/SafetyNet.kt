@@ -33,7 +33,9 @@ class SafetyNet<T>(
             var lastError: Throwable = original
 
             repeat(maxRetries) {
-                log.warn(lastError) { "Parsing failed. Attempting to fix JSON and retry... (Attempt ${it + 1} of $maxRetries)" }
+                // the exception quotes the model's answer, so its text stays at debug level
+                log.warn { "Parsing failed (${lastError.javaClass.simpleName}). Attempting to fix JSON and retry... (Attempt ${it + 1} of $maxRetries)" }
+                log.debug(lastError) { "Parsing failure in detail" }
                 try {
                     // Reuses the same sessionId as the original request so the fix call has
                     // access to the same conversation memory.

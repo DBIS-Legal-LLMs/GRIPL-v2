@@ -88,9 +88,12 @@ class GlobalExceptionHandler {
         code: String,
         message: String?
     ): ResponseEntity<ApiError> {
-        log.warn { "${describe(exchange)} rejected with ${status.value()} $code: ${ex.javaClass.simpleName}: ${ex.message?.let { FailureMapper.sanitize(it) }}" }
+        log.warn { "${describe(exchange)} rejected with ${status.value()} $code: ${ex.javaClass.simpleName}: ${ex.logMessage()?.let { FailureMapper.sanitize(it) }}" }
         return respond(status.value(), code, message)
     }
+
+    // Jackson's message quotes the start of the request body, which is the user's data
+    private fun Exception.logMessage(): String? = (this as? StreamReadException)?.originalMessage ?: message
 
     private fun respond(status: Int, code: String, message: String?, requestId: String? = null): ResponseEntity<ApiError> =
         ResponseEntity.status(status).body(ApiError(status = status, code = code, message = message, requestId = requestId))
