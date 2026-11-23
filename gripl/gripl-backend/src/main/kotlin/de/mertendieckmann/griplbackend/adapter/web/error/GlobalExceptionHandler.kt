@@ -1,7 +1,10 @@
 package de.mertendieckmann.griplbackend.adapter.web.error
 
 import de.mertendieckmann.griplbackend.application.dataset.DatasetImportException
-import dev.langchain4j.service.output.OutputParsingException
+import de.mertendieckmann.griplbackend.application.failure.FailureMapper
+import de.mertendieckmann.griplbackend.application.failure.logFailure
+import de.mertendieckmann.griplbackend.security.AUTHENTICATED_USER_ID_ATTRIBUTE
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.camunda.bpm.model.xml.ModelParseException
 import org.camunda.bpm.model.xml.ModelValidationException
 import org.springframework.http.HttpStatus
@@ -10,98 +13,91 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.server.MissingRequestValueException
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.web.server.ServerWebExchange
+import org.springframework.web.reactive.resource.NoResourceFoundException
+import tools.jackson.core.exc.StreamReadException
 
+/**
+ * Turns every exception that leaves a controller into the same JSON body, [ApiError]:
+ * the HTTP status, a stable `code`, a short `message` that is safe to show to the user,
+ * and a `requestId` that is also in the log line, so an operator can find the cause.
+ */
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
-    // Must stay ahead of the catch-all RuntimeException handler below in
-    // intent (Spring picks the most specific match regardless of declaration
-    // order, but this is the one that matters): ResponseStatusException
-    // (GRIPL-v2#33's ownership 404/400s, GRIPL-v2#40's role 403s, ...) carries
-    // its own correct status — without this it was falling through to the
-    // generic 500 handler, silently turning every "not found"/"forbidden"
-    // into an internal error. Found while testing #40's role gate for real.
+    private val log = KotlinLogging.logger {}
+
+    // ResponseStatusException (GRIPL-v2#33's ownership 404/400s, GRIPL-v2#40's role 403s, ...) carries
+    // its own correct status and a reason written for the user.
     @ExceptionHandler(ResponseStatusException::class)
-    fun handleResponseStatusException(ex: ResponseStatusException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(ex.statusCode)
-            .body(ApiError(code = ex.statusCode.toString(), message = ex.reason))
+    fun handleResponseStatusException(ex: ResponseStatusException, exchange: ServerWebExchange): ResponseEntity<ApiError> {
+        val status = HttpStatus.resolve(ex.statusCode.value())
+        val code = status?.name ?: ex.statusCode.value().toString()
+        val message = ex.reason ?: status?.reasonPhrase
+        if (ex.statusCode.is5xxServerError) {
+            val requestId = FailureMapper.newRequestId()
+            log.error(ex) { "${describe(exchange)} failed [code=$code, requestId=$requestId]: $message" }
+            return respond(ex.statusCode.value(), code, message, requestId)
+        }
+        log.debug { "${describe(exchange)} rejected with ${ex.statusCode.value()}: $message" }
+        return respond(ex.statusCode.value(), code, message)
+    }
 
     @ExceptionHandler(ModelParseException::class)
-    fun handleInvalidBpmn(ex: ModelParseException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.BAD_REQUEST)
-            .body(ApiError(code = "BPMN_PARSE_ERROR", message = "BPMN XMl could not be parsed"))
-            .also { ex.printStackTrace() }
+    fun handleInvalidBpmn(ex: ModelParseException, exchange: ServerWebExchange): ResponseEntity<ApiError> =
+        clientError(exchange, ex, HttpStatus.BAD_REQUEST, "BPMN_PARSE_ERROR", "BPMN XML could not be parsed")
 
     @ExceptionHandler(ModelValidationException::class)
-    fun handleValidationError(ex: ModelValidationException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.BAD_REQUEST)
-            .body(ApiError(code = "BPMN_VALIDATION_ERROR", message = "BPMN XML is not valid"))
-            .also { ex.printStackTrace() }
+    fun handleValidationError(ex: ModelValidationException, exchange: ServerWebExchange): ResponseEntity<ApiError> =
+        clientError(exchange, ex, HttpStatus.BAD_REQUEST, "BPMN_VALIDATION_ERROR", "BPMN XML is not valid")
 
-    @ExceptionHandler(org.springframework.web.reactive.resource.NoResourceFoundException::class)
-    fun handleNoResourceFoundException(ex: org.springframework.web.reactive.resource.NoResourceFoundException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.NOT_FOUND)
-            .body(ApiError(code = "RESOURCE_NOT_FOUND", message = "The requested resource was not found"))
-            .also { ex.printStackTrace() }
+    @ExceptionHandler(NoResourceFoundException::class)
+    fun handleNoResourceFoundException(ex: NoResourceFoundException, exchange: ServerWebExchange): ResponseEntity<ApiError> =
+        clientError(exchange, ex, HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "The requested resource was not found")
 
-    @ExceptionHandler(tools.jackson.core.exc.StreamReadException::class)
-    fun handleJsonParseException(ex: tools.jackson.core.exc.StreamReadException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.BAD_REQUEST)
-            .body(ApiError(code = "JSON_PARSE_ERROR", message = ex.message))
-            .also { ex.printStackTrace() }
-
-    @ExceptionHandler(dev.langchain4j.exception.InvalidRequestException::class)
-    fun handleInterruptedException(ex: dev.langchain4j.exception.InvalidRequestException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiError(code = "INTERRUPTED", message = ex.message))
-            .also { print(ex) }
+    @ExceptionHandler(StreamReadException::class)
+    fun handleJsonParseException(ex: StreamReadException, exchange: ServerWebExchange): ResponseEntity<ApiError> =
+        clientError(exchange, ex, HttpStatus.BAD_REQUEST, "JSON_PARSE_ERROR", "The request body is not valid JSON")
 
     @ExceptionHandler(DatasetImportException::class)
-    fun handleDatasetImportException(ex: DatasetImportException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.BAD_REQUEST)
-            .body(ApiError(code = "DATASET_IMPORT_ERROR", message = ex.message))
-
-    @ExceptionHandler(RuntimeException::class)
-    fun handleRuntimeException(ex: RuntimeException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiError(code = "INTERNAL_ERROR", message = "There was an internal error processing your request: ${ex.localizedMessage}"))
-            .also { ex.printStackTrace() }
+    fun handleDatasetImportException(ex: DatasetImportException, exchange: ServerWebExchange): ResponseEntity<ApiError> =
+        clientError(exchange, ex, HttpStatus.BAD_REQUEST, "DATASET_IMPORT_ERROR", ex.message)
 
     @ExceptionHandler(MissingRequestValueException::class)
-    fun handleMissingRequestValueException(ex: MissingRequestValueException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.BAD_REQUEST)
-            .body(ApiError(code = "MISSING_REQUEST_VALUE", message = ex.message))
-            .also { ex.printStackTrace() }
+    fun handleMissingRequestValueException(ex: MissingRequestValueException, exchange: ServerWebExchange): ResponseEntity<ApiError> =
+        clientError(exchange, ex, HttpStatus.BAD_REQUEST, "MISSING_REQUEST_VALUE", ex.reason ?: "A required part of the request is missing")
 
-    @ExceptionHandler(dev.langchain4j.exception.AuthenticationException::class)
-    fun handleAuthenticationException(ex: dev.langchain4j.exception.AuthenticationException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.UNAUTHORIZED)
-            .body(ApiError(code = "AUTHENTICATION_ERROR", message = ex.message))
-            .also { ex.printStackTrace() }
+    // Everything else, including problems with the language model provider, the knowledge graph service
+    // and auth-service: FailureMapper knows the provider's own explanation and what is safe to show.
+    @ExceptionHandler(Exception::class)
+    fun handleFailure(ex: Exception, exchange: ServerWebExchange): ResponseEntity<ApiError> {
+        val requestId = FailureMapper.newRequestId()
+        val failure = log.logFailure(
+            operation = describe(exchange),
+            e = ex,
+            context = mapOf("userId" to exchange.getAttribute<String>(AUTHENTICATED_USER_ID_ATTRIBUTE)),
+            requestId = requestId
+        )
+        return respond(failure.status, failure.code, failure.message, requestId)
+    }
 
-    @ExceptionHandler(dev.langchain4j.exception.RateLimitException::class)
-    fun handleRateLimitException(ex: dev.langchain4j.exception.RateLimitException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.TOO_MANY_REQUESTS)
-            .body(ApiError(code = "RATE_LIMIT_EXCEEDED", message = ex.message))
-            .also { ex.printStackTrace() }
+    private fun clientError(
+        exchange: ServerWebExchange,
+        ex: Exception,
+        status: HttpStatus,
+        code: String,
+        message: String?
+    ): ResponseEntity<ApiError> {
+        log.warn { "${describe(exchange)} rejected with ${status.value()} $code: ${ex.javaClass.simpleName}: ${ex.message?.let { FailureMapper.sanitize(it) }}" }
+        return respond(status.value(), code, message)
+    }
 
-    @ExceptionHandler(OutputParsingException::class)
-    fun handleOutputParsingException(ex: OutputParsingException): ResponseEntity<ApiError> =
-        ResponseEntity
-            .status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiError(code = "OUTPUT_PARSING_ERROR", message = "There was an error parsing the output from the AI service: ${ex.localizedMessage}"))
-            .also { ex.printStackTrace() }
+    private fun respond(status: Int, code: String, message: String?, requestId: String? = null): ResponseEntity<ApiError> =
+        ResponseEntity.status(status).body(ApiError(status = status, code = code, message = message, requestId = requestId))
 
-    data class ApiError(val code: String, val message: String?)
+    private fun describe(exchange: ServerWebExchange): String =
+        "${exchange.request.method} ${exchange.request.path.value()}"
+
+    /** `requestId` is only set for failures that are logged as errors, i.e. the ones an operator may have to look into. */
+    data class ApiError(val status: Int, val code: String, val message: String?, val requestId: String? = null)
 }
