@@ -35,7 +35,11 @@ enum class FailureCode(val httpStatus: Int) {
     LLM_TIMEOUT(504),
     LLM_BAD_OUTPUT(502),
     RAG_UNAVAILABLE(502),
+    RAGAS_UNAVAILABLE(502),
     AUTH_SERVICE_UNAVAILABLE(502),
+
+    // 401 on purpose: the frontend renews the session and repeats the request.
+    AUTH_SERVICE_REJECTED_TOKEN(401),
     INTERNAL_ERROR(500)
 }
 
