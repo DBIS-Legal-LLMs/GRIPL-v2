@@ -159,7 +159,8 @@ class HttpEvaluator(
             criticalElements = response.classifiedElements.map {
                 AnalysisResponse.CriticalElement(id = it.id, name = it.name, reason = it.reason)
             },
-            amountOfRetries = response.amountOfRetries
+            amountOfRetries = response.amountOfRetries,
+            warnings = response.warnings
         )
     )
 

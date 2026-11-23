@@ -43,9 +43,10 @@ class MulticlassBpmnAnalyzer(
         val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)
 
         if (useRag) {
-            val ragContextMap = ragAugmenter.fetchRagContext(
+            val ragFetch = ragAugmenter.fetchRagContext(
                 bpmnElements, ragMode, maxConcurrency = ragApiProperties.maxConcurrency, activitiesOnly = activitiesOnly
             )
+            val ragContextMap = ragFetch.context
             val pool = ragAugmenter.buildDedupedPool(ragContextMap)
 
             val result = safetyNet.safeGuardResultParsing(sessionId, maxRetries = 3) {
@@ -59,7 +60,7 @@ class MulticlassBpmnAnalyzer(
             log.info { "BPMN Multiclass Analysis Result (with RAG): $analysisResult" }
 
             return MulticlassAnalysisResponse.fromBpmnMulticlassAnalysisResult(
-                analysisResult, bpmnElements, result.second, ragContext, pool.flatten()
+                analysisResult, bpmnElements, result.second, ragContext, pool.flatten(), ragFetch.warnings
             )
         } else {
             val result = safetyNet.safeGuardResultParsing(sessionId, maxRetries = 3) {

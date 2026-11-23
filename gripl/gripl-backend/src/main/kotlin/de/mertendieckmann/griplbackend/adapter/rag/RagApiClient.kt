@@ -5,10 +5,18 @@ import de.mertendieckmann.griplbackend.model.dto.RagMode
 import de.mertendieckmann.griplbackend.model.dto.RagRequest
 import de.mertendieckmann.griplbackend.model.dto.RagResponseWrapper
 import de.mertendieckmann.griplbackend.model.dto.RagStatusResponse
+import de.mertendieckmann.griplbackend.application.failure.Failure
+import de.mertendieckmann.griplbackend.application.failure.FailureCode
+import de.mertendieckmann.griplbackend.application.failure.FailureMapper
+import de.mertendieckmann.griplbackend.application.failure.ServiceFailureException
+import de.mertendieckmann.griplbackend.application.failure.logFailure
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.WebClientResponseException
+import java.util.concurrent.TimeoutException
 import java.time.Duration
 import java.util.Collections
 import java.util.LinkedHashMap
@@ -62,9 +70,11 @@ class RagApiClient(
                 .bodyToMono(RagResponseWrapper::class.java)
                 .timeout(Duration.ofMinutes(10))
                 .awaitSingle()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            log.error(e) { "RAG service call failed for query: $queryText" }
-            throw RuntimeException("Failed to query RAG service", e)
+            // the query text is user content and stays out of the log
+            throw ragFailure("RAG query", mapOf("mode" to ragMode), e)
         }
 
         responseCache[cacheKey] = response
@@ -87,10 +97,26 @@ class RagApiClient(
                 .bodyToMono(RagStatusResponse::class.java)
                 .timeout(Duration.ofSeconds(10))
                 .awaitSingle()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            log.error(e) { "RAG status check failed" }
-            throw RuntimeException("Failed to check RAG status", e)
+            throw ragFailure("RAG status check", emptyMap(), e)
         }
+    }
+
+    private fun ragFailure(operation: String, context: Map<String, Any?>, e: Exception): ServiceFailureException {
+        val status = (e as? WebClientResponseException)?.statusCode?.value()
+        val failure = Failure(
+            FailureCode.RAG_UNAVAILABLE,
+            if (status != null) "The GDPR knowledge graph service answered with status $status."
+            else if (e is TimeoutException) "The GDPR knowledge graph service did not answer in time."
+            else "The GDPR knowledge graph service could not be reached.",
+            upstreamStatus = status,
+            upstreamBody = (e as? WebClientResponseException)?.responseBodyAsString?.let { FailureMapper.sanitize(it, 1000) }
+        )
+        val serviceFailure = ServiceFailureException(failure, e)
+        log.logFailure(operation, serviceFailure, context)
+        return serviceFailure
     }
 
     companion object {

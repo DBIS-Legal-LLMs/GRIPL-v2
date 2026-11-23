@@ -10,7 +10,9 @@ data class AnalysisResponse(
     val criticalElements: List<CriticalElement>,
     val amountOfRetries: Int? = null,
     val ragContext: Map<String, RagElementContext>? = null,
-    val ragPromptContext: List<String>? = null
+    val ragPromptContext: List<String>? = null,
+    /** Things the user should know about the result, e.g. that the knowledge graph could not be queried. */
+    val warnings: List<String> = emptyList()
 ) {
     data class CriticalElement(
         val id: String,
@@ -26,7 +28,8 @@ data class AnalysisResponse(
             bpmnElements: Set<BpmnElement>,
             amountOfRetries: Int,
             ragContext: Map<String, RagElementContext>? = null,
-            ragPromptContext: List<String>? = null
+            ragPromptContext: List<String>? = null,
+            warnings: List<String> = emptyList()
         ): AnalysisResponse {
             val elements = result.elements.map { element ->
                 val bpmnElement = bpmnElements.find { it.id == element.id }
@@ -50,7 +53,8 @@ data class AnalysisResponse(
                 criticalElements = elements,
                 amountOfRetries = amountOfRetries,
                 ragContext = ragContext,
-                ragPromptContext = ragPromptContext
+                ragPromptContext = ragPromptContext,
+                warnings = warnings
             )
         }
 
@@ -95,7 +99,9 @@ data class MulticlassAnalysisResponse(
     val classifiedElements: List<ClassifiedElement>,
     val amountOfRetries: Int? = null,
     val ragContext: Map<String, RagElementContext>? = null,
-    val ragPromptContext: List<String>? = null
+    val ragPromptContext: List<String>? = null,
+    /** Things the user should know about the result, e.g. that the knowledge graph could not be queried. */
+    val warnings: List<String> = emptyList()
 ) {
     data class ClassifiedElement(
         val id: String,
@@ -110,7 +116,8 @@ data class MulticlassAnalysisResponse(
             bpmnElements: Set<BpmnElement>,
             amountOfRetries: Int,
             ragContext: Map<String, RagElementContext>? = null,
-            ragPromptContext: List<String>? = null
+            ragPromptContext: List<String>? = null,
+            warnings: List<String> = emptyList()
         ): MulticlassAnalysisResponse {
             val elements = result.elements.map { element ->
                 ClassifiedElement(
@@ -125,7 +132,8 @@ data class MulticlassAnalysisResponse(
                 classifiedElements = elements,
                 amountOfRetries = amountOfRetries,
                 ragContext = ragContext,
-                ragPromptContext = ragPromptContext
+                ragPromptContext = ragPromptContext,
+                warnings = warnings
             )
         }
     }

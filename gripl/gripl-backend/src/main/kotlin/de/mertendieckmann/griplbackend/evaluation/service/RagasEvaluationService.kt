@@ -7,7 +7,9 @@ import de.mertendieckmann.griplbackend.model.dto.RagElementContext
 import de.mertendieckmann.griplbackend.model.dto.RagasEvaluationRequest
 import de.mertendieckmann.griplbackend.model.dto.RagasSampleRequest
 import de.mertendieckmann.griplbackend.model.evaluation.RagMetrics
+import de.mertendieckmann.griplbackend.application.failure.logFailure
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import org.springframework.stereotype.Service
 
 /**
@@ -25,15 +27,18 @@ class RagasEvaluationService(
 
     private val log = KotlinLogging.logger {}
 
+    /** The Ragas scores of one test case; [warning] says why there are none when scoring was attempted and failed. */
+    data class RagScore(val metrics: RagMetrics?, val warning: String? = null)
+
     suspend fun scoreTestCase(
         analysisResponse: AnalysisResponse,
         bpmnElements: Set<BpmnElement>,
         includeElementIds: Set<String>? = null
-    ): RagMetrics? {
+    ): RagScore {
         // Use the exact deduplicated pool the analyzer's prompt was built from, so Faithfulness
         // measures grounding against what the LLM actually saw (not the per-element display view).
-        val promptContexts = analysisResponse.ragPromptContext ?: return null
-        if (promptContexts.isEmpty()) return null
+        val promptContexts = analysisResponse.ragPromptContext ?: return RagScore(null)
+        if (promptContexts.isEmpty()) return RagScore(null)
 
         val elementsById = bpmnElements.associateBy { it.id }
         val criticalById = analysisResponse.criticalElements.associateBy { it.id }
@@ -55,7 +60,7 @@ class RagasEvaluationService(
 
         if (samples.isEmpty()) {
             log.info { "No scorable RAG samples for this test case (no critical elements with both context and explanation)." }
-            return null
+            return RagScore(null)
         }
 
         log.debug { "Scoring ${samples.size} Ragas sample(s) against ${promptContexts.size} prompt context(s)" }
@@ -67,15 +72,19 @@ class RagasEvaluationService(
                     metrics = listOf("faithfulness", "context_utilization")
                 )
             )
-            RagMetrics(
-                faithfulness = response.aggregate.faithfulnessMean,
-                contextUtilization = response.aggregate.contextUtilizationMean,
-                sampleCount = response.aggregate.sampleCount,
-                failedCount = response.aggregate.failedCount
+            RagScore(
+                RagMetrics(
+                    faithfulness = response.aggregate.faithfulnessMean,
+                    contextUtilization = response.aggregate.contextUtilizationMean,
+                    sampleCount = response.aggregate.sampleCount,
+                    failedCount = response.aggregate.failedCount
+                )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            log.warn(e) { "Ragas evaluation failed; classification metrics are unaffected." }
-            null
+            val failure = log.logFailure("Ragas scoring", e, mapOf("samples" to samples.size))
+            RagScore(null, "RAG quality metrics could not be computed (${failure.message.trimEnd('.')}). The classification metrics are not affected.")
         }
     }
 

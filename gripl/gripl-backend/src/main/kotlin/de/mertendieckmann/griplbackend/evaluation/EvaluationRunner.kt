@@ -236,16 +236,20 @@ private suspend fun evaluateEntryOrFailFast(
         }
     }
 
+    val warnings = actualResult.analysisResponse.warnings.toMutableList()
+
     val ragMetrics: RagMetrics? =
         if (
             evaluationRequest.evaluateRag &&
             actualActivityIds.isNotEmpty()
         ) {
-            ragasEvaluationService.scoreTestCase(
+            val score = ragasEvaluationService.scoreTestCase(
                 actualResult.analysisResponse,
                 bpmnElements,
                 scopeIds
             )
+            score.warning?.let { warnings.add(it) }
+            score.metrics
         } else {
             if (
                 evaluationRequest.evaluateRag &&
@@ -385,7 +389,8 @@ private suspend fun evaluateEntryOrFailFast(
         amountOfRetries = amountOfRetries,
         ragMetrics = ragMetrics,
         ragPromptContext = actualResult.analysisResponse.ragPromptContext,
-        perElementType = perElementType
+        perElementType = perElementType,
+        warnings = warnings
     )
 
     return EvaluationOutcome.Success(

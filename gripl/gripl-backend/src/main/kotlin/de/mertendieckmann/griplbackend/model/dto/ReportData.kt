@@ -76,10 +76,13 @@ data class TestCaseReport(
     val ragMetrics: RagMetrics? = null,
     val ragPromptContext: List<String>? = null,
     /** Confusion counts of this test case broken down by element category. */
-    val perElementType: Map<String, ElementTypeCounts> = emptyMap()
+    val perElementType: Map<String, ElementTypeCounts> = emptyMap(),
+    /** Things the user should know about this test case, e.g. that the knowledge graph was not available for it. */
+    val warnings: List<String> = emptyList()
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
+        val warningBlock = if (warnings.isEmpty()) "" else "\n" + warnings.joinToString("\n") { "> ⚠️ $it" } + "\n"
         val ragBlock = ragMetrics?.let {
             """
             |
@@ -92,6 +95,7 @@ data class TestCaseReport(
 
         return """
             |## Test Case $testCaseId${if (testCaseName != null) " - $testCaseName" else ""}
+            |$warningBlock
             |<img src="$imageSrc" alt="Test Case BPMN XML" />
             |
             |- Amount of Correct Activities: ${correctActivityIds.size}

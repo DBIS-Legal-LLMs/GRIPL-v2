@@ -46,9 +46,10 @@ class PromptBpmnAnalyzer(
         if (useRag) {
             // RAG-augmented path
             val bpmnAnalysisAiServiceWithRag = PromptBpmnAnalysisAiServiceFactory.create(llm, memoryProvider, basePrompt)
-            val ragContextMap = ragAugmenter.fetchRagContext(
+            val ragFetch = ragAugmenter.fetchRagContext(
                 bpmnElements, ragMode, maxConcurrency = ragApiProperties.maxConcurrency, activitiesOnly = activitiesOnly
             )
+            val ragContextMap = ragFetch.context
 
             val pool = ragAugmenter.buildDedupedPool(ragContextMap)
 
@@ -69,7 +70,7 @@ class PromptBpmnAnalyzer(
             log.info { "BPMN Analysis Result (with RAG): $analysisResult" }
 
             return AnalysisResponse.fromBpmnAnalysisResult(
-                analysisResult, bpmnElements, amountOfRetries, ragContext, pool.flatten()
+                analysisResult, bpmnElements, amountOfRetries, ragContext, pool.flatten(), ragFetch.warnings
             )
         } else {
             // Original path — unchanged from evaluation baseline
