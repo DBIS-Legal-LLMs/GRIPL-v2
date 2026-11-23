@@ -181,6 +181,7 @@ class HttpEvaluator(
         bodyBuilder.part("useRag", evaluationRequest.useRag.toString())
         bodyBuilder.part("ragMode", evaluationRequest.ragMode.toString())
         bodyBuilder.part("activitiesOnly", evaluationRequest.activitiesOnly.toString())
+        bodyBuilder.part("useSQLLM", evaluationRequest.useSQLLM.toString())
 
         try {
             return withTimeout(EVALUATION_CALL_TIMEOUT) {
