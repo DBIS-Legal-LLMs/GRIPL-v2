@@ -27,15 +27,42 @@ export function decodeGriplRole(token: string): string | null {
     }
 }
 
-/** True if the token is malformed or its `exp` claim has passed (30s of
- * clock-skew slack, matching gripl-backend). auth-service access tokens last
- * ~15 min with no refresh flow yet, while the cookie holding one lives 30 days
- * — without this the UI keeps looking logged in and every request 401s. */
-export function isTokenExpired(token: string): boolean {
+function tokenPayload(token: string): { exp?: unknown; iat?: unknown } | null {
     try {
-        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-        return typeof payload.exp !== "number" || payload.exp * 1000 < Date.now() - 30_000;
+        return JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
     } catch {
-        return true;
+        return null;
     }
+}
+
+/** The token's `exp` claim in seconds since the epoch, or null if the token is malformed. */
+export function tokenExpiry(token: string): number | null {
+    const exp = tokenPayload(token)?.exp;
+    return typeof exp === "number" ? exp : null;
+}
+
+/** Milliseconds until a token should be renewed: a minute before it expires, or sooner for tokens that live less
+ * than four minutes (a quarter of the lifetime), but never within 5 seconds. null if the token has no expiry. */
+export function msUntilRefresh(token: string): number | null {
+    const payload = tokenPayload(token);
+    if (typeof payload?.exp !== "number") return null;
+    const lifetime = typeof payload.iat === "number" ? payload.exp - payload.iat : 900;
+    const lead = Math.min(60, lifetime / 4);
+    return Math.max((payload.exp - lead) * 1000 - Date.now(), 5_000);
+}
+
+/** True if the token is malformed or its `exp` claim has passed (30s of
+ * clock-skew slack, matching gripl-backend). The cookie holding the token lives
+ * as long as the session, so without this check the UI keeps looking logged in
+ * after the access token has expired and every request 401s; the refresh token
+ * (session.ts) is what replaces it. */
+export function isTokenExpired(token: string): boolean {
+    const exp = tokenExpiry(token);
+    return exp === null || exp * 1000 < Date.now() - 30_000;
+}
+
+/** True if the token is missing its expiry or expires within [seconds]; the time to refresh it up front. */
+export function tokenExpiresWithin(token: string, seconds: number): boolean {
+    const exp = tokenExpiry(token);
+    return exp === null || exp * 1000 < Date.now() + seconds * 1000;
 }

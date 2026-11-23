@@ -19,8 +19,8 @@ Only after the version has been tested on dev and approved.
    - points `:prod` at them (no rebuild),
    - marks that GitHub Release as the normal, **Latest** release, and clears the pre-release flag of every older version,
    - warns if there are commits after the tag that are **not** in the images (`chore:`, `docs:`, non-conventional ones).
-5. The prod timer on the server pulls `:prod` within a few minutes and restarts what changed, after taking a backup
-   ([server-operations.md](server-operations.md)).
+5. The prod timers on the server pull `:prod` at the next scheduled run (nightly at 03:00) and restart what changed, after taking a
+   backup. To have the version live right away, run the updater by hand ([server-operations.md](server-operations.md), "Update now, by hand").
 
 Implemented in: `.github/workflows/promote.yml`.
 
@@ -40,13 +40,31 @@ for i in gripl-frontend gripl-backend gripl-rag; do docker buildx imagetools ins
 (`:prod` is a one-entry index that wraps the image, so its own `Digest:` differs; ignore it.) In the app, the sidebar footer
 on prod shows `prod-vX.Y.Z`.
 
+## Promote a specific version (not the newest)
+
+Use this to put an older version on prod (a rollback), or a version that is not the newest release. GitHub -> Actions -> **Promote** ->
+*Run workflow*, branch `main`, enter the version, e.g. `1.5.0`. It points `:prod` at that version's images without a rebuild, marks that
+release **Latest**, and clears the pre-release flag of every *older* release; newer releases stay pre-releases. The commit warning in
+the run is expected. The prod timers pull `:prod` at the nightly run (03:00); to have it live at once, run the updater by hand
+([server-operations.md](server-operations.md), "Update now, by hand").
+
+Two things to know before choosing a version:
+
+- **Prod's compose definition follows `main`, not the version.** The updater takes the stack's compose file from the `main` branch and the
+  images from `:prod`. A version newer than what `main` last received may need settings that `main`'s compose file does not have yet; this
+  is what broke saving the OpenRouter key on prod on 2026-11-18 ([troubleshooting.md](troubleshooting.md)). So for such a version, first
+  merge `dev` into `main` as described above, then run the workflow with the version you want. The merge itself runs `Promote` for the newest
+  release (or fails and changes nothing if a release is still being built), so until your manual run finishes `:prod` points at that newest
+  release; if the nightly run falls in between, prod takes it. Start the manual run right after the merge.
+- **Migrations only go forward.** Flyway applies the migrations up to the promoted version; later ones are applied when a newer version is
+  promoted. Going back to a version older than a migration that already ran is a rollback, see below.
+
 ## Roll prod back
 
 Two ways, use the first one if the schema did not change.
 
-**A. Promote an older version (no server access needed).** GitHub -> Actions -> **Promote** -> *Run workflow*, branch `main`,
-enter the version, e.g. `1.3.0`. It points `:prod` at that version again, and the timer pulls it. The commit warning in
-the run is expected here.
+**A. Promote an older version (no server access needed).** Run the workflow with that version, see
+[Promote a specific version](#promote-a-specific-version-not-the-newest).
 
 **B. Pin a version on the server.** In `/srv/gripl/prod/gripl/.env` set `IMAGE_TAG=1.3.0` (the file ships with
 `IMAGE_TAG=prod`), then:

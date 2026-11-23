@@ -18,8 +18,13 @@ Registering the users again on prod would give them new ids and orphan their dat
   new as dev's database schema, otherwise it refuses the copied database.
 - [ ] Both prod stacks (`/srv/gripl/prod/auth`, `/srv/gripl/prod/gripl`) have their `.env`/`rag.env` with **their own** secrets, and for `--with-rag` the
   same `NEO4J_PASSWORD` as dev.
-- [ ] Pull the prod images beforehand, one stack after the other (the RAG image is several GB):
-  `cd /srv/gripl/prod/auth && docker compose pull` and `cd /srv/gripl/prod/gripl && docker compose pull`.
+- [ ] Bring both prod checkouts up to date and pull the prod images, one stack after the other (the RAG image is several GB). The
+  compose file of a stack comes from its `repo/` checkout, which only the updater refreshes, and the prod updater is still off, so
+  the checkout can be months old and miss settings the current images need:
+  ```bash
+  cd /srv/gripl/prod/auth && git -C repo fetch --quiet --depth 1 origin main && git -C repo reset --quiet --hard FETCH_HEAD && docker compose pull
+  cd /srv/gripl/prod/gripl && git -C repo fetch --quiet --depth 1 origin main && git -C repo reset --quiet --hard FETCH_HEAD && docker compose pull
+  ```
 - [ ] The prod updater timers are still **off** until the move is done ([server-operations.md](server-operations.md)).
 - [ ] The users know the time; **nothing written on dev after the start is carried over.**
 

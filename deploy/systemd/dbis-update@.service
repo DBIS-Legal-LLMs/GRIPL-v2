@@ -8,6 +8,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
+# the account that owns /srv/gripl and may use Docker; set it when installing the unit
 User=deploy
 ExecStart=/srv/gripl/bin/update-stack.sh %f
 # a stuck registry or health check must not pile up runs

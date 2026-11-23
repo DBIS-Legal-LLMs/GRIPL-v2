@@ -11,7 +11,7 @@ cd /srv/gripl/<env>/auth        # <env> = dev or prod
 
 - Every application registered in auth-service has its own roles. GRIPL has `admin`, `dpo`, `researcher`, `user`.
 - Someone without an explicit role gets the application's default role (`user`). A **superuser** is `admin` in every application.
-- The role is written into the token at login. After a role change the person has to **log out and in again**.
+- The role is written into the access token, which the browser renews in the background (see below). A role change therefore reaches a person within one token lifetime (15 minutes by default), or at once when GRIPL refuses a call because of the role; nobody has to log out and in.
 - In GRIPL, `admin` and `researcher` see everything, including *Labeling* and *Evaluation*. `dpo` and `user` only see *Process Analysis*
   and *Custom Endpoints*.
 
@@ -94,11 +94,13 @@ Implemented in: `app/core/secrets.py`, `app/services/user_service.py` (auth-serv
 In `/srv/gripl/<env>/auth/.env`:
 
 ```
-ACCESS_TOKEN_EXPIRE_MINUTES=480     # default 15
+ACCESS_TOKEN_EXPIRE_MINUTES=15     # default; the value is also how long a role change can take to arrive
+REFRESH_TOKEN_EXPIRE_DAYS=30       # default
 ```
 
-When a token expires the user logs in again (there are no refresh tokens yet, auth-service#13). Apply the change (only auth-service
-restarts; existing tokens keep their old expiry):
+The access token is short-lived and GRIPL swaps it for a new one in the background with a refresh token, so users stay logged in; they
+log in again `REFRESH_TOKEN_EXPIRE_DAYS` after their login, or after logging out. Apply a change (only auth-service restarts; existing
+tokens keep their old expiry):
 
 ```bash
 docker compose up -d

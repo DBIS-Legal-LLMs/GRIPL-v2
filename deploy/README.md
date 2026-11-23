@@ -33,7 +33,7 @@ and **dev** (branch `dev`).
   prod container can never talk to a dev one.
 * **Only Traefik publishes ports.** Databases and the RAG service sit on a private
   network of their own stack. To look into a database use `docker compose exec` as
-  the `deploy` user.
+  the stack user.
 * **Only the frontend is routed publicly.** The browser talks to the Next.js
   frontend, which proxies `/api` to the backend and `/auth` to auth-service inside
   the environment network. auth-service has no public address of its own unless
@@ -96,23 +96,19 @@ echo "deb [signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/l
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# 2. a service user that runs the stacks (membership in `docker` is root-equivalent,
-#    so only this user gets it)
-sudo useradd --create-home --shell /bin/bash deploy
-sudo usermod -aG docker deploy
+# 2. the account that maintains the stacks (the stack user) is added to `docker`
+#    (membership is root-equivalent; there is no separate service account)
+sudo usermod -aG docker "$USER"
 
-# 3. /srv/gripl already exists (group project-gripl, setgid, group-writable).
-#    `project-gripl` is a central (sssd) group, so `deploy` cannot be added with
-#    usermod; give it access with an ACL instead:
-sudo setfacl -R  -m u:deploy:rwx /srv/gripl
-sudo setfacl -Rd -m u:deploy:rwx /srv/gripl
+# 3. /srv/gripl already exists (group project-gripl, setgid, group-writable); the stack
+#    user must be in that central (sssd) group, which the university admins manage
 
 # 4. optional but recommended: swap, because prod + dev share 11 GB of RAM
 sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ```
 
-Then, as `deploy` (`sudo -iu deploy`):
+Then, as the stack user (log in again so the `docker` group applies):
 
 ```bash
 cd /srv/gripl
@@ -188,6 +184,7 @@ Enable the timers (root, once per stack):
 
 ```bash
 sudo cp /srv/gripl/traefik/repo/deploy/systemd/dbis-update@.* /etc/systemd/system/
+sudo sed -i "s/^User=deploy/User=$USER/" /etc/systemd/system/dbis-update@.service   # the stack user
 sudo systemctl daemon-reload
 for s in prod/auth dev/auth prod/gripl dev/gripl; do
   sudo systemctl enable --now "dbis-update@$(systemd-escape --path /srv/gripl/$s).timer"
@@ -197,7 +194,7 @@ done
 Why not Watchtower? The upstream project (`containrrr/watchtower`) was archived in
 December 2025 and its old Docker API version no longer works with Docker 29, which
 Ubuntu 26.04 ships. The updater above needs no extra container and no access to the
-Docker socket beyond the `deploy` user, and it honours compose's health checks.
+Docker socket beyond the stack user, and it honours compose's health checks.
 
 ### What CI has to produce
 
@@ -246,11 +243,12 @@ domain, Traefik serves a **self-signed certificate**
 (`traefik/make-selfsigned-cert.sh`), valid for `*.134.60.71.167.nip.io` and the IP.
 The connection is encrypted, but browsers warn on every new visit. Two ways around
 the warning for the people who work with it regularly: install `traefik/certs/ca.crt`
-as a trusted CA on their machine (it is a small private CA created by the script;
-keep `ca.key` on the server), or accept the warning.
+as a trusted CA on their machine (it is a small private CA created by the script,
+limited by X.509 name constraints to this server's names, so trusting it does not
+make any other website trusted; keep `ca.key` on the server), or accept the warning.
 
-Rotating the certificate (before it expires after 13 months): run the script again.
-It keeps the CA, so installed copies stay valid.
+The certificate is valid for 397 days; how to check and renew it is in
+[`docs/server-operations.md`](../docs/server-operations.md#renew-the-https-certificate).
 
 ### A real certificate later
 
@@ -294,7 +292,8 @@ Known gaps (application level, not solved by this folder):
 * A registered user with the default role can run analyses with RAG, which uses the
   project's LLM key. Decide whether registration should stay open on prod, and set a
   spending limit on the OpenRouter key either way.
-* The login cookie (`gripl_token`) is readable by JavaScript and has no `Secure` flag.
+* The access-token cookie (`gripl_token`) is readable by JavaScript, because the app attaches it to its requests; the refresh-token
+  cookie (`gripl_refresh`) is `HttpOnly`. Both are `Secure` when the request reached the frontend over HTTPS (Traefik's forwarded protocol).
 * Rate limits count per client IP, so many users behind one university NAT address
   share a budget.
 
@@ -341,7 +340,7 @@ backup first. The pull request check `Migrations` (`.github/workflows/migrations
   and restart a database whenever the registry publishes a new patch release. Bump the
   pin deliberately, preferably in dev first.
 * **Looking into a database:** nothing is published, so use
-  `docker compose exec gripl-postgres psql -U postgres gripl_db` as `deploy`.
+  `docker compose exec gripl-postgres psql -U postgres gripl_db` as the stack user.
 * **VPN and Docker subnets (your laptop, not the server).** Some university VPN clients
   claim `172.17.0.0/16` and `172.20.0.0/16`, which are Docker's default bridge ranges;
   containers on those subnets become unreachable from the host while the VPN is up. If
