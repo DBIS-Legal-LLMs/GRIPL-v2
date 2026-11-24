@@ -1,8 +1,10 @@
 package de.mertendieckmann.griplbackend.model.dto
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import de.mertendieckmann.griplbackend.model.evaluation.ElementTypeCounts
+import de.mertendieckmann.griplbackend.model.evaluation.EvaluationMetrics
 import de.mertendieckmann.griplbackend.model.evaluation.RagMetrics
 import java.sql.Timestamp
 import de.mertendieckmann.griplbackend.model.analysis.GdprProcessingClass
@@ -74,7 +76,13 @@ data class TestCaseReport(
     val ragMetrics: RagMetrics? = null,
     val ragPromptContext: List<String>? = null,
     /** Confusion counts of this test case broken down by element category. */
-    val perElementType: Map<String, ElementTypeCounts> = emptyMap()
+    val perElementType: Map<String, ElementTypeCounts> = emptyMap(),
+    /**
+     * The metrics this test case added to the summary. Not part of the JSON report; evaluation
+     * jobs store it separately so a resumed run can rebuild the summary over all test cases.
+     */
+    @get:JsonIgnore
+    val metrics: EvaluationMetrics? = null
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {

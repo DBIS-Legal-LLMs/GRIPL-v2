@@ -4,6 +4,8 @@ import de.mertendieckmann.griplbackend.model.dto.EvaluationMetadataReport
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRequest
 import de.mertendieckmann.griplbackend.model.dto.ModelReportEnvelope
 import de.mertendieckmann.griplbackend.model.dto.MultiEvaluationRequest
+import de.mertendieckmann.griplbackend.model.dto.ResumeState
+import de.mertendieckmann.griplbackend.model.dto.RunModelKey
 import de.mertendieckmann.griplbackend.repository.DatasetRepository
 import de.mertendieckmann.griplbackend.repository.EvaluationDataRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -21,17 +23,33 @@ class MultiEvaluationRunner(
 ) {
     private val log = KotlinLogging.logger {}
 
-    fun runAll(request: MultiEvaluationRequest, ownerUserId: String): Flow<ModelReportEnvelope> = flow {
+    /**
+     * [resume] continues a run that was stopped: no metadata event is emitted (it was stored the first
+     * time), finished model/repetition pairs are skipped, and the others skip their finished test cases.
+     * Resuming only gives the same seeds per repetition if [MultiEvaluationRequest.seed] is set.
+     */
+    fun runAll(
+        request: MultiEvaluationRequest,
+        ownerUserId: String,
+        resume: Map<RunModelKey, ResumeState>? = null
+    ): Flow<ModelReportEnvelope> = flow {
         require(request.models.isNotEmpty()) { "models must not be empty" }
 
-        val baseSeed = request.seed ?: (System.currentTimeMillis() * (Math.random() * 10) % Int.MAX_VALUE).toInt()
+        val baseSeed = request.seed ?: randomSeed()
         val repetitions = request.repetitions.coerceAtLeast(1)
-        emit(ModelReportEnvelope("", createMetadata(request, baseSeed, repetitions, ownerUserId), 1))
+        if (resume == null) {
+            emit(ModelReportEnvelope("", createMetadata(request, baseSeed, repetitions, ownerUserId), 1))
+        }
 
         for (runNumber in 1..repetitions) {
             log.info { "Starting evaluation run $runNumber/$repetitions" }
 
             for ((index, model) in request.models.withIndex()) {
+                val resumeState = resume?.get(RunModelKey(runNumber, model.label))
+                if (resumeState?.finished == true) {
+                    log.info { "Run $runNumber - Skipping finished model '${model.label}'" }
+                    continue
+                }
                 val effectiveEndpoint = model.evaluationEndpoint ?: request.defaultEvaluationEndpoint
                 log.info { "Run $runNumber - Starting model ${index + 1}/${request.models.size}: '${model.label}' @ $effectiveEndpoint" }
 
@@ -49,7 +67,7 @@ class MultiEvaluationRunner(
                     activitiesOnly = request.activitiesOnly
                 )
 
-                singleRunner.run(singleRequest, ownerUserId)
+                singleRunner.run(singleRequest, ownerUserId, resumeState)
                     .map { event -> ModelReportEnvelope(model.label, event, runNumber) }
                     .collect { wrapped -> emit(wrapped) }
 
@@ -82,6 +100,10 @@ class MultiEvaluationRunner(
             totalRepetitions = repetitions,
             activitiesOnly = request.activitiesOnly
         )
+    }
+
+    companion object {
+        fun randomSeed(): Int = (System.currentTimeMillis() * (Math.random() * 10) % Int.MAX_VALUE).toInt()
     }
 
     /**

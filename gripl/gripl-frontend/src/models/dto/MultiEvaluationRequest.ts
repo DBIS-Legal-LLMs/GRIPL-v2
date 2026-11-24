@@ -11,6 +11,8 @@ export interface MultiEvaluationRequest {
     ragMode: string;
     evaluateRag: boolean;
     activitiesOnly: boolean;
+    /** Optional name of the run (experiment); used for the file names of the reports. */
+    name?: string;
 }
 
 export interface ModelRunConfig {

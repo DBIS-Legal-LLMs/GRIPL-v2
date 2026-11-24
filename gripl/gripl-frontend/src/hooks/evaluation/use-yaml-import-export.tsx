@@ -7,12 +7,14 @@ import {AnalysisEndpoint, ModelRowState} from "@/models/evaluation/Config";
 import {cryptoRandomId, findPreset, normalize, pruneNulls} from "@/lib/evaluation-config-utils";
 import {useToast} from "@/components/ui/toast";
 import {toErrorMessage} from "@/lib/http-error";
+import {safeFileName} from "@/lib/evaluation-report";
 
 export function useYamlImportExport(props: {
     availableEvaluationEndpoints: AnalysisEndpoint[];
     effectiveDefaultEndpoint: string;
     models: ModelRowState[];
     selectedDatasets: number[];
+    experimentName: string;
     seed: number | null;
     maxConcurrent: number;
     repetitions: number;
@@ -23,6 +25,7 @@ export function useYamlImportExport(props: {
     setDefaultEndpointChoice: (v: "preset" | "custom") => void;
     setDefaultPresetEndpoint: (v: string) => void;
     setDefaultCustomEndpoint: (v: string) => void;
+    setExperimentName: (v: string) => void;
     setSeed: (v: number) => void;
     setMaxConcurrent: (v: number) => void;
     setRepetitions: (v: number) => void;
@@ -38,6 +41,7 @@ export function useYamlImportExport(props: {
         effectiveDefaultEndpoint,
         models,
         selectedDatasets,
+        experimentName,
         seed,
         maxConcurrent,
         repetitions,
@@ -48,6 +52,7 @@ export function useYamlImportExport(props: {
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
         setDefaultCustomEndpoint,
+        setExperimentName,
         setSeed,
         setMaxConcurrent,
         setRepetitions,
@@ -90,6 +95,10 @@ export function useYamlImportExport(props: {
         const datasets: number[] = Array.isArray(cfg?.datasets) ? cfg.datasets.map((d: any) => parseInt(d)) : [];
 
         setSelectedDatasets(datasets);
+
+        if (typeof cfg?.name === "string" || typeof cfg?.name === "number") {
+            setExperimentName(String(cfg.name).trim());
+        }
 
         if (defaultEvaluationEndpoint) {
             const presetHit = findPreset(defaultEvaluationEndpoint, availableEvaluationEndpoints);
@@ -192,6 +201,8 @@ export function useYamlImportExport(props: {
         });
 
         return {
+            // First, so the name is at the top of the YAML file.
+            name: experimentName.trim() || undefined,
             defaultEvaluationEndpoint: effectiveDefaultEndpoint,
             seed: seed || undefined,
             maxConcurrent: maxConcurrent || 1,
@@ -214,7 +225,7 @@ export function useYamlImportExport(props: {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `evaluation-config.yaml`;
+        a.download = `${safeFileName(experimentName) || "evaluation-config"}.yaml`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

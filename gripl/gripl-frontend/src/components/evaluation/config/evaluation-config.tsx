@@ -1,6 +1,8 @@
 "use client";
 
-import React, { JSX } from "react";
+import React, { JSX, useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {Dataset} from "@/models/dto/Dataset";
 import {MultiEvaluationRequest} from "@/models/dto/MultiEvaluationRequest";
 import {useEvaluationConfig} from "@/hooks/evaluation/use-evaluation-config";
@@ -10,6 +12,8 @@ import EvaluationConfigDefaultSettings from "@/components/evaluation/config/eval
 import EvaluationConfigDatasetSettings from "@/components/evaluation/config/evaluation-config-dataset-settings";
 import EvaluationConfigModelsSettings from "@/components/evaluation/config/evaluation-config-models-settings";
 import {nextLabel} from "@/lib/evaluation-config-utils";
+
+const CONFIG_OPEN_KEY = "gripl.evaluation.configOpen";
 
 interface EvaluationConfigCardMultiProps {
     className?: string;
@@ -26,6 +30,7 @@ export default function EvaluationConfig({ className, children, datasets, onMult
         effectiveDefaultEndpoint: config.effectiveDefaultEndpoint,
         models: config.models,
         selectedDatasets: config.selectedDatasets,
+        experimentName: config.experimentName,
         seed: config.seed,
         maxConcurrent: config.maxConcurrent,
         repetitions: config.repetitions,
@@ -36,6 +41,7 @@ export default function EvaluationConfig({ className, children, datasets, onMult
         setDefaultEndpointChoice: (v) => config.setDefaultEndpointChoice(v),
         setDefaultPresetEndpoint: config.setDefaultPresetEndpoint,
         setDefaultCustomEndpoint: config.setDefaultCustomEndpoint,
+        setExperimentName: config.setExperimentName,
         setSeed: config.setSeed,
         setMaxConcurrent: config.setMaxConcurrent,
         setRepetitions: config.setRepetitions,
@@ -47,15 +53,34 @@ export default function EvaluationConfig({ className, children, datasets, onMult
         setActivitiesOnly: config.setActivitiesOnly,
     });
 
+    // Remembered across visits, so someone who only looks at results keeps the settings out of the way.
+    const [isOpen, setIsOpen] = useState(true);
+    useEffect(() => {
+        if (localStorage.getItem(CONFIG_OPEN_KEY) === "false") setIsOpen(false);
+    }, []);
+    const toggleOpen = (open: boolean) => {
+        setIsOpen(open);
+        localStorage.setItem(CONFIG_OPEN_KEY, String(open));
+    };
+
     return (
+        <Collapsible open={isOpen} onOpenChange={toggleOpen}>
         <div className={`bg-background dark ${className ?? ""}`}>
             <div className="border-b border-border bg-card">
                 <div className="container mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold text-card-foreground">Evaluation Config</h1>
-                            <p className="text-sm text-muted-foreground mt-1">Multiple Models</p>
-                        </div>
+                        <CollapsibleTrigger asChild>
+                            <button type="button" className="flex items-center gap-3 text-left group"
+                                    aria-label={isOpen ? "Collapse the evaluation settings" : "Expand the evaluation settings"}>
+                                <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${isOpen ? "" : "-rotate-90"}`}/>
+                                <div>
+                                    <h1 className="text-2xl font-bold text-card-foreground group-hover:underline">Evaluation Config</h1>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {isOpen ? "Settings, datasets and models" : `${config.models.length} model(s), ${config.selectedDatasets.length} dataset(s) selected. Click to show the settings.`}
+                                    </p>
+                                </div>
+                            </button>
+                        </CollapsibleTrigger>
                         <EvaluationConfigHeader
                             fileInputRef={fileInputRef}
                             onFileChange={onFileChange}
@@ -66,13 +91,16 @@ export default function EvaluationConfig({ className, children, datasets, onMult
                 </div>
             </div>
 
-            <div className="container mx-auto px-6 py-8 space-y-8">
+            <div className={`container mx-auto px-6 space-y-8 ${isOpen ? "py-8" : "pt-4 pb-2"}`}>
+                <CollapsibleContent className="space-y-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <EvaluationConfigDefaultSettings
                         availableEvaluationEndpoints={config.availableEvaluationEndpoints}
                         defaultEndpointChoice={config.defaultEndpointChoice}
                         defaultPresetEndpoint={config.defaultPresetEndpoint}
                         defaultCustomEndpoint={config.defaultCustomEndpoint}
+                        experimentName={config.experimentName}
+                        setExperimentName={config.setExperimentName}
                         seed={config.seed}
                         maxConcurrent={config.maxConcurrent}
                         repetitions={config.repetitions}
@@ -110,9 +138,11 @@ export default function EvaluationConfig({ className, children, datasets, onMult
                     duplicateModel={(id) => config.duplicateModel(id, nextLabel)}
                     removeModel={config.removeModel}
                 />
+                </CollapsibleContent>
 
                 {children}
             </div>
         </div>
+        </Collapsible>
     );
 }

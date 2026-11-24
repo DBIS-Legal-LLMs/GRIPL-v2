@@ -1,7 +1,7 @@
 "use client";
 
 import {Button} from "@/components/ui/button";
-import React, {useMemo, useState} from "react";
+import React, {useEffect, useMemo, useState} from "react";
 import {
     EvaluationReportError,
     EvaluationReportSummary,
@@ -18,14 +18,17 @@ import {Card, CardContent, CardDescription, CardHeader} from "@/components/ui/ca
 import EvaluationConfig from "@/components/evaluation/config/evaluation-config";
 import {Dataset} from "@/models/dto/Dataset";
 import {ChevronDown, FileText, Play} from "lucide-react";
+import EvaluationRunList from "@/components/evaluation/evaluation-run-list";
+import {isResumableRun} from "@/models/dto/EvaluationRun";
 import TestcaseResultsStacked from "@/components/evaluation/charts/aggregated/testcase-results-stacked";
 import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluationResult";
 import MetricChart from "@/components/evaluation/charts/aggregated/metric-chart";
-import {ColorProvider, useColors} from "@/components/evaluation/charts/common/color-context";
+import {useColors} from "@/components/evaluation/charts/common/color-context";
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
 import {useToast} from "@/components/ui/toast";
 import {useEvaluationJob} from "@/components/providers/evaluation-job-provider";
 import {toErrorMessage} from "@/lib/http-error";
+import {computeAggregateStats, isMulticlassMetadata} from "@/lib/evaluation-report";
 import {
     applyClassSelectionToSummary,
     ALL_CLASSES_FILTER,
@@ -54,8 +57,9 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
         currentStepInfos,
         errorsByRun, setErrorsByRun,
         isLoading,
-        isFinished, setIsFinished,
+        setIsFinished,
         startEvaluation,
+        run, resumeEvaluation, detachRun, attachToActiveRun,
     } = useEvaluationJob();
 
     const [selectedRun, setSelectedRun] = useState<number>(1);
@@ -63,10 +67,15 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const [selectedDataset, setSelectedDataset] = useState<string | undefined>(undefined);
     const [selectedClasses, setSelectedClasses] = useState<string[]>([ALL_CLASSES_FILTER]);
 
+    // The provider attaches on its own mount, which can be before the user logged in.
+    useEffect(() => {
+        void attachToActiveRun();
+    }, [attachToActiveRun]);
+
     const [isMetricsSummaryOpen, setIsMetricsSummaryOpen] = useState<boolean>(false);
 
     const { colors, setColors } = useColors()
-    const { showToast, showError } = useToast()
+    const { showError } = useToast()
 
     // Resetting the run/job state itself lives in the provider (so it survives
     // navigation); resetting which run tab is selected is page-local view state.
@@ -75,11 +84,10 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
         await startEvaluation();
     };
 
-    const isMulticlassEvaluation = useMemo(() => {
-        const endpoint = evaluationRequest?.defaultEvaluationEndpoint
-            ?? metadata?.defaultEvaluationEndpoint;
-        return endpoint?.includes("multiclass") === true;
-    }, [evaluationRequest, metadata]);
+    const isMulticlassEvaluation = useMemo(
+        () => isMulticlassMetadata(metadata, evaluationRequest?.defaultEvaluationEndpoint),
+        [evaluationRequest, metadata]
+    );
 
     const showExactMatchMetric = isMulticlassEvaluation && isAllClassesSelected(selectedClasses);
     const showClassSpecificMetrics = isMulticlassEvaluation && !isAllClassesSelected(selectedClasses);
@@ -124,216 +132,10 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
             .map((id) => ({ id, name: nameById.get(id) ?? `Dataset ${id}` }));
     }, [testCases, errors, metadata, datasets]);
 
-    const aggregateStats = useMemo<AggregatedEvaluationResults | null>(() => {
-        if (summaryByRun.size === 0 || !metadata?.modelLabels) return null;
-
-        const stats = {} as AggregatedEvaluationResults;
-
-        for (const modelLabel of metadata.modelLabels) {
-            const precisions: number[] = [];
-            const recalls: number[] = [];
-            const f1Scores: number[] = [];
-            const accuracies: number[] = [];
-            const exactMatchAccuracies: number[] = [];
-            const passedCounts: number[] = [];
-            const failedCounts: number[] = [];
-            const errorCounts: number[] = [];
-            const amountOfRetries: number[] = [];
-            const truePositives: number[] = [];
-            const falsePositives: number[] = [];
-            const falseNegatives: number[] = [];
-            const trueNegatives: number[] = [];
-            const contextUtilizations: number[] = [];
-            const faithfulnesses: number[] = [];
-            const perTypeValues = new Map<string, {
-                displayName: string;
-                precisions: number[];
-                recalls: number[];
-                f1Scores: number[];
-                tps: number[];
-                fps: number[];
-                fns: number[];
-                tns: number[];
-            }>();
-            const expectedClassifications: number[] = [];
-            const predictedClassifications: number[] = [];
-
-            for (const [runNum, runSummaries] of summaryByRun.entries()) {
-                const rawSummary = runSummaries.get(modelLabel);
-                const modelSummary = rawSummary && isMulticlassEvaluation
-                    ? applyClassSelectionToSummary(rawSummary, selectedClasses)
-                    : rawSummary;
-                if (modelSummary) {
-                    precisions.push(modelSummary.precision);
-                    recalls.push(modelSummary.recall);
-                    f1Scores.push(modelSummary.f1Score);
-                    accuracies.push(modelSummary.accuracy);
-                    exactMatchAccuracies.push(modelSummary.exactMatchAccuracy);
-                    passedCounts.push(modelSummary.passed);
-                    failedCounts.push(modelSummary.failed);
-                    errorCounts.push(modelSummary.error);
-                    if (modelSummary.amountOfRetries !== null && modelSummary.amountOfRetries !== undefined) {
-                        amountOfRetries.push(modelSummary.amountOfRetries);
-                    }
-                    truePositives.push(modelSummary.totalTruePositives);
-                    falsePositives.push(modelSummary.totalFalsePositives);
-                    falseNegatives.push(modelSummary.totalFalseNegatives);
-                    trueNegatives.push(modelSummary.totalTrueNegatives);
-                    if (modelSummary.ragMetrics?.contextUtilizationMean !== null && modelSummary.ragMetrics?.contextUtilizationMean !== undefined) {
-                        contextUtilizations.push(modelSummary.ragMetrics.contextUtilizationMean);
-                    }
-                    if (modelSummary.ragMetrics?.faithfulnessMean !== null && modelSummary.ragMetrics?.faithfulnessMean !== undefined) {
-                        faithfulnesses.push(modelSummary.ragMetrics.faithfulnessMean);
-                    }
-                    if (modelSummary.perElementType) {
-                        for (const [key, typeSummary] of Object.entries(modelSummary.perElementType)) {
-                            let bucket = perTypeValues.get(key);
-                            if (!bucket) {
-                                bucket = { displayName: typeSummary.displayName, precisions: [], recalls: [], f1Scores: [], tps: [], fps: [], fns: [], tns: [] };
-                                perTypeValues.set(key, bucket);
-                            }
-                            bucket.precisions.push(typeSummary.precision);
-                            bucket.recalls.push(typeSummary.recall);
-                            bucket.f1Scores.push(typeSummary.f1Score);
-                            bucket.tps.push(typeSummary.truePositives);
-                            bucket.fps.push(typeSummary.falsePositives);
-                            bucket.fns.push(typeSummary.falseNegatives);
-                            bucket.tns.push(typeSummary.trueNegatives);
-                        }
-                    }
-                }
-
-                const runTestCases = (testCasesByRun.get(runNum) || []).filter((testCase) => testCase.modelLabel === modelLabel);
-                if (runTestCases.length > 0) {
-                    const expectedCount = runTestCases.reduce(
-                        (sum, testCase) => sum + testCase.correctActivityIds.length + testCase.falseNegativeIds.length,
-                        0
-                    );
-                    const predictedCount = runTestCases.reduce(
-                        (sum, testCase) => sum + testCase.correctActivityIds.length + testCase.falsePositiveIds.length,
-                        0
-                    );
-
-                    expectedClassifications.push(expectedCount);
-                    predictedClassifications.push(predictedCount);
-                }
-            }
-
-            if (precisions.length > 0) {
-                const avgPrecision = precisions.reduce((a, b) => a + b, 0) / precisions.length;
-                const avgRecall = recalls.reduce((a, b) => a + b, 0) / recalls.length;
-                const avgF1Score = f1Scores.reduce((a, b) => a + b, 0) / f1Scores.length;
-                const avgAccuracy = accuracies.reduce((a, b) => a + b, 0) / accuracies.length;
-                const avgExactMatchAccuracy = exactMatchAccuracies.reduce((a, b) => a + b, 0) / exactMatchAccuracies.length;
-
-                const stdPrecision = Math.sqrt(precisions.reduce((sum, val) => sum + Math.pow(val - avgPrecision, 2), 0) / precisions.length);
-                const stdRecall = Math.sqrt(recalls.reduce((sum, val) => sum + Math.pow(val - avgRecall, 2), 0) / recalls.length);
-                const stdF1Score = Math.sqrt(f1Scores.reduce((sum, val) => sum + Math.pow(val - avgF1Score, 2), 0) / f1Scores.length);
-                const stdAccuracy = Math.sqrt(accuracies.reduce((sum, val) => sum + Math.pow(val - avgAccuracy, 2), 0) / accuracies.length);
-                const stdExactMatchAccuracy = Math.sqrt(exactMatchAccuracies.reduce((sum, val) => sum + Math.pow(val - avgExactMatchAccuracy, 2), 0) / exactMatchAccuracies.length);
-
-                const avgPassed = passedCounts.reduce((a, b) => a + b, 0) / passedCounts.length;
-                const stdPassed = Math.sqrt(passedCounts.reduce((sum, val) => sum + Math.pow(val - avgPassed, 2), 0) / passedCounts.length);
-                const avgFailed = failedCounts.reduce((a, b) => a + b, 0) / failedCounts.length;
-                const stdFailed = Math.sqrt(failedCounts.reduce((sum, val) => sum + Math.pow(val - avgFailed, 2), 0) / failedCounts.length);
-                const avgErrors = errorCounts.reduce((a, b) => a + b, 0) / errorCounts.length;
-                const stdErrors = Math.sqrt(errorCounts.reduce((sum, val) => sum + Math.pow(val - avgErrors, 2), 0) / errorCounts.length);
-
-                const avgAmountOfRetries = amountOfRetries.length > 0 ? amountOfRetries.reduce((a, b) => a + b, 0) / amountOfRetries.length : undefined;
-                const stdAmountOfRetries = amountOfRetries.length > 0 ? Math.sqrt(amountOfRetries.reduce((sum, val) => sum + Math.pow(val - (avgAmountOfRetries || 0), 2), 0) / amountOfRetries.length) : undefined;
-
-                const avgContextUtilization = contextUtilizations.length > 0 ? contextUtilizations.reduce((a, b) => a + b, 0) / contextUtilizations.length : undefined;
-                const stdContextUtilization = contextUtilizations.length > 0 ? Math.sqrt(contextUtilizations.reduce((sum, val) => sum + Math.pow(val - (avgContextUtilization || 0), 2), 0) / contextUtilizations.length) : undefined;
-                const avgFaithfulness = faithfulnesses.length > 0 ? faithfulnesses.reduce((a, b) => a + b, 0) / faithfulnesses.length : undefined;
-                const stdFaithfulness = faithfulnesses.length > 0 ? Math.sqrt(faithfulnesses.reduce((sum, val) => sum + Math.pow(val - (avgFaithfulness || 0), 2), 0) / faithfulnesses.length) : undefined;
-                const ragRunsCounted = Math.max(contextUtilizations.length, faithfulnesses.length);
-
-                const avgTruePositives = truePositives.reduce((a, b) => a + b, 0) / truePositives.length;
-                const avgFalsePositives = falsePositives.reduce((a, b) => a + b, 0) / falsePositives.length;
-                const avgFalseNegatives = falseNegatives.reduce((a, b) => a + b, 0) / falseNegatives.length;
-                const avgTrueNegatives = trueNegatives.reduce((a, b) => a + b, 0) / trueNegatives.length;
-                const stdTruePositives = Math.sqrt(truePositives.reduce((sum, val) => sum + Math.pow(val - avgTruePositives, 2), 0) / truePositives.length);
-                const stdFalsePositives = Math.sqrt(falsePositives.reduce((sum, val) => sum + Math.pow(val - avgFalsePositives, 2), 0) / falsePositives.length);
-                const stdFalseNegatives = Math.sqrt(falseNegatives.reduce((sum, val) => sum + Math.pow(val - avgFalseNegatives, 2), 0) / falseNegatives.length);
-                const stdTrueNegatives = Math.sqrt(trueNegatives.reduce((sum, val) => sum + Math.pow(val - avgTrueNegatives, 2), 0) / trueNegatives.length);
-                const avgExpectedClassifications = expectedClassifications.length > 0
-                    ? expectedClassifications.reduce((a, b) => a + b, 0) / expectedClassifications.length
-                    : 0;
-                const avgPredictedClassifications = predictedClassifications.length > 0
-                    ? predictedClassifications.reduce((a, b) => a + b, 0) / predictedClassifications.length
-                    : 0;
-                const stdExpectedClassifications = expectedClassifications.length > 0
-                    ? Math.sqrt(expectedClassifications.reduce((sum, val) => sum + Math.pow(val - avgExpectedClassifications, 2), 0) / expectedClassifications.length)
-                    : 0;
-                const stdPredictedClassifications = predictedClassifications.length > 0
-                    ? Math.sqrt(predictedClassifications.reduce((sum, val) => sum + Math.pow(val - avgPredictedClassifications, 2), 0) / predictedClassifications.length)
-                    : 0;
-
-                const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-                const std = (xs: number[]) => {
-                    const m = mean(xs);
-                    return Math.sqrt(xs.reduce((sum, val) => sum + Math.pow(val - m, 2), 0) / xs.length);
-                };
-                const perElementType = perTypeValues.size > 0
-                    ? Object.fromEntries([...perTypeValues.entries()].map(([key, v]) => [key, {
-                        displayName: v.displayName,
-                        avgPrecision: mean(v.precisions),
-                        stdPrecision: std(v.precisions),
-                        avgRecall: mean(v.recalls),
-                        stdRecall: std(v.recalls),
-                        avgF1Score: mean(v.f1Scores),
-                        stdF1Score: std(v.f1Scores),
-                        avgTruePositives: mean(v.tps),
-                        avgFalsePositives: mean(v.fps),
-                        avgFalseNegatives: mean(v.fns),
-                        avgTrueNegatives: mean(v.tns),
-                        runsCounted: v.precisions.length
-                    }]))
-                    : undefined;
-
-                stats[modelLabel] = {
-                    avgPrecision,
-                    stdPrecision,
-                    avgRecall,
-                    stdRecall,
-                    avgF1Score,
-                    stdF1Score,
-                    avgAccuracy,
-                    stdAccuracy,
-                    avgExactMatchAccuracy,
-                    stdExactMatchAccuracy,
-                    avgPassed,
-                    stdPassed,
-                    avgFailed,
-                    stdFailed,
-                    avgErrors,
-                    stdErrors,
-                    avgAmountOfRetries,
-                    stdAmountOfRetries,
-                    avgContextUtilization,
-                    stdContextUtilization,
-                    avgTruePositives,
-                    stdTruePositives,
-                    avgFalsePositives,
-                    stdFalsePositives,
-                    avgFalseNegatives,
-                    stdFalseNegatives,
-                    avgTrueNegatives,
-                    stdTrueNegatives,
-                    avgFaithfulness,
-                    stdFaithfulness,
-                    ragRunsCounted,
-                    perElementType,
-                    avgExpectedClassifications,
-                    stdExpectedClassifications,
-                    avgPredictedClassifications,
-                    stdPredictedClassifications
-                }
-            }
-        }
-
-        return stats;
-    }, [summaryByRun, metadata, isMulticlassEvaluation, selectedClasses, testCasesByRun]);
+    const aggregateStats = useMemo<AggregatedEvaluationResults | null>(
+        () => computeAggregateStats({metadata, testCasesByRun, summaryByRun, errorsByRun}, isMulticlassEvaluation, selectedClasses),
+        [summaryByRun, metadata, isMulticlassEvaluation, selectedClasses, testCasesByRun, errorsByRun]
+    );
 
     const toggleClassSelection = (className: string, checked: boolean) => {
         setSelectedClasses((previous) => {
@@ -348,140 +150,12 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
         });
     };
 
-    const handleDownloadMarkdownReport = () => {
-        const hasSummaries = summaryByRun.size > 0;
-        if (testCasesByRun.size === 0 && !hasSummaries) {
-            showToast({title: "No results yet", description: "Run an evaluation before downloading a report.", variant: "info"});
-            return;
-        }
-        const sections: string[] = [];
-
-        if (metadata) {
-            sections.push("# Evaluation Report");
-            sections.push(metadata.markdown);
-        }
-
-        if (aggregateStats && summaryByRun.size >= 1) {
-            sections.push("# Aggregate Statistics Across All Runs");
-            for (const [modelLabel, stats] of Object.entries(aggregateStats)) {
-                sections.push(`## Model: ${modelLabel}`);
-                sections.push(`- Precision: ${stats.avgPrecision.toFixed(3)} ± ${stats.stdPrecision.toFixed(3)}`);
-                sections.push(`- Recall: ${stats.avgRecall.toFixed(3)} ± ${stats.stdRecall.toFixed(3)}`);
-                sections.push(`- F1-Score: ${stats.avgF1Score.toFixed(3)} ± ${stats.stdF1Score.toFixed(3)}`);
-                if (isMulticlassEvaluation && isAllClassesSelected(selectedClasses)) {
-                    sections.push(`- Exact Match Accuracy: ${stats.avgExactMatchAccuracy.toFixed(3)} ± ${stats.stdExactMatchAccuracy.toFixed(3)}`);
-                } else if (!isMulticlassEvaluation) {
-                    sections.push(`- Accuracy: ${stats.avgAccuracy.toFixed(3)} ± ${stats.stdAccuracy.toFixed(3)}`);
-                }
-                sections.push(`- True Positives: ${stats.avgTruePositives.toFixed(3)} ± ${stats.stdTruePositives.toFixed(3)}`);
-                sections.push(`- False Positives: ${stats.avgFalsePositives.toFixed(3)} ± ${stats.stdFalsePositives.toFixed(3)}`);
-                sections.push(`- False Negatives: ${stats.avgFalseNegatives.toFixed(3)} ± ${stats.stdFalseNegatives.toFixed(3)}`);
-                sections.push(`- True Negatives: ${stats.avgTrueNegatives.toFixed(3)} ± ${stats.stdTrueNegatives.toFixed(3)}`);
-                sections.push(`- Expected Classifications: ${stats.avgExpectedClassifications.toFixed(3)} ± ${stats.stdExpectedClassifications.toFixed(3)}`);
-                sections.push(`- Predicted Classifications: ${stats.avgPredictedClassifications.toFixed(3)} ± ${stats.stdPredictedClassifications.toFixed(3)}`);
-                sections.push(`- Passed: ${stats.avgPassed.toFixed(3)} ± ${stats.stdPassed.toFixed(3)} / ${metadata?.totalTestCases}`);
-                sections.push(`- Failed: ${stats.avgFailed.toFixed(3)} ± ${stats.stdFailed.toFixed(3)} / ${metadata?.totalTestCases}`);
-                sections.push(`- Errors: ${stats.avgErrors.toFixed(3)} ± ${stats.stdErrors.toFixed(3)} / ${metadata?.totalTestCases}`);
-                if (stats.avgAmountOfRetries !== undefined && stats.stdAmountOfRetries !== undefined) {
-                    sections.push(`- Amount of Retries: ${stats.avgAmountOfRetries.toFixed(3)} ± ${stats.stdAmountOfRetries.toFixed(3)}`);
-                }
-                if (stats.ragRunsCounted > 0) {
-                    sections.push(`\n### RAG Metrics (averaged across ${stats.ragRunsCounted} run(s))`);
-                    if (stats.avgContextUtilization !== undefined && stats.stdContextUtilization !== undefined) {
-                        sections.push(`- Context Utilization: ${stats.avgContextUtilization.toFixed(3)} ± ${stats.stdContextUtilization.toFixed(3)}`);
-                    }
-                    if (stats.avgFaithfulness !== undefined && stats.stdFaithfulness !== undefined) {
-                        sections.push(`- Faithfulness: ${stats.avgFaithfulness.toFixed(3)} ± ${stats.stdFaithfulness.toFixed(3)}`);
-                    }
-                }
-                if (stats.perElementType && Object.keys(stats.perElementType).length > 0) {
-                    const rows = Object.values(stats.perElementType).map((t) =>
-                        `| ${t.displayName} | ${t.avgPrecision.toFixed(3)} ± ${t.stdPrecision.toFixed(3)} | ${t.avgRecall.toFixed(3)} ± ${t.stdRecall.toFixed(3)} | ${t.avgF1Score.toFixed(3)} ± ${t.stdF1Score.toFixed(3)} | ${t.avgTruePositives.toFixed(1)} | ${t.avgFalsePositives.toFixed(1)} | ${t.avgFalseNegatives.toFixed(1)} | ${t.avgTrueNegatives.toFixed(1)} |`
-                    );
-                    sections.push([
-                        `### Metrics by Element Type (averaged across runs)`,
-                        `| Type | Precision | Recall | F1-Score | TP | FP | FN | TN |`,
-                        `|------|-----------|--------|----------|----|----|----|----|`,
-                        ...rows
-                    ].join("\n"));
-                }
-            }
-        }
-
-        for (const [runNum, runSummaries] of summaryByRun.entries()) {
-            sections.push(`# Run ${runNum}`);
-            for (const [modelLabel, modelSummary] of runSummaries.entries()) {
-                sections.push(`## Summary (${modelLabel})`);
-                sections.push(modelSummary.markdown);
-            }
-
-            const runTestCases = testCasesByRun.get(runNum) || [];
-            const byModel = groupBy(runTestCases, (x) => x.modelLabel);
-
-            Object.keys(byModel).forEach((label) => {
-                sections.push(`## Model: ${label}`);
-                const cases = byModel[label];
-                sections.push(...cases.map((c) => c.markdown));
-            });
-        }
-
-        const blob = new Blob([sections.join("\n\n")], { type: "text/markdown" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "evaluation_report_multi.md";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    };
-
-    const handleDownloadJsonReport = () => {
-        const hasSummaries = summaryByRun.size > 0;
-        if (testCasesByRun.size === 0 && !hasSummaries) {
-            showToast({title: "No results yet", description: "Run an evaluation before downloading a report.", variant: "info"});
-            return;
-        }
-
-        // Convert Maps to serializable format
-        const testCasesByRunObj: Record<number, any[]> = {};
-        for (const [runNum, cases] of testCasesByRun.entries()) {
-            testCasesByRunObj[runNum] = cases;
-        }
-
-        const summariesByRunObj: Record<number, any[]> = {};
-        for (const [runNum, runSummaries] of summaryByRun.entries()) {
-            summariesByRunObj[runNum] = Array.from(runSummaries.entries()).map(([label, s]) => ({ label, summary: s }));
-        }
-
-        const errorsByRunObj: Record<number, any[]> = {};
-        for (const [runNum, errs] of errorsByRun.entries()) {
-            errorsByRunObj[runNum] = errs;
-        }
-
-        const report = {
-            metadata,
-            testCasesByRun: testCasesByRunObj,
-            summariesByRun: summariesByRunObj,
-            errorsByRun: errorsByRunObj,
-            aggregateStats: aggregateStats || null,
-            colors: colors
-        };
-
-        const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "evaluation_report_multi.json";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
 
     const handleUploadJsonReport = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
+        // The uploaded report replaces the shown server-side run.
+        detachRun();
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -527,6 +201,10 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
         setIsFinished(true);
     };
 
+    const completedCount =
+        Array.from(testCasesByRun.values()).reduce((sum, cases) => sum + cases.length, 0) +
+        Array.from(errorsByRun.values()).reduce((sum, errs) => sum + errs.length, 0);
+
     const onUploadJsonReportClick = () => {
         document.getElementById("upload-json-report")?.click()
     };
@@ -539,16 +217,9 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     return (
         <div className="w-full">
             <EvaluationConfig onMultiConfigChanged={setEvaluationRequest} datasets={datasets} className="mb-6">
+                <>
                 <div className="flex flex-row justify-between items-start flex-wrap mb-4 gap-4">
                     <div className="flex flex-row gap-4 flex-wrap">
-                        <Button variant="secondary" disabled={!isFinished} onClick={handleDownloadMarkdownReport}>
-                            <FileText className="h-4 w-4" />
-                            Download Markdown Report
-                        </Button>
-                        <Button variant="secondary" disabled={!isFinished} onClick={handleDownloadJsonReport}>
-                            <FileText className="h-4 w-4" />
-                            Download JSON Report
-                        </Button>
                         <input id="upload-json-report" type="file" accept=".json" className="hidden" onChange={handleUploadJsonReport} />
                         <label htmlFor="upload-json-report">
                             <Button variant="secondary" onClick={onUploadJsonReportClick} disabled={isLoading} className="hover:cursor-pointer">
@@ -577,7 +248,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                                 </span>
                                                 ))}
                                             </div>
-                                            <p>({Array.from(testCasesByRun.values()).reduce((sum, cases) => sum + cases.length, 0) + Array.from(errorsByRun.values()).reduce((sum, errs) => sum + errs.length, 0)} / {currentStepInfos[0]?.totalTestCases * (evaluationRequest?.models.length || 1) * (metadata?.totalRepetitions || 1)})</p>
+                                            <p>({completedCount} / {run?.totalTestCases ?? "?"})</p>
                                         </div>
                                     )}
                                 </div>
@@ -585,7 +256,25 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                         </>
                     </Button>
                 </div>
+                {run && isResumableRun(run.status) && (
+                    <div className="mb-4 flex flex-row flex-wrap items-center gap-3 rounded-md border border-amber-500 p-3 text-sm">
+                        <span>
+                            {run.status === "CANCELLED" && "This evaluation was cancelled. "}
+                            {run.status === "INTERRUPTED" && "This evaluation was interrupted by a server restart. "}
+                            {run.status === "ERROR" && `This evaluation failed${run.errorMessage ? `: ${run.errorMessage}` : ""}. `}
+                            {completedCount} of {run.totalTestCases ?? "?"} test cases are finished and shown below.
+                        </span>
+                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => resumeEvaluation(run.id)}>
+                            <Play className="h-4 w-4"/> Resume
+                        </Button>
+                    </div>
+                )}
+                </>
             </EvaluationConfig>
+
+            <section className="px-6 container mx-auto">
+                <EvaluationRunList/>
+            </section>
 
             <section className="px-6 container mx-auto">
                 <h2 className="text-2xl font-semibold mb-2">Complete Result Overview</h2>
@@ -870,13 +559,4 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
             </section>
         </div>
     );
-}
-
-function groupBy<T>(arr: T[], key: (t: T) => string) {
-    return arr.reduce<Record<string, T[]>>((acc, item) => {
-        const k = key(item);
-        // @ts-ignore
-        (acc[k] ||= []).push(item);
-        return acc;
-    }, {});
 }

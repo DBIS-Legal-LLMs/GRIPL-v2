@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.core.env.Environment
@@ -69,7 +70,7 @@ class EvaluationControllerRoleTest {
         runBlocking {
             whenever(env.resolvePlaceholders(any())).thenAnswer { it.arguments[0] }
             whenever(authServiceClient.getOpenRouterApiKey(any())).thenReturn("sk-or-v1-test")
-            whenever(runner.runAll(any(), any())).thenReturn(emptyFlow())
+            whenever(runner.runAll(any(), any(), anyOrNull())).thenReturn(emptyFlow())
 
             // Should not throw past the role gate.
             controller.evaluateStream(request, exchangeAs("researcher"))

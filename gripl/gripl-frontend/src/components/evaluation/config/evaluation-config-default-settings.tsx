@@ -14,6 +14,8 @@ interface EvaluationConfigDefaultSettingsProps {
     defaultEndpointChoice: EndpointChoice;
     defaultPresetEndpoint: string;
     defaultCustomEndpoint: string;
+    experimentName: string;
+    setExperimentName: (name: string) => void;
     seed: number | null;
     maxConcurrent: number;
     repetitions: number;
@@ -46,6 +48,8 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
         defaultEndpointChoice,
         defaultPresetEndpoint,
         defaultCustomEndpoint,
+        experimentName,
+        setExperimentName,
         seed,
         maxConcurrent,
         repetitions,
@@ -71,6 +75,15 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
                 <CardTitle className="text-lg">Default Settings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="experiment-name">Experiment Name</Label>
+                    <Input id="experiment-name" type="text" maxLength={200}
+                           placeholder="Optional, e.g. GPT-4o vs. Llama with RAG"
+                           value={experimentName}
+                           onChange={(e) => setExperimentName(e.target.value)}
+                           className="w-full"/>
+                    <p className="text-sm text-muted-foreground">Shown in the list of runs and used as the file name of the reports. You can change it later.</p>
+                </div>
                 <div className="space-y-2">
                     <Label>Default Evaluation Endpoint</Label>
                     <Select value={defaultEndpointChoice}
