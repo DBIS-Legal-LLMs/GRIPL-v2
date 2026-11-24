@@ -250,7 +250,7 @@ Die Konfiguration gliedert sich in drei Bereiche.
 | **Seed** | Optionale Zahl für reproduzierbarere Ergebnisse. |
 | **Evaluate Activities Only** | Bewertet nur Aktivitäten; Ereignisse, Gateways sowie Datenobjekte und -speicher werden ignoriert. |
 | **RAG Configuration → Use RAG / RAG Mode** | Rechtstexte einbeziehen und Suchmodus wählen (*Hybrid* wird empfohlen). |
-| **Evaluate RAG Quality (Ragas)** | Bewertet zusätzlich, wie gut das LLM die abgerufenen Rechtstexte nutzt (siehe [5.4](#54-ergebnisse-verstehen)). |
+| **Evaluate RAG Quality (Ragas)** | Bewertet zusätzlich, wie gut das LLM die abgerufenen Rechtstexte nutzt (siehe [5.5](#55-ergebnisse-verstehen)). |
 
 **b) Models Configuration – zu testende Modelle**
 
@@ -277,17 +277,37 @@ Mit **Download YAML Config** speichern Sie die aktuelle Konfiguration als Datei,
 
 Klicken Sie auf **Start Evaluation**. Während der Ausführung zeigt der Button an, welches Modell gerade welchen Testfall bearbeitet und wie viele Testfälle bereits erledigt sind. Je nach Anzahl der Modelle, Testfälle und Wiederholungen kann das einige Zeit dauern.
 
-### 5.3 Berichte speichern und laden
+Die Evaluation läuft auf dem Server. Sie können den Tab schließen, die Seite neu laden oder den Rechner in den Ruhezustand gehen lassen. Die Evaluation läuft weiter, und jedes Ergebnis wird gespeichert, sobald es fertig ist. Wenn Sie die Seite **Evaluation** wieder öffnen, wird die laufende Evaluation automatisch wieder angezeigt.
 
-Nach Abschluss stehen folgende Buttons zur Verfügung:
+Pro Person kann immer nur eine Evaluation gleichzeitig laufen. Mit **Cancel evaluation** brechen Sie eine laufende Evaluation ab. Die bis dahin fertigen Testfälle bleiben gespeichert.
+
+### 5.3 Frühere Evaluationen (Evaluation runs)
+
+Unter **Evaluation runs** sehen Sie alle Ihre Evaluationen, die neueste zuerst. Für jede Evaluation werden der Status, das Startdatum, der Fortschritt (fertige Testfälle von allen) sowie die Modelle und Datensätze angezeigt.
+
+| Status | Bedeutung |
+|---|---|
+| Queued / Running | Die Evaluation läuft gerade. |
+| Done | Die Evaluation ist vollständig. |
+| Cancelled | Sie haben die Evaluation abgebrochen. |
+| Interrupted | Der Server wurde während der Evaluation neu gestartet, z. B. für ein Update. |
+| Failed | Die Evaluation ist mit einem Fehler abgebrochen. Der Grund steht unter dem Eintrag. |
+
+- **Open** zeigt die gespeicherten Ergebnisse unten an. Von dort können Sie die Berichte wie gewohnt herunterladen, auch bei unvollständigen Evaluationen.
+- **Resume** setzt eine abgebrochene, unterbrochene oder fehlgeschlagene Evaluation fort. Dabei werden nur die fehlenden Testfälle und die Testfälle mit Fehler ausgewertet. Die Zusammenfassung (Summary) umfasst danach wieder alle Testfälle. Die Evaluation läuft mit denselben Einstellungen und demselben Seed wie beim ersten Start.
+- **Delete** löscht die Evaluation mit allen Ergebnissen. Laufende Evaluationen müssen Sie zuerst abbrechen.
+
+### 5.4 Berichte speichern und laden
+
+Nach Abschluss (oder nach einem Abbruch) stehen folgende Buttons zur Verfügung:
 
 - **Download Markdown Report** – lesbarer Bericht mit allen Kennzahlen, z. B. für die Projektdokumentation.
 - **Download JSON Report** – vollständige Ergebnisdaten.
 - **Upload JSON Report** – lädt einen früher gespeicherten JSON-Bericht wieder in die Ansicht, ohne die Evaluation erneut auszuführen.
 
-> 💡 Laden Sie den JSON-Bericht nach jeder Evaluation herunter. Die Ergebnisse sind sonst nach dem Neuladen der Seite nicht mehr sichtbar.
+> 💡 Die Ergebnisse bleiben unter **Evaluation runs** gespeichert, bis Sie die Evaluation löschen. Für Ihre Unterlagen oder zum Teilen laden Sie trotzdem den JSON- oder Markdown-Bericht herunter.
 
-### 5.4 Ergebnisse verstehen
+### 5.5 Ergebnisse verstehen
 
 Unter **Complete Result Overview** werden die Ergebnisse dargestellt.
 
@@ -434,8 +454,14 @@ Die Detailansicht speichert keine Änderungen. Exportieren Sie das Diagramm und 
 **Die Evaluation bricht ab oder viele Testfälle zeigen Fehler.**
 Verringern Sie **Max Concurrent LLM Requests** (Rate Limits des Anbieters) oder erhöhen Sie das **LLM Response Timeout**.
 
-**Die Evaluationsergebnisse sind nach dem Neuladen der Seite verschwunden.**
-Laden Sie den zuvor gespeicherten JSON-Bericht über **Upload JSON Report** wieder hoch. Laden Sie Berichte deshalb immer direkt nach einer Evaluation herunter.
+**Die Evaluationsergebnisse sind nach dem Neuladen der Seite nicht mehr zu sehen.**
+Öffnen Sie die Evaluation unter **Evaluation runs** mit **Open**. Eine laufende Evaluation wird beim Öffnen der Seite automatisch angezeigt.
+
+**Eine Evaluation steht auf „Interrupted“.**
+Der Server wurde während der Evaluation neu gestartet, z. B. für ein Update. Klicken Sie auf **Resume**. Die schon fertigen Testfälle werden nicht erneut ausgewertet.
+
+**„An evaluation is already running“ beim Start.**
+Pro Person läuft immer nur eine Evaluation. Warten Sie, bis sie fertig ist, oder brechen Sie sie unter **Evaluation runs** mit **Cancel** ab.
 
 **Die Ergebnisse unterscheiden sich bei gleicher Eingabe.**
 LLMs arbeiten nicht vollständig deterministisch. Eine niedrige **Temperature** und ein fester **Seed** verringern die Schwankungen; mehrere **Repetitions** in der Evaluation machen sie messbar.

@@ -107,6 +107,8 @@ systemctl list-timers 'dbis-update@*'
 The list must show the prod timers with a `NEXT` of 03:00 tomorrow. Nothing is paused for the backup: the databases are dumped while they run, and
 a container is only restarted when its image or configuration changed. A restart takes seconds to a minute; when the RAG image
 changes on prod, the knowledge graph is stopped for the copy of its volumes, which takes a few minutes longer.
+A backend restart interrupts running evaluations: their results so far stay stored, the run shows **Interrupted**, and the user
+resumes it under **Evaluation runs** ([troubleshooting.md](troubleshooting.md)).
 
 ### Update the updater itself
 

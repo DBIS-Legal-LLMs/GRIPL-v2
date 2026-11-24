@@ -251,6 +251,10 @@ All paths below except `/actuator/health`, `/swagger-ui`, `/v3/api-docs` and `/t
 | Labeling | `GET` `POST` | `/dataset/export`, `/dataset/{id}/export`, `/dataset/import` | admin, researcher | Export or import datasets as ZIP files; ZIP transfers preserve custom labels and their assignments |
 | Evaluation | `POST` | `/gdpr/evaluation/markdown` | admin, researcher | Run an evaluation, markdown report |
 | Evaluation | `POST` | `/gdpr/evaluation/stream` | admin, researcher | Run an evaluation, NDJSON stream |
+| Evaluation | `POST` `GET` | `/gdpr/evaluation/runs` | admin, researcher | Start an evaluation as a background job (202, 409 if the caller already has one running) or list the caller's runs. The job keeps running when the browser disconnects and stores every result |
+| Evaluation | `GET` `DELETE` | `/gdpr/evaluation/runs/{id}` | admin, researcher | Status, metadata and current progress of a run, or delete a stopped run with its results (owner-scoped) |
+| Evaluation | `GET` | `/gdpr/evaluation/runs/{id}/events?after=&limit=` | admin, researcher | Stored `testCase`, `error` and `summary` events after an event id, in the same JSON form as the NDJSON stream |
+| Evaluation | `POST` | `/gdpr/evaluation/runs/{id}/cancel`, `/gdpr/evaluation/runs/{id}/resume` | admin, researcher | Cancel a running evaluation (results stay stored), or resume a cancelled, interrupted or failed one (only missing and failed test cases run again) |
 | — | `GET` | `/thesis/pdf` | — (public) | Serves the thesis PDF |
 | — | `GET` | `/actuator/health`, `/swagger-ui`, `/v3/api-docs` | — (public) | Liveness + API docs |
 

@@ -28,17 +28,26 @@ class EvaluationRunner(
     private val bpmnExtractor = BpmnExtractor()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun run(request: EvaluationRequest, ownerUserId: String): Flow<EvaluationReport> {
+    /**
+     * With [resume], the test cases it lists as completed are skipped and their metrics are fed
+     * into the summary first, so the summary still covers every test case.
+     */
+    fun run(request: EvaluationRequest, ownerUserId: String, resume: ResumeState? = null): Flow<EvaluationReport> {
         val metricsAccumulator = MetricsAccumulator()
-        val startedCounter = AtomicInteger(0)
 
-        val entries = (if (request.evaluationDataIds.isNotEmpty()) {
+        val allEntries = (if (request.evaluationDataIds.isNotEmpty()) {
             evaluationDataRepository.getEvaluationDataByIdsForOwner(request.evaluationDataIds, ownerUserId)
         } else {
             evaluationDataRepository.getEvaluationDataByDatasetIdsOrAllForOwner(request.datasets, ownerUserId)
         }).sortedBy { it.id }
-        val totalCount = entries.size
-        val entriesFlow = entries.asFlow()
+        val completedIds = resume?.completedTestCaseIds.orEmpty()
+        val entries = allEntries.filter { it.id !in completedIds }
+        val totalCount = allEntries.size
+        val startedCounter = AtomicInteger(totalCount - entries.size)
+        val entriesFlow = flow {
+            resume?.completedMetrics?.forEach { metricsAccumulator.add(it) }
+            emitAll(entries.asFlow())
+        }
 
         log.info { "Starting evaluation with endpoint=${request.evaluationEndpoint}; maxConcurrent=${request.maxConcurrent}; evaluateRag=${request.evaluateRag}" }
 
@@ -67,8 +76,9 @@ class EvaluationRunner(
                     }
                 }
             }
-            .onCompletion {
-                emit(metricsAccumulator.toSummary())
+            .onCompletion { cause ->
+                // A cancelled or failed run has no complete summary.
+                if (cause == null) emit(metricsAccumulator.toSummary())
             }
     }
 
@@ -367,7 +377,8 @@ private suspend fun evaluateEntryOrFailFast(
         amountOfRetries = amountOfRetries,
         ragMetrics = ragMetrics,
         ragPromptContext = actualResult.analysisResponse.ragPromptContext,
-        perElementType = perElementType
+        perElementType = perElementType,
+        metrics = metrics
     )
 
     return EvaluationOutcome.Success(

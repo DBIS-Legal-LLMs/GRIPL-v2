@@ -1,7 +1,7 @@
 "use client";
 
 import {Button} from "@/components/ui/button";
-import React, {useMemo, useState} from "react";
+import React, {useEffect, useMemo, useState} from "react";
 import {
     EvaluationReportError,
     EvaluationReportSummary,
@@ -18,6 +18,8 @@ import {Card, CardContent, CardDescription, CardHeader} from "@/components/ui/ca
 import EvaluationConfig from "@/components/evaluation/config/evaluation-config";
 import {Dataset} from "@/models/dto/Dataset";
 import {ChevronDown, FileText, Play} from "lucide-react";
+import EvaluationRunList from "@/components/evaluation/evaluation-run-list";
+import {isResumableRun} from "@/models/dto/EvaluationRun";
 import TestcaseResultsStacked from "@/components/evaluation/charts/aggregated/testcase-results-stacked";
 import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluationResult";
 import MetricChart from "@/components/evaluation/charts/aggregated/metric-chart";
@@ -56,12 +58,18 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
         isLoading,
         isFinished, setIsFinished,
         startEvaluation,
+        run, resumeEvaluation, detachRun, attachToActiveRun,
     } = useEvaluationJob();
 
     const [selectedRun, setSelectedRun] = useState<number>(1);
     const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
     const [selectedDataset, setSelectedDataset] = useState<string | undefined>(undefined);
     const [selectedClasses, setSelectedClasses] = useState<string[]>([ALL_CLASSES_FILTER]);
+
+    // The provider attaches on its own mount, which can be before the user logged in.
+    useEffect(() => {
+        void attachToActiveRun();
+    }, [attachToActiveRun]);
 
     const [isMetricsSummaryOpen, setIsMetricsSummaryOpen] = useState<boolean>(false);
 
@@ -482,6 +490,8 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const handleUploadJsonReport = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
+        // The uploaded report replaces the shown server-side run.
+        detachRun();
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -527,6 +537,10 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
         setIsFinished(true);
     };
 
+    const completedCount =
+        Array.from(testCasesByRun.values()).reduce((sum, cases) => sum + cases.length, 0) +
+        Array.from(errorsByRun.values()).reduce((sum, errs) => sum + errs.length, 0);
+
     const onUploadJsonReportClick = () => {
         document.getElementById("upload-json-report")?.click()
     };
@@ -539,6 +553,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     return (
         <div className="w-full">
             <EvaluationConfig onMultiConfigChanged={setEvaluationRequest} datasets={datasets} className="mb-6">
+                <>
                 <div className="flex flex-row justify-between items-start flex-wrap mb-4 gap-4">
                     <div className="flex flex-row gap-4 flex-wrap">
                         <Button variant="secondary" disabled={!isFinished} onClick={handleDownloadMarkdownReport}>
@@ -577,7 +592,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                                 </span>
                                                 ))}
                                             </div>
-                                            <p>({Array.from(testCasesByRun.values()).reduce((sum, cases) => sum + cases.length, 0) + Array.from(errorsByRun.values()).reduce((sum, errs) => sum + errs.length, 0)} / {currentStepInfos[0]?.totalTestCases * (evaluationRequest?.models.length || 1) * (metadata?.totalRepetitions || 1)})</p>
+                                            <p>({completedCount} / {run?.totalTestCases ?? "?"})</p>
                                         </div>
                                     )}
                                 </div>
@@ -585,7 +600,25 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                         </>
                     </Button>
                 </div>
+                {run && isResumableRun(run.status) && (
+                    <div className="mb-4 flex flex-row flex-wrap items-center gap-3 rounded-md border border-amber-500 p-3 text-sm">
+                        <span>
+                            {run.status === "CANCELLED" && "This evaluation was cancelled. "}
+                            {run.status === "INTERRUPTED" && "This evaluation was interrupted by a server restart. "}
+                            {run.status === "ERROR" && `This evaluation failed${run.errorMessage ? `: ${run.errorMessage}` : ""}. `}
+                            {completedCount} of {run.totalTestCases ?? "?"} test cases are finished and shown below.
+                        </span>
+                        <Button variant="outline" size="sm" disabled={isLoading} onClick={() => resumeEvaluation(run.id)}>
+                            <Play className="h-4 w-4"/> Resume
+                        </Button>
+                    </div>
+                )}
+                </>
             </EvaluationConfig>
+
+            <section className="px-6 container mx-auto">
+                <EvaluationRunList/>
+            </section>
 
             <section className="px-6 container mx-auto">
                 <h2 className="text-2xl font-semibold mb-2">Complete Result Overview</h2>

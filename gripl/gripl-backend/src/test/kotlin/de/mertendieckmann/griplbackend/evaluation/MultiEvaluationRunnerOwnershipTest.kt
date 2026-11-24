@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
@@ -32,7 +33,7 @@ class MultiEvaluationRunnerOwnershipTest {
         runBlocking {
             whenever(datasetRepository.getDatasetsByIdsAndOwner(eq(listOf(5L)), eq("user-1")))
                 .thenReturn(listOf(Dataset(id = 5, name = "mine", description = null, createdAt = "now", updatedAt = "now")))
-            whenever(singleRunner.run(any(), eq("user-1"))).thenReturn(emptyFlow())
+            whenever(singleRunner.run(any(), eq("user-1"), anyOrNull())).thenReturn(emptyFlow())
 
             val request = MultiEvaluationRequest(
                 defaultEvaluationEndpoint = "endpoint",
@@ -44,7 +45,7 @@ class MultiEvaluationRunnerOwnershipTest {
             runner.runAll(request, "user-1").toList()
 
             verify(datasetRepository).getDatasetsByIdsAndOwner(listOf(5L), "user-1")
-            verify(singleRunner).run(any(), eq("user-1"))
+            verify(singleRunner).run(any(), eq("user-1"), anyOrNull())
         }
     }
 
@@ -55,7 +56,7 @@ class MultiEvaluationRunnerOwnershipTest {
             // owner-scoped lookup returns nothing for them.
             whenever(datasetRepository.getDatasetsByIdsAndOwner(eq(listOf(5L)), eq("attacker")))
                 .thenReturn(emptyList())
-            whenever(singleRunner.run(any(), eq("attacker"))).thenReturn(emptyFlow())
+            whenever(singleRunner.run(any(), eq("attacker"), anyOrNull())).thenReturn(emptyFlow())
 
             val request = MultiEvaluationRequest(
                 defaultEvaluationEndpoint = "endpoint",
