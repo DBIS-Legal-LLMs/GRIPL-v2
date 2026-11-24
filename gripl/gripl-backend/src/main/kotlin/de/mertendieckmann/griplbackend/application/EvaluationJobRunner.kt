@@ -78,11 +78,16 @@ class EvaluationJobRunner(
      * [runRequest] (resolved, with the key). Both must carry the same seed, so a resume
      * reproduces the seeds per repetition.
      */
-    fun start(ownerUserId: String, storedRequest: MultiEvaluationRequest, runRequest: MultiEvaluationRequest): Long {
+    fun start(
+        ownerUserId: String,
+        storedRequest: MultiEvaluationRequest,
+        runRequest: MultiEvaluationRequest,
+        name: String? = null
+    ): Long {
         require(storedRequest.models.none { it.llmProps?.apiKey != null }) { "The stored request must not contain an API key" }
         require(storedRequest.seed != null && storedRequest.seed == runRequest.seed) { "The request needs a fixed seed" }
         val id = try {
-            repository.insertRun(ownerUserId, objectMapper.writeValueAsString(storedRequest))
+            repository.insertRun(ownerUserId, objectMapper.writeValueAsString(storedRequest), name)
         } catch (e: org.springframework.dao.DuplicateKeyException) {
             throw ActiveEvaluationRunExistsException()
         }

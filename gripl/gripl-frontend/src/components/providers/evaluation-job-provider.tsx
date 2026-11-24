@@ -1,13 +1,8 @@
 "use client"
 
 import React, {createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState} from "react";
-import {
-    EvaluationMetadataReport,
-    EvaluationReportError,
-    EvaluationReportStepInfo,
-    EvaluationReportSummary,
-    TestCaseReport
-} from "@/models/dto/ReportData";
+import {EvaluationMetadataReport, EvaluationReportStepInfo} from "@/models/dto/ReportData";
+import {ErrorsByRun, groupEvents, SummaryByRun, TestCasesByRun} from "@/lib/evaluation-report";
 import {MultiEvaluationRequest} from "@/models/dto/MultiEvaluationRequest";
 import {authenticatedFetch} from "@/lib/authenticated-fetch";
 import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
@@ -19,9 +14,6 @@ import {
     isActiveRun
 } from "@/models/dto/EvaluationRun";
 
-type TestCasesByRun = Map<number, (TestCaseReport & { modelLabel: string })[]>;
-type SummaryByRun = Map<number, Map<string, EvaluationReportSummary>>;
-type ErrorsByRun = Map<number, (EvaluationReportError & { modelLabel: string })[]>;
 type StepInfo = EvaluationReportStepInfo & { modelLabel: string; runNumber: number };
 
 const RUNS_URL = "/api/gdpr/evaluation/runs";
@@ -105,20 +97,7 @@ export function EvaluationJobProvider({children}: { children: ReactNode }) {
     }, []);
 
     const applyEvents = useCallback((events: EvaluationRunEvent[]) => {
-        const cases: TestCasesByRun = new Map();
-        const summaries: SummaryByRun = new Map();
-        const errors: ErrorsByRun = new Map();
-        for (const {modelLabel, report, runNumber} of events) {
-            if (report.type === "testCase") {
-                cases.set(runNumber, [...(cases.get(runNumber) ?? []), {...(report as TestCaseReport), modelLabel}]);
-            } else if (report.type === "summary") {
-                const runSummaries = summaries.get(runNumber) ?? new Map<string, EvaluationReportSummary>();
-                runSummaries.set(modelLabel, report as EvaluationReportSummary);
-                summaries.set(runNumber, runSummaries);
-            } else if (report.type === "error") {
-                errors.set(runNumber, [...(errors.get(runNumber) ?? []), {...(report as EvaluationReportError), modelLabel}]);
-            }
-        }
+        const {testCasesByRun: cases, summaryByRun: summaries, errorsByRun: errors} = groupEvents(events);
         if (cases.size > 0) {
             setTestCasesByRun((prev) => {
                 const next = new Map(prev);

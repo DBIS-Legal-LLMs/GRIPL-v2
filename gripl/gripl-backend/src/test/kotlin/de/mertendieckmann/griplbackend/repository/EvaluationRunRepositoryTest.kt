@@ -170,4 +170,17 @@ class EvaluationRunRepositoryTest(
             jdbc.queryForObject("select count(*) from evaluation_run_event where run_id = ?", Int::class.java, id)
         )
     }
+
+    @Test
+    fun `a run keeps its name, only the owner can change or remove it`() {
+        val id = repository.insertRun(user(1), request, "First try")
+        assertEquals("First try", repository.getByIdAndOwner(id, user(1))!!.name)
+
+        assertFalse(repository.rename(id, user(2), "Hijacked"))
+        assertTrue(repository.rename(id, user(1), "Second try"))
+        assertEquals("Second try", repository.getByIdAndOwner(id, user(1))!!.name)
+
+        assertTrue(repository.rename(id, user(1), null))
+        assertNull(repository.getByIdAndOwner(id, user(1))!!.name)
+    }
 }

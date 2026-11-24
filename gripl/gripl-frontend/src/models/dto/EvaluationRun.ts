@@ -13,6 +13,8 @@ export const isResumableRun = (status: EvaluationRunStatus | undefined) =>
 /** One evaluation run as listed by GET /api/gdpr/evaluation/runs. */
 export interface EvaluationRun {
     id: number;
+    /** Name given by the user; used for the file names of the reports. */
+    name: string | null;
     status: EvaluationRunStatus;
     modelLabels: string[];
     datasetNames: string[];

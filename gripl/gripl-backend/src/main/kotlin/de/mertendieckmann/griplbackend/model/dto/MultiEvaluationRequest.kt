@@ -14,6 +14,8 @@ data class MultiEvaluationRequest(
     val ragMode: RagMode = RagMode.HYBRID,
     val evaluateRag: Boolean = true,
     val activitiesOnly: Boolean = false,
+    /** Optional name of the run; stored in its own column, not in the stored request. */
+    val name: String? = null,
 )
 
 data class ModelRunConfig(

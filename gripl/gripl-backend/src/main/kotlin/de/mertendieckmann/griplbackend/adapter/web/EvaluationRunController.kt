@@ -10,6 +10,7 @@ import de.mertendieckmann.griplbackend.model.dto.EvaluationRunDetail
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRunEvent
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRunListItem
 import de.mertendieckmann.griplbackend.model.dto.MultiEvaluationRequest
+import de.mertendieckmann.griplbackend.model.dto.RenameEvaluationRunRequest
 import de.mertendieckmann.griplbackend.model.dto.StartEvaluationRunResponse
 import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import de.mertendieckmann.griplbackend.repository.EvaluationRunRepository
@@ -30,6 +31,7 @@ import tools.jackson.databind.ObjectMapper
 
 private const val DEFAULT_EVENT_PAGE_SIZE = 500
 private const val MAX_EVENT_PAGE_SIZE = 2000
+private const val MAX_NAME_LENGTH = 200
 
 /**
  * Evaluations as background jobs (see [EvaluationJobRunner]): start a run, poll its status
@@ -61,11 +63,12 @@ class EvaluationRunController(
         }
         val apiKey = requireOpenRouterApiKey(exchange)
         // The seed is fixed up front so a resumed run uses the same seeds per repetition.
-        val storedRequest = request.copy(seed = request.seed ?: MultiEvaluationRunner.randomSeed()).withoutApiKeys()
+        val name = normalizeName(request.name)
+        val storedRequest = request.copy(seed = request.seed ?: MultiEvaluationRunner.randomSeed(), name = null).withoutApiKeys()
         val runRequest = prepareRunRequest(storedRequest, apiKey, userId)
         val id = withContext(Dispatchers.IO) {
             try {
-                jobRunner.start(userId, storedRequest, runRequest)
+                jobRunner.start(userId, storedRequest, runRequest, name)
             } catch (e: ActiveEvaluationRunExistsException) {
                 throw activeRunConflict()
             }
@@ -152,6 +155,24 @@ class EvaluationRunController(
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(StartEvaluationRunResponse(id))
     }
 
+    @Operation(summary = "Rename an evaluation run; a blank name removes the name")
+    @PatchMapping("/{id}")
+    suspend fun renameRun(
+        @PathVariable id: Long,
+        @RequestBody body: RenameEvaluationRunRequest,
+        exchange: ServerWebExchange
+    ): EvaluationRunListItem {
+        val userId = exchange.authenticatedUserId()
+        exchange.requirePrivilegedGriplRole()
+        val name = normalizeName(body.name)
+        return withContext(Dispatchers.IO) {
+            if (!repository.rename(id, userId, name)) {
+                throw ResponseStatusException(HttpStatus.NOT_FOUND, "Evaluation run not found")
+            }
+            requireOwnedRun(id, userId).toListItem()
+        }
+    }
+
     @Operation(summary = "Delete an evaluation run and its results")
     @DeleteMapping("/{id}")
     suspend fun deleteRun(@PathVariable id: Long, exchange: ServerWebExchange): ResponseEntity<Void> {
@@ -169,6 +190,14 @@ class EvaluationRunController(
     private fun requireOwnedRun(id: Long, userId: String): EvaluationRunRow =
         repository.getByIdAndOwner(id, userId)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Evaluation run not found")
+
+    private fun normalizeName(name: String?): String? {
+        val trimmed = name?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (trimmed.length > MAX_NAME_LENGTH) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "The name can have at most $MAX_NAME_LENGTH characters")
+        }
+        return trimmed
+    }
 
     private fun activeRunConflict() =
         ResponseStatusException(HttpStatus.CONFLICT, "An evaluation is already running. Wait for it or cancel it first")
@@ -199,6 +228,7 @@ class EvaluationRunController(
         val metadata = metadataJson?.let { objectMapper.readTree(it) }
         return EvaluationRunListItem(
             id = id,
+            name = name,
             status = status,
             modelLabels = request.path("models").values().map { it.path("label").asString() },
             datasetNames = metadata?.path("datasets")?.values()?.map { it.path("name").asString() }.orEmpty(),

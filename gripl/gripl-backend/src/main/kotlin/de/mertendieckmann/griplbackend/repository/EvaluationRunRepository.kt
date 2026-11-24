@@ -16,6 +16,7 @@ import tools.jackson.databind.ObjectMapper
 data class EvaluationRunRow(
     val id: Long,
     val ownerUserId: String,
+    val name: String? = null,
     val status: EvaluationRunStatus,
     val requestJson: String,
     val metadataJson: String?,
@@ -46,6 +47,7 @@ class EvaluationRunRepository(
         EvaluationRunRow(
             id = rs.getLong("id"),
             ownerUserId = rs.getString("owner_user_id"),
+            name = rs.getString("name"),
             status = EvaluationRunStatus.valueOf(rs.getString("status")),
             requestJson = rs.getString("request"),
             metadataJson = rs.getString("metadata"),
@@ -90,6 +92,13 @@ class EvaluationRunRepository(
             runId, ownerUserId, afterId, limit
         )
 
+    /** Sets or (with null) removes the name of the run. Returns false if the run does not exist or is not the owner's. */
+    fun rename(id: Long, ownerUserId: String, name: String?): Boolean =
+        jdbc.update(
+            "UPDATE evaluation_run SET name = ?, updated_at = now() WHERE id = ? AND owner_user_id = ?",
+            name, id, ownerUserId
+        ) > 0
+
     /** Deletes the run and its events unless it is active. Returns false if nothing was deleted. */
     fun deleteIfNotActive(id: Long, ownerUserId: String): Boolean =
         jdbc.update(
@@ -103,10 +112,10 @@ class EvaluationRunRepository(
      * Inserts a QUEUED run. Throws [org.springframework.dao.DuplicateKeyException]
      * if the owner already has an active run.
      */
-    fun insertRun(ownerUserId: String, requestJson: String): Long =
+    fun insertRun(ownerUserId: String, requestJson: String, name: String? = null): Long =
         jdbc.queryForObject(
-            "INSERT INTO evaluation_run (owner_user_id, status, request) VALUES (?, 'QUEUED', ?) RETURNING id",
-            Long::class.java, ownerUserId, jsonb(requestJson)
+            "INSERT INTO evaluation_run (owner_user_id, status, request, name) VALUES (?, 'QUEUED', ?, ?) RETURNING id",
+            Long::class.java, ownerUserId, jsonb(requestJson), name
         )!!
 
     fun getById(id: Long): EvaluationRunRow? =

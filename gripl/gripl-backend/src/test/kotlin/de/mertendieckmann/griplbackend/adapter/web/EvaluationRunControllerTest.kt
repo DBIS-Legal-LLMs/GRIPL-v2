@@ -7,6 +7,7 @@ import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.EvaluationRunStatus
 import de.mertendieckmann.griplbackend.model.dto.ModelRunConfig
 import de.mertendieckmann.griplbackend.model.dto.MultiEvaluationRequest
+import de.mertendieckmann.griplbackend.model.dto.RenameEvaluationRunRequest
 import de.mertendieckmann.griplbackend.repository.CustomAnalysisEndpointRepository
 import de.mertendieckmann.griplbackend.repository.EvaluationRunRepository
 import de.mertendieckmann.griplbackend.repository.EvaluationRunRow
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
@@ -91,7 +93,7 @@ class EvaluationRunControllerTest {
     fun `the stored request has no api key and a fixed seed, the job gets the key`() {
         runBlocking {
             stubKeyAndPlaceholders()
-            whenever(jobRunner.start(any(), any(), any())).thenReturn(42L)
+            whenever(jobRunner.start(any(), any(), any(), anyOrNull())).thenReturn(42L)
 
             val response = controller.startRun(request, exchangeAs("researcher"))
 
@@ -99,7 +101,7 @@ class EvaluationRunControllerTest {
             assertEquals(42L, response.body!!.id)
             val stored = argumentCaptor<MultiEvaluationRequest>()
             val run = argumentCaptor<MultiEvaluationRequest>()
-            verify(jobRunner).start(eq("user-1"), stored.capture(), run.capture())
+            verify(jobRunner).start(eq("user-1"), stored.capture(), run.capture(), anyOrNull())
             assertNull(stored.firstValue.models.single().llmProps?.apiKey)
             assertNotNull(stored.firstValue.seed)
             assertEquals(stored.firstValue.seed, run.firstValue.seed)
@@ -111,7 +113,7 @@ class EvaluationRunControllerTest {
     fun `starting while a run is active is a conflict`() {
         runBlocking {
             stubKeyAndPlaceholders()
-            whenever(jobRunner.start(any(), any(), any())).thenThrow(ActiveEvaluationRunExistsException())
+            whenever(jobRunner.start(any(), any(), any(), anyOrNull())).thenThrow(ActiveEvaluationRunExistsException())
 
             val ex = assertThrows(ResponseStatusException::class.java) {
                 runBlocking { controller.startRun(request, exchangeAs("researcher")) }
@@ -168,6 +170,48 @@ class EvaluationRunControllerTest {
             verify(jobRunner).resume(eq(42L), eq("user-1"), run.capture())
             assertEquals(7, run.firstValue.seed)
             assertEquals(authKey, run.firstValue.models.single().llmProps?.apiKey)
+        }
+    }
+
+    @Test
+    fun `the name is trimmed, stored apart from the request, and a blank name is no name`() {
+        runBlocking {
+            stubKeyAndPlaceholders()
+            whenever(jobRunner.start(any(), any(), any(), anyOrNull())).thenReturn(42L)
+
+            controller.startRun(request.copy(name = "  GPT vs Llama  "), exchangeAs("researcher"))
+            controller.startRun(request.copy(name = "   "), exchangeAs("researcher"))
+
+            val stored = argumentCaptor<MultiEvaluationRequest>()
+            val names = argumentCaptor<String>()
+            verify(jobRunner, org.mockito.kotlin.times(2)).start(eq("user-1"), stored.capture(), any(), names.capture())
+            assertEquals(listOf("GPT vs Llama", null), names.allValues)
+            stored.allValues.forEach { assertNull(it.name) }
+        }
+    }
+
+    @Test
+    fun `renaming sets or removes the name of the caller's own run only`() {
+        runBlocking {
+            whenever(repository.rename(42L, "user-1", "New name")).thenReturn(true)
+            whenever(repository.rename(42L, "user-1", null)).thenReturn(true)
+            whenever(repository.getByIdAndOwner(42L, "user-1")).thenReturn(row(EvaluationRunStatus.DONE).copy(name = "New name"))
+
+            val renamed = controller.renameRun(42L, RenameEvaluationRunRequest(" New name "), exchangeAs("researcher"))
+            assertEquals("New name", renamed.name)
+            controller.renameRun(42L, RenameEvaluationRunRequest(""), exchangeAs("researcher"))
+            verify(repository).rename(42L, "user-1", null)
+
+            whenever(repository.rename(42L, "user-2", "x")).thenReturn(false)
+            val notFound = assertThrows(ResponseStatusException::class.java) {
+                runBlocking { controller.renameRun(42L, RenameEvaluationRunRequest("x"), exchangeAs("researcher", "user-2")) }
+            }
+            assertEquals(HttpStatus.NOT_FOUND, notFound.statusCode)
+
+            val tooLong = assertThrows(ResponseStatusException::class.java) {
+                runBlocking { controller.renameRun(42L, RenameEvaluationRunRequest("x".repeat(201)), exchangeAs("researcher")) }
+            }
+            assertEquals(HttpStatus.BAD_REQUEST, tooLong.statusCode)
         }
     }
 }

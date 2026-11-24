@@ -71,7 +71,7 @@ class EvaluationJobRunnerTest {
     )
 
     init {
-        whenever(repository.insertRun(any(), any())).thenReturn(42L)
+        whenever(repository.insertRun(any(), any(), anyOrNull())).thenReturn(42L)
     }
 
     @Test
@@ -90,7 +90,7 @@ class EvaluationJobRunnerTest {
 
         verify(repository, timeout(2000)).markDone(42L)
         val storedJson = argumentCaptor<String>()
-        verify(repository).insertRun(eq("user-1"), storedJson.capture())
+        verify(repository).insertRun(eq("user-1"), storedJson.capture(), anyOrNull())
         assertFalse(storedJson.firstValue.contains(key), storedJson.firstValue)
         assertTrue(storedJson.firstValue.contains("1234"), "the seed is stored")
 
@@ -115,12 +115,12 @@ class EvaluationJobRunnerTest {
         assertThrows(IllegalArgumentException::class.java) {
             runner.start("user-1", runRequest, runRequest)
         }
-        verify(repository, never()).insertRun(any(), any())
+        verify(repository, never()).insertRun(any(), any(), anyOrNull())
     }
 
     @Test
     fun `a second active run of the same user is rejected`() {
-        whenever(repository.insertRun(any(), any())).thenThrow(DuplicateKeyException("active run"))
+        whenever(repository.insertRun(any(), any(), anyOrNull())).thenThrow(DuplicateKeyException("active run"))
         assertThrows(ActiveEvaluationRunExistsException::class.java) {
             runner.start("user-1", storedRequest, runRequest)
         }

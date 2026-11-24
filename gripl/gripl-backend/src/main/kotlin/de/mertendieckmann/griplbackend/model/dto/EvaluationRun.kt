@@ -15,9 +15,13 @@ enum class EvaluationRunStatus {
     }
 }
 
+/** Body of PATCH /gdpr/evaluation/runs/{id}; a blank or null name removes the name. */
+data class RenameEvaluationRunRequest(val name: String?)
+
 /** Light row for the list of a user's evaluation runs. */
 data class EvaluationRunListItem(
     val id: Long,
+    val name: String?,
     val status: EvaluationRunStatus,
     val modelLabels: List<String>,
     val datasetNames: List<String>,

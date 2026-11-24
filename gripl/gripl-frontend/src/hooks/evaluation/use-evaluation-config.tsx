@@ -36,6 +36,7 @@ export function useEvaluationConfig(
     const [defaultPresetEndpoint, setDefaultPresetEndpoint] = useState<string>("");
     const [defaultCustomEndpoint, setDefaultCustomEndpoint] = useState<string>("");
     const [seed, setSeed] = useState<number | null>(null);
+    const [experimentName, setExperimentName] = useState<string>("");
 
     const [maxConcurrent, setMaxConcurrent] = useState<number>(4);
     const [repetitions, setRepetitions] = useState<number>(1);
@@ -107,10 +108,11 @@ export function useEvaluationConfig(
             ragMode,
             evaluateRag: useRag && evaluateRag,
             activitiesOnly,
+            name: experimentName.trim() || undefined,
         };
 
         onMultiConfigChanged(multi);
-    }, [models, selectedDatasets, selectedTestCaseIds, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, useRag, ragMode, evaluateRag, activitiesOnly, onMultiConfigChanged]);
+    }, [models, selectedDatasets, selectedTestCaseIds, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, useRag, ragMode, evaluateRag, activitiesOnly, experimentName, onMultiConfigChanged]);
 
     function addModel() {
         setModels((prev) => [...prev, newModelRow(prev.length + 1)]);
@@ -146,6 +148,7 @@ export function useEvaluationConfig(
         defaultPresetEndpoint,
         defaultCustomEndpoint,
         seed,
+        experimentName,
         maxConcurrent,
         repetitions,
         models,
@@ -160,6 +163,7 @@ export function useEvaluationConfig(
         setDefaultPresetEndpoint,
         setDefaultCustomEndpoint,
         setSeed,
+        setExperimentName,
         setMaxConcurrent,
         setRepetitions,
         setSelectedDatasets,
