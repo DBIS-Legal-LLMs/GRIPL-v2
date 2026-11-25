@@ -2,11 +2,18 @@ package de.mertendieckmann.griplbackend.adapter.auth
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import de.mertendieckmann.griplbackend.config.AuthServiceProperties
+import de.mertendieckmann.griplbackend.application.failure.Failure
+import de.mertendieckmann.griplbackend.application.failure.FailureCode
+import de.mertendieckmann.griplbackend.application.failure.FailureMapper
+import de.mertendieckmann.griplbackend.application.failure.ServiceFailureException
+import de.mertendieckmann.griplbackend.application.failure.logFailure
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.WebClientResponseException
 import java.time.Duration
 
 /**
@@ -42,9 +49,27 @@ class AuthServiceClient(
                 .bodyToMono(AuthServiceProfile::class.java)
                 .timeout(Duration.ofSeconds(10))
                 .awaitSingle()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            log.error(e) { "Could not reach auth-service to look up the caller's OpenRouter API key" }
-            throw RuntimeException("Could not reach auth-service to look up your OpenRouter API key", e)
+            val status = (e as? WebClientResponseException)?.statusCode?.value()
+            val failure = if (status == 401 || status == 403) {
+                Failure(
+                    FailureCode.AUTH_SERVICE_REJECTED_TOKEN,
+                    "The login service did not accept your session. Please sign in again.",
+                    upstreamStatus = status
+                )
+            } else {
+                Failure(
+                    FailureCode.AUTH_SERVICE_UNAVAILABLE,
+                    "The login service could not be reached to look up your OpenRouter API key. Please try again.",
+                    upstreamStatus = status,
+                    upstreamBody = (e as? WebClientResponseException)?.responseBodyAsString?.let { FailureMapper.sanitize(it, 1000) }
+                )
+            }
+            val serviceFailure = ServiceFailureException(failure, e)
+            log.logFailure("Look up of the caller's OpenRouter API key", serviceFailure)
+            throw serviceFailure
         }
         return profile.openrouterApiKey
     }

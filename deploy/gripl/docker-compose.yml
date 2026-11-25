@@ -112,8 +112,13 @@ services:
       # auth-service of the SAME environment, reached over the shared env network
       - AUTH_SERVICE_JWKS_URI=http://auth-service:8000/.well-known/jwks.json
       - AUTH_SERVICE_INTERNAL_URL=http://auth-service:8000
+      # the daily file of warnings and errors, see docs/server-operations.md ("Error logs")
+      - LOG_DIR=/app/logs
     volumes:
       - playwright-browsers:/root/.cache/ms-playwright
+      # ./logs next to compose.yaml, not a named volume: readable on the host without docker, and
+      # not part of any backup. update-stack.sh creates it; the container runs as root and can write to it.
+      - ./logs:/app/logs
     healthcheck:
       # plain TCP check: the image has no curl and the app serves /actuator/health
       # only behind its auth filter allow-list, so "port open" is the cheap signal

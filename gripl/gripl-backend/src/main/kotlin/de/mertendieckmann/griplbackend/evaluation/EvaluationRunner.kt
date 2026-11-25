@@ -10,6 +10,8 @@ import de.mertendieckmann.griplbackend.model.evaluation.EvaluationOutcome
 import de.mertendieckmann.griplbackend.model.evaluation.RagMetrics
 import de.mertendieckmann.griplbackend.repository.EvaluationDataRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import de.mertendieckmann.griplbackend.application.failure.logFailure
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import org.springframework.stereotype.Component
@@ -55,7 +57,7 @@ class EvaluationRunner(
                     val currentNumber = startedCounter.incrementAndGet()
                     emit(buildStepInfo(entry, currentNumber, totalCount))
 
-                    when (val outcome = evaluateSingleEntry(entry, request)) {
+                    when (val outcome = evaluateSingleEntry(entry, request, ownerUserId)) {
                         is EvaluationOutcome.Error -> {
                             metricsAccumulator.addError()
                             emit(outcome.errorReport)
@@ -74,19 +76,34 @@ class EvaluationRunner(
 
     private suspend fun evaluateSingleEntry(
         entry: EvaluationData,
-        evaluationRequest: EvaluationRequest
+        evaluationRequest: EvaluationRequest,
+        ownerUserId: String
     ): EvaluationOutcome = try {
         evaluateEntryOrFailFast(entry, evaluationRequest)
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
+        val failure = log.logFailure(
+            "Evaluating test case",
+            e,
+            mapOf(
+                "userId" to ownerUserId,
+                "testCaseId" to entry.id,
+                "datasetId" to entry.datasetId,
+                "endpoint" to evaluationRequest.evaluationEndpoint,
+                "model" to evaluationRequest.llmProps?.modelName
+            )
+        )
         EvaluationOutcome.Error(
             EvaluationReportError(
                 testCaseId = entry.id,
                 datasetId = entry.datasetId,
                 testCaseName = entry.name ?: "Test Case ${entry.id}",
-                errorMessage = e.message ?: "Unbekannter Fehler aufgetreten"
+                errorMessage = failure.message,
+                code = failure.code
             )
-    )
-}
+        )
+    }
 
 private suspend fun evaluateEntryOrFailFast(
     entry: EvaluationData,
@@ -110,7 +127,8 @@ private suspend fun evaluateEntryOrFailFast(
                     "RAG evaluation (evaluateRag=true) was requested, but endpoint " +
                         "'${evaluationRequest.evaluationEndpoint}' returned no RAG context — the endpoint " +
                         "does not support RAG (e.g. baseline) or useRag is false. " +
-                        "Disable 'Evaluate RAG Quality' or use a RAG-capable endpoint with useRag=true."
+                        "Disable 'Evaluate RAG Quality' or use a RAG-capable endpoint with useRag=true.",
+                code = "RAG_NOT_SUPPORTED"
             )
         )
     }
@@ -218,16 +236,20 @@ private suspend fun evaluateEntryOrFailFast(
         }
     }
 
+    val warnings = actualResult.analysisResponse.warnings.toMutableList()
+
     val ragMetrics: RagMetrics? =
         if (
             evaluationRequest.evaluateRag &&
             actualActivityIds.isNotEmpty()
         ) {
-            ragasEvaluationService.scoreTestCase(
+            val score = ragasEvaluationService.scoreTestCase(
                 actualResult.analysisResponse,
                 bpmnElements,
                 scopeIds
             )
+            score.warning?.let { warnings.add(it) }
+            score.metrics
         } else {
             if (
                 evaluationRequest.evaluateRag &&
@@ -367,7 +389,8 @@ private suspend fun evaluateEntryOrFailFast(
         amountOfRetries = amountOfRetries,
         ragMetrics = ragMetrics,
         ragPromptContext = actualResult.analysisResponse.ragPromptContext,
-        perElementType = perElementType
+        perElementType = perElementType,
+        warnings = warnings
     )
 
     return EvaluationOutcome.Success(

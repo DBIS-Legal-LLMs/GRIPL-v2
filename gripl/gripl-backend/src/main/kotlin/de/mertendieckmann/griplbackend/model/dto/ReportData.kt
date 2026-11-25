@@ -17,7 +17,9 @@ import de.mertendieckmann.griplbackend.model.analysis.GdprProcessingClass
     JsonSubTypes.Type(TestCaseReport::class, name = "testCase"),
     JsonSubTypes.Type(EvaluationReportSummary::class, name = "summary"),
     JsonSubTypes.Type(EvaluationReportStepInfo::class, name = "stepInfo"),
-    JsonSubTypes.Type(EvaluationReportError::class, name = "error")
+    JsonSubTypes.Type(EvaluationReportError::class, name = "error"),
+    JsonSubTypes.Type(EvaluationReportModelError::class, name = "modelError"),
+    JsonSubTypes.Type(EvaluationReportFatal::class, name = "fatal")
 )
 sealed class EvaluationReport{
     val markdown: String by lazy { toMarkdown() }
@@ -74,10 +76,13 @@ data class TestCaseReport(
     val ragMetrics: RagMetrics? = null,
     val ragPromptContext: List<String>? = null,
     /** Confusion counts of this test case broken down by element category. */
-    val perElementType: Map<String, ElementTypeCounts> = emptyMap()
+    val perElementType: Map<String, ElementTypeCounts> = emptyMap(),
+    /** Things the user should know about this test case, e.g. that the knowledge graph was not available for it. */
+    val warnings: List<String> = emptyList()
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
+        val warningBlock = if (warnings.isEmpty()) "" else "\n" + warnings.joinToString("\n") { "> ⚠️ $it" } + "\n"
         val ragBlock = ragMetrics?.let {
             """
             |
@@ -90,6 +95,7 @@ data class TestCaseReport(
 
         return """
             |## Test Case $testCaseId${if (testCaseName != null) " - $testCaseName" else ""}
+            |$warningBlock
             |<img src="$imageSrc" alt="Test Case BPMN XML" />
             |
             |- Amount of Correct Activities: ${correctActivityIds.size}
@@ -239,12 +245,49 @@ data class EvaluationReportError(
     val testCaseId: Long,
     val datasetId: Long?,
     val testCaseName: String? = null,
-    val errorMessage: String
+    val errorMessage: String,
+    /** Stable code of the failure (see FailureCode), when it is one the user can act on. */
+    val code: String? = null
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
         return """
             |## Error in Test Case ${if (testCaseName != null) "$testCaseName" else ""} ($testCaseId)
+            |**Error Message:** $errorMessage
+        """.trimMargin()
+    }
+}
+
+/**
+ * Every test case of one model (in one run) failed, so the run of that model produced no result at all.
+ * [errorMessage] is the reason of the first failure; the details are in the log under [requestId].
+ */
+data class EvaluationReportModelError(
+    val totalTestCases: Int,
+    val failedTestCases: Int,
+    val errorMessage: String,
+    val code: String? = null,
+    val requestId: String? = null
+): EvaluationReport() {
+
+    override fun toMarkdown(): String {
+        return """
+            |## All test cases failed
+            |$failedTestCases of $totalTestCases test cases failed. **Error Message:** $errorMessage
+        """.trimMargin()
+    }
+}
+
+/** The evaluation stopped before it was finished. Always the last event of the stream; nothing after it is evaluated. */
+data class EvaluationReportFatal(
+    val errorMessage: String,
+    val code: String,
+    val requestId: String? = null
+): EvaluationReport() {
+
+    override fun toMarkdown(): String {
+        return """
+            |## Evaluation stopped
             |**Error Message:** $errorMessage
         """.trimMargin()
     }

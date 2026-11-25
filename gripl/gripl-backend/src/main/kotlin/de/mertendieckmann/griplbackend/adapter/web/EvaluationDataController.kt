@@ -21,6 +21,7 @@ import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import de.mertendieckmann.griplbackend.adapter.web.utils.ControllerUtils.requireValidBpmn
+import de.mertendieckmann.griplbackend.application.failure.FailureMapper
 
 @RestController
 @RequestMapping("/dataset/testcase")
@@ -284,8 +285,9 @@ class EvaluationDataController(
             log.error(ex) { "Ungültiges BPMN XML für Id: $id" }
             return ResponseEntity.badRequest().body("Fehler beim Parsen: ${ex.message}")
         } catch (ex: Exception) {
-            log.error(ex) { "Fehler beim Generieren des SVG für Id: $id" }
-            return ResponseEntity.status(500).body("Serverfehler: ${ex.message}")
+            val requestId = FailureMapper.newRequestId()
+            log.error(ex) { "Fehler beim Generieren des SVG für Id: $id [requestId=$requestId]" }
+            return ResponseEntity.status(500).body("The preview could not be generated (request id $requestId).")
         }
 
         previewCacheRepository.insertPreviewCache(PreviewCacheInsert(

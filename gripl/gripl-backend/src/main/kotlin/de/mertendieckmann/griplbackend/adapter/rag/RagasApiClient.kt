@@ -3,10 +3,17 @@ package de.mertendieckmann.griplbackend.adapter.rag
 import de.mertendieckmann.griplbackend.config.RagApiProperties
 import de.mertendieckmann.griplbackend.model.dto.RagasEvaluationRequest
 import de.mertendieckmann.griplbackend.model.dto.RagasEvaluationResponse
+import de.mertendieckmann.griplbackend.application.failure.Failure
+import de.mertendieckmann.griplbackend.application.failure.FailureCode
+import de.mertendieckmann.griplbackend.application.failure.FailureMapper
+import de.mertendieckmann.griplbackend.application.failure.ServiceFailureException
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.WebClientResponseException
+import java.util.concurrent.TimeoutException
 import java.time.Duration
 
 
@@ -36,9 +43,22 @@ class RagasApiClient(
                 .bodyToMono(RagasEvaluationResponse::class.java)
                 .timeout(Duration.ofMinutes(15))
                 .awaitSingle()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            log.error(e) { "Ragas evaluation call failed" }
-            throw RuntimeException("Failed to call Ragas evaluator at $evaluationUrl", e)
+            // logged once, with context, by the caller that decides what the failure means
+            val status = (e as? WebClientResponseException)?.statusCode?.value()
+            throw ServiceFailureException(
+                Failure(
+                    FailureCode.RAGAS_UNAVAILABLE,
+                    if (status != null) "The RAG quality scoring service answered with status $status."
+                    else if (e is TimeoutException) "The RAG quality scoring service did not answer in time."
+                    else "The RAG quality scoring service could not be reached.",
+                    upstreamStatus = status,
+                    upstreamBody = (e as? WebClientResponseException)?.responseBodyAsString?.let { FailureMapper.sanitize(it, 1000) }
+                ),
+                e
+            )
         }
     }
 }

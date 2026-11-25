@@ -1,6 +1,10 @@
 package de.mertendieckmann.griplbackend.application
 
 import de.mertendieckmann.griplbackend.application.analyzer.AnalysisService
+import de.mertendieckmann.griplbackend.application.failure.Failure
+import de.mertendieckmann.griplbackend.application.failure.FailureCode
+import de.mertendieckmann.griplbackend.application.failure.ServiceFailureException
+import de.mertendieckmann.griplbackend.application.failure.logFailure
 import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.CustomAnalysisResponseType
 import de.mertendieckmann.griplbackend.model.dto.EnqueueAnalysisRequest
@@ -92,8 +96,8 @@ class ProcessModelJobRunner(
             try {
                 processModel(id)
             } catch (e: Exception) {
-                log.error(e) { "Unexpected error processing process model $id" }
-                repository.markError(id, e.message ?: "Unknown error")
+                val failure = log.logFailure("Processing process model", e, mapOf("processModelId" to id))
+                repository.markError(id, failure.message)
             } finally {
                 apiKeys.remove(id)
                 synchronized(inFlight) { inFlight.remove(id) }
@@ -140,9 +144,9 @@ class ProcessModelJobRunner(
                 }
                 else -> if (endpoint.startsWith(CUSTOM_ENDPOINT_PREFIX)) {
                     val customEndpointId = endpoint.removePrefix(CUSTOM_ENDPOINT_PREFIX).toLongOrNull()
-                        ?: throw IllegalArgumentException("Malformed custom analysis endpoint '$endpoint'")
+                        ?: throw invalidEndpoint("Malformed custom analysis endpoint '$endpoint'")
                     val customEndpoint = customAnalysisEndpointRepository.getById(customEndpointId)
-                        ?: throw IllegalArgumentException("Custom analysis endpoint $customEndpointId no longer exists")
+                        ?: throw invalidEndpoint("Custom analysis endpoint $customEndpointId no longer exists")
 
                     // RAG usage is a fixed property of the custom endpoint itself (like responseType),
                     // not something re-picked per analysis run.
@@ -170,14 +174,22 @@ class ProcessModelJobRunner(
                             Triple(objectMapper.writeValueAsString(result), result.classifiedElements.size, result.amountOfRetries)
                         }
                     }
-                } else throw IllegalArgumentException("Unknown analysis endpoint '$endpoint'")
+                } else throw invalidEndpoint("Unknown analysis endpoint '$endpoint'")
             }
 
             val totalElements = BpmnExtractor().extractBpmnElements(model.bpmnXml).size
             repository.markDone(id, model.bpmnXml, resultJson, criticalCount, totalElements, amountOfRetries)
         } catch (e: Exception) {
-            log.error(e) { "Analysis failed for process model $id" }
-            repository.markError(id, e.message ?: "Analysis failed")
+            // The message is stored with the process model and shown to the user, so it comes from FailureMapper, not from e.message
+            val failure = log.logFailure(
+                "Analysis",
+                e,
+                mapOf("processModelId" to id, "endpoint" to endpoint, "model" to llmProps.modelName)
+            )
+            repository.markError(id, failure.message)
         }
     }
+
+    private fun invalidEndpoint(message: String) =
+        ServiceFailureException(Failure(FailureCode.ANALYSIS_ENDPOINT_INVALID, message))
 }

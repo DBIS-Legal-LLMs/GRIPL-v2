@@ -9,8 +9,8 @@ Everything here runs on the server over SSH (university network or VPN). `<env>`
   bin/            -> traefik/repo/deploy/scripts   (the updater and the clone scripts)
   backups/<env>/<app>/<time>-before-update/        (automatic backups, see below)
   traefik/        shared reverse proxy
-  <env>/auth/     auth-service + MongoDB        compose.yaml, .env, repo/
-  <env>/gripl/    frontend, backend, RAG, Neo4j, Postgres   compose.yaml, .env, rag.env, repo/
+  <env>/auth/     auth-service + MongoDB        compose.yaml, .env, logs/, repo/
+  <env>/gripl/    frontend, backend, RAG, Neo4j, Postgres   compose.yaml, .env, rag.env, logs/, repo/
 ```
 
 Each stack folder holds its own configuration and secrets (`.env`, `rag.env`, never committed). Always run `docker compose` from
@@ -37,6 +37,30 @@ cd /srv/gripl/<env>/gripl && docker compose exec gripl-postgres psql -U postgres
 For MongoDB see the command in [users-and-roles.md](users-and-roles.md).
 
 Stop a stack without losing data: `docker compose down`. **Never add `-v`**, it deletes the volumes (the databases).
+
+## Error logs
+
+Besides the container logs, the backend of each stack writes its warnings and errors to a file of its own, one file per day, in the `logs/`
+folder of the stack (not in git, not part of any backup):
+
+```
+/srv/gripl/<env>/gripl/logs/gripl-backend-errors-2026-11-23.log
+/srv/gripl/<env>/auth/logs/auth-service-errors-2026-11-23.log
+```
+
+Only warnings and errors are in them (`docker compose logs` has everything else). The application keeps the last 30 days and deletes older
+files itself, and keeps the files of the past days under 200 MB together, so nothing has to be cleaned up by hand.
+
+```bash
+cd /srv/gripl/<env>/gripl
+ls -lh logs/
+less logs/gripl-backend-errors-$(date +%F).log      # one day; change the date for another one
+grep -h -A 25 "requestId=a1b2c3d4" logs/*.log       # a failure by the request id the user saw, with its cause chain
+grep -c ' ERROR ' logs/*.log                         # errors per day
+```
+
+A failure is one line (`code=`, `requestId=` and the ids of what failed, e.g. `processModelId=` or `testCaseId=`) followed by its cause chain
+(`Caused by:` lines). Prompts, process models and API keys are not logged.
 
 ## The updater
 

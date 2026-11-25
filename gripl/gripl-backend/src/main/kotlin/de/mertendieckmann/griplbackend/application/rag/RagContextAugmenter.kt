@@ -8,11 +8,15 @@ import de.mertendieckmann.griplbackend.model.dto.RagElementContext
 import de.mertendieckmann.griplbackend.model.dto.RagEntity
 import de.mertendieckmann.griplbackend.model.dto.RagMode
 import de.mertendieckmann.griplbackend.model.dto.RagRelationship
+import de.mertendieckmann.griplbackend.application.failure.Failure
+import de.mertendieckmann.griplbackend.application.failure.FailureMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Retrieves and assembles GDPR knowledge-graph context for a set of BPMN elements, and renders it
@@ -34,12 +38,20 @@ class RagContextAugmenter(
         fun flatten(): List<String> = entityLines + relationshipLines + documentLines
     }
 
+    /** What the knowledge graph returned per element id, and a note for the user when queries failed. */
+    data class RagFetchResult(
+        val context: Map<String, Map<String, Any>>,
+        val warnings: List<String> = emptyList()
+    )
+
     fun fetchRagContext(
         bpmnElements: Set<BpmnElement>,
         ragMode: RagMode,
         maxConcurrency: Int = ragApiProperties.maxConcurrency,
         activitiesOnly: Boolean = false
-    ): Map<String, Map<String, Any>> {
+    ): RagFetchResult {
+        val failures = ConcurrentHashMap<String, Failure>()
+        var distinctQueries = 0
         val semaphore = Semaphore(maxConcurrency)
 
         val result = kotlinx.coroutines.runBlocking {
@@ -75,6 +87,8 @@ class RagContextAugmenter(
             val elementsByNormalizedQuery: Map<String, List<Pair<String, String>>> =
                 elementQueries.groupBy { normalizeKey(it.second) }
 
+            distinctQueries = elementsByNormalizedQuery.size
+
             log.info {
                 "${elementQueries.size} elements need RAG context, " +
                     "${elementsByNormalizedQuery.size} distinct queries after dedup"
@@ -97,8 +111,11 @@ class RagContextAugmenter(
                                 }
                                 parsed
                             }
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (e: Exception) {
-                            log.error(e) { "RAG query failed for text: $queryText" }
+                            // already logged, without the query text, by RagApiClient
+                            failures.putIfAbsent(normalized, FailureMapper.describe(e))
                             null
                         }
                     }
@@ -115,7 +132,18 @@ class RagContextAugmenter(
         }
 
         log.info { "RAG context retrieved for ${result.size} / ${bpmnElements.size} elements" }
-        return result
+        if (failures.isNotEmpty()) {
+            log.warn { "RAG queries failed for ${failures.size} of $distinctQueries distinct queries; the analysis continues without that context: ${failures.values.first().message}" }
+        }
+        return RagFetchResult(result, ragWarnings(failures.size, distinctQueries, failures.values.firstOrNull()))
+    }
+
+    private fun ragWarnings(failed: Int, total: Int, first: Failure?): List<String> = when {
+        failed == 0 || first == null -> emptyList()
+        failed == total ->
+            listOf("The GDPR knowledge graph could not be queried (${first.message.trimEnd('.')}). The analysis ran without GDPR context.")
+        else ->
+            listOf("The GDPR knowledge graph could not be queried for $failed of $total queries (${first.message.trimEnd('.')}). The analysis used incomplete GDPR context.")
     }
 
     private fun normalizeKey(value: String): String = value.trim().lowercase()

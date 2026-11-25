@@ -29,6 +29,7 @@ fi
 [ -f "repo/$compose" ] || { echo "repo/$compose does not exist on branch $branch" >&2; exit 1; }
 
 ln -sfn "repo/$compose" compose.yaml
+mkdir -p logs   # bind-mounted by compose files that have error logs (GRIPL backend, auth-service)
 
 src="$(dirname "repo/$compose")"
 shopt -s nullglob dotglob
