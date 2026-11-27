@@ -2,7 +2,6 @@ import {AnalysisEndpoint} from "@/models/evaluation/Config";
 
 export function cryptoRandomId(): string {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-        // @ts-ignore
         return crypto.randomUUID();
     }
     return Math.random().toString(36).slice(2);
@@ -14,7 +13,7 @@ export function emptyToNull(v: string): string | null {
 }
 
 export function normalize<T>(v: T | null | undefined): T | null {
-    return v === undefined ? null : (v as any);
+    return v === undefined ? null : (v as T | null);
 }
 
 export function nextLabel(base: string, existing: string[]): string {
@@ -53,18 +52,17 @@ export function findPreset(endpoint: string, presets: AnalysisEndpoint[]) {
 export function pruneNulls<T>(obj: T): T {
     if (obj === null || obj === undefined) return obj as T;
     if (Array.isArray(obj)) {
-        // @ts-ignore
         return obj
-            .map(pruneNulls)
-            .filter((v) => v !== null && v !== undefined) as any;
+            .map((item) => pruneNulls(item as T))
+            .filter((v) => v !== null && v !== undefined) as unknown as T;
     }
     if (typeof obj === "object") {
-        const out: any = {};
-        Object.entries(obj as any).forEach(([k, v]) => {
-            const vv = pruneNulls(v as any);
+        const out: Record<string, unknown> = {};
+        Object.entries(obj as Record<string, unknown>).forEach(([k, v]) => {
+            const vv = pruneNulls(v as T);
             if (vv !== null && vv !== undefined) out[k] = vv;
         });
-        return out;
+        return out as T;
     }
     return obj as T;
 }

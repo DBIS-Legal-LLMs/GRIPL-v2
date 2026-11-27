@@ -3,9 +3,6 @@
 import React, {ReactNode, useCallback} from "react";
 import {useCurrentPng} from "recharts-to-png";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Spinner} from "@/components/ui/spinner";
-import {ImageDown} from "lucide-react";
 import ChartMenu from "@/components/evaluation/charts/common/chart-menu";
 
 interface ChartContainerProps {
@@ -15,7 +12,7 @@ interface ChartContainerProps {
 
 export default function ChartContainer({ title, children }: ChartContainerProps) {
 
-    const [getPng, { ref, isLoading }] = useCurrentPng();
+    const [getPng, { ref }] = useCurrentPng();
 
     const handleDownload = useCallback(async () => {
         const png = await getPng();

@@ -316,7 +316,6 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
             animationConfig,
             maxCount = 3,
             modalPopover = false,
-            asChild = false,
             className,
             hideSelectAll = false,
             searchable = true,

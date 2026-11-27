@@ -4,11 +4,7 @@ const nextConfig: NextConfig = {
     experimental: {
         proxyTimeout: 1_800_000, // 30 min
     },
-    eslint: {
-        // Temporary unblocker: avoid failing production build on unrelated legacy lint findings.
-        ignoreDuringBuilds: true,
-    },
-    webpack(config, { isServer }) {
+    webpack(config) {
         config.module.rules.push({
             test: /\.bpmn$/,
             use: 'raw-loader'

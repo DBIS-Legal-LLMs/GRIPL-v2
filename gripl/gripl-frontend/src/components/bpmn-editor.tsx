@@ -1,19 +1,90 @@
 "use client"
 
-import React, {useEffect, useRef, useState} from "react"
-import {Download, LockKeyhole, PlusCircle, RotateCcw, RotateCw, ZoomIn, ZoomOut} from "lucide-react"
+import React, {useCallback, useEffect, useRef, useState} from "react"
+import {Download, PlusCircle, RotateCcw, RotateCw, ZoomIn, ZoomOut} from "lucide-react"
 import {downloadBpmnXml} from "@/lib/download-bpmn"
 import ExportFileNameDialog from "@/components/export-file-name-dialog"
 import {Button} from "@/components/ui/button";
 import BpmnUploadButton from "@/components/bpmn-upload-button";
 import {BpmnToolCard} from "@/models/BpmnToolCard";
 import emptyDiagram from "@/data/empty-diagram.bpmn";
-// @ts-ignore
 import DisableModelingModule from 'bpmn-js-token-simulation/lib/features/disable-modeling';
-// @ts-ignore
 import { TOGGLE_MODE_EVENT } from 'bpmn-js-token-simulation/lib/util/EventHelper';
-import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
+import {BpmnEditorEvent, BpmnEditorEventPayload} from "@/models/BpmnEditorEvent";
 import {GdprCategory} from "@/models/GdprCategory";
+
+/**
+ * Minimal structural types of the bpmn-js modeler surface used here. bpmn-js ships
+ * no usable declarations for the minified production bundle, so the imported module
+ * is cast to this facade and every service used via get(...) is declared explicitly
+ * to keep the rest of the editor type-safe.
+ */
+interface BpmnCanvas {
+    addMarker(elementId: string, marker: string): void
+    removeMarker(elementId: string, marker: string): void
+    zoom(level: string | number): void
+}
+
+interface BpmnElementRegistry {
+    getAll(): {id?: string}[]
+    get(elementId: string): {id?: string} | undefined
+}
+
+interface BpmnEventBus {
+    on(event: string, listener: (payload: unknown) => void): void
+    fire(event: string, payload: unknown): void
+}
+
+interface BpmnZoomScroll {
+    stepZoom(delta: number): void
+}
+
+interface BpmnCommandStack {
+    canUndo(): boolean
+    canRedo(): boolean
+    undo(): void
+    redo(): void
+}
+
+interface BpmnModelerInstance {
+    get(service: "canvas"): BpmnCanvas
+    get(service: "eventBus"): BpmnEventBus
+    get(service: "elementRegistry"): BpmnElementRegistry
+    get(service: "commandStack"): BpmnCommandStack
+    get(service: "zoomScroll"): BpmnZoomScroll
+    on(event: string, listener: (payload: unknown) => void): void
+    destroy(): void
+    importXML(xml: string): Promise<{warnings?: unknown[]}>
+    saveXML(options: {format?: boolean}): Promise<{xml: string}>
+}
+
+type BpmnModelerConstructor = new (options: {
+    container: HTMLDivElement | null
+    additionalModules: unknown[]
+}) => BpmnModelerInstance
+
+function hexToRgba(hex: string, alpha: number): string {
+    const clean = hex.replace("#", "");
+    const bigint = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function mixColors(colors: string[], alpha: number): string {
+    if (colors.length === 0) return "rgba(239, 68, 68, 0.45)";
+    if (colors.length === 1) return hexToRgba(colors[0], alpha);
+    // Average multiple label colors for a visually distinct blend.
+    const rgb = colors.map((hex) => {
+        const clean = hex.replace("#", "");
+        const bigint = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
+        return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+    });
+    const sums = rgb.reduce(([r, g, b], [rr, gg, bb]) => [r + rr, g + gg, b + bb], [0, 0, 0]);
+    const avg = sums.map((v) => Math.round(v / colors.length));
+    return `rgba(${avg[0]}, ${avg[1]}, ${avg[2]}, ${alpha})`;
+}
 
 const GDPR_MARKER_BY_CATEGORY: Record<GdprCategory, string> = {
   Collection: "highlight-gdpr-collection",
@@ -45,8 +116,7 @@ interface BpmnEditorProps {
   cards?: BpmnToolCard[]
   editorClassName?: string
   disableEditing?: boolean
-  onEvent?: (type: BpmnEditorEvent, event: any) => void
-  onModelerChanged?: (modeler: any) => void
+  onEvent?: (type: BpmnEditorEvent, event: BpmnEditorEventPayload) => void
   /** File name used for export, defaults to the title */
   exportFileName?: string
   /** If true, a dialog asks for the file name (prefilled with exportFileName) before exporting */
@@ -54,10 +124,10 @@ interface BpmnEditorProps {
 }
 
 export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActivityIds = [], onNew, onDiagramChanged, cards = [],
-                                     highlightedActivityCategories = {}, highlightedActivityLabelColors = {}, editorClassName, disableEditing, onEvent, onModelerChanged,
+                                     highlightedActivityCategories = {}, highlightedActivityLabelColors = {}, editorClassName, disableEditing, onEvent,
                                      exportFileName, askForExportFileName }: BpmnEditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const modelerRef = useRef<any>(null)
+  const modelerRef = useRef<BpmnModelerInstance | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
@@ -65,172 +135,15 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
   const styleElementRef = useRef<HTMLStyleElement | null>(null)
   const disableEditingRef = useRef(disableEditing)
 
-  useEffect(() => {
-    if (onModelerChanged && modelerRef.current) {
-      onModelerChanged(modelerRef.current)
-    }
-  }, [modelerRef.current])
-
-  useEffect(() => {
-    if (!containerRef.current || !bpmnXml) return
-
-    initializeModeler(bpmnXml).then()
-
-    return () => {
-      if (modelerRef.current) {
-        try {
-          modelerRef.current.destroy()
-        } catch (err) {
-          console.error("Error while destroying BPMN modeler", err)
-        }
-        modelerRef.current = null
-        setIsLoaded(false)
-      }
-
-      if (styleElementRef.current) {
-        document.head.removeChild(styleElementRef.current)
-        styleElementRef.current = null
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!containerRef.current || !modelerRef.current || !bpmnXml) return
-
-    disableEditingRef.current = disableEditing
-
-    modelerRef.current
-        .get('eventBus')
-        .fire(TOGGLE_MODE_EVENT, { active: disableEditing })
-
-    document
-        .querySelector('.djs-palette')
-        ?.toggleAttribute('hidden', disableEditing);
-  }, [disableEditing])
-
-  useEffect(() => {
-    if (!modelerRef.current || !isLoaded || !highlightedActivityIds) return
-    highlightActivities(modelerRef.current, highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors)
-  }, [highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors, isLoaded])
-
-  async function handleFileLoaded(content: string) {
-    onDiagramChanged(content)
-    initializeModeler(content).then()
-  }
-
-  async function initializeModeler(xml: string) {
-    try {
-      const BpmnModeler = // @ts-ignore
-          (await import("bpmn-js/dist/bpmn-modeler.production.min.js")).default
-
-
-      if (modelerRef.current) {
-        try {
-          modelerRef.current.destroy()
-        } catch (err) {
-          console.error("Error while destroying existing BPMN modeler", err)
-        }
-        modelerRef.current = null
-      }
-
-      const modeler = new BpmnModeler({
-        container: containerRef.current,
-        additionalModules: [ DisableModelingModule ]
-      })
-
-      modelerRef.current = modeler
-
-      const eventBus = modeler.get("eventBus")
-
-      Object.values(BpmnEditorEvent).forEach(function(event) {
-        eventBus.on(event, function(e: any) {
-          if (onEvent) {
-            onEvent(event as BpmnEditorEvent, e)
-          }
-        });
-      });
-
-      modeler.on("commandStack.changed", () => {
-        try {
-          const commandStack = modeler.get("commandStack")
-          setCanUndo(commandStack.canUndo())
-          setCanRedo(commandStack.canRedo())
-
-          if (onDiagramChanged) {
-            modeler
-                .saveXML({ format: true })
-                .then(({ xml }: { xml: string }) => {
-                  onDiagramChanged(xml)
-                })
-                .catch((err: any) => {
-                  console.error("Error while saving XML after command stack change", err)
-                })
-          }
-        } catch (err) {
-          console.error("Error while handling command stack change", err)
-        }
-      })
-
-      try {
-        await modeler.importXML(xml)
-
-        const canvas = modeler.get("canvas");
-        canvas.zoom("fit-viewport");
-        modelerRef.current.get("zoomScroll").stepZoom(-1)
-
-        setIsLoaded(true)
-
-        try {
-          const commandStack = modeler.get("commandStack")
-          setCanUndo(commandStack.canUndo())
-          setCanRedo(commandStack.canRedo())
-        } catch (err) {
-          console.error("Error while initializing command stack state", err)
-        }
-
-        if (highlightedActivityIds) {
-          highlightActivities(modeler, highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors)
-        }
-      } catch (err) {
-        console.error("Error while importing BPMN XML", err)
-        setIsLoaded(false)
-      }
-    } catch (err) {
-      console.error("Error while initializing BPMN modeler", err)
-    }
-  }
-
-  function hexToRgba(hex: string, alpha: number): string {
-    const clean = hex.replace("#", "");
-    const bigint = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-
-  function mixColors(colors: string[], alpha: number): string {
-    if (colors.length === 0) return "rgba(239, 68, 68, 0.45)";
-    if (colors.length === 1) return hexToRgba(colors[0], alpha);
-    // Average multiple label colors for a visually distinct blend.
-    const rgb = colors.map((hex) => {
-      const clean = hex.replace("#", "");
-      const bigint = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16);
-      return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
-    });
-    const sums = rgb.reduce(([r, g, b], [rr, gg, bb]) => [r + rr, g + gg, b + bb], [0, 0, 0]);
-    const avg = sums.map((v) => Math.round(v / colors.length));
-    return `rgba(${avg[0]}, ${avg[1]}, ${avg[2]}, ${alpha})`;
-  }
-
-  function highlightActivities(modeler: any, activityIds: string[], categoryMap: Record<string, GdprCategory[]>, labelColorMap: Record<string, string[]>) {
+  const highlightActivities = useCallback((modeler: BpmnModelerInstance, activityIds: string[], categoryMap: Record<string, GdprCategory[]>, labelColorMap: Record<string, string[]>) => {
     try {
       const canvas = modeler.get("canvas")
       const elementRegistry = modeler.get("elementRegistry")
 
-      elementRegistry.getAll().forEach((element: any) => {
-        if (element.id) {
-          GDPR_MARKER_CLASSES.forEach((marker) => canvas.removeMarker(element.id, marker))
+      elementRegistry.getAll().forEach((element) => {
+        const elementId = element.id
+        if (elementId) {
+          GDPR_MARKER_CLASSES.forEach((marker) => canvas.removeMarker(elementId, marker))
         }
       })
 
@@ -282,15 +195,9 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
       if (!styleElementRef.current) {
         const styleElement = document.createElement("style")
         styleElement.textContent = `
-        /* Fill every shape primitive (rect, circle, polygon, path) with the SAME
-             OPAQUE tint. Using an opaque colour (a 50/50 mix of destructive and the
-             canvas background, so it still looks like a light red) means overlapping
-             fills — e.g. a message event's circle and envelope — don't compound into
-             a darker patch. We only set fill, never stroke or opacity, so the
-             element outline and the label text keep their normal colour. */  
           .highlight-privacy .djs-visual > :nth-child(1) {
-              fill: rgba(239, 68, 68, 0.45) !important;
-            }
+            fill: rgba(239, 68, 68, 0.45) !important;
+          }
           .bpmn-multiclass-highlights .highlight-privacy .djs-visual > :nth-child(1) {
             fill: rgba(148, 163, 184, 0.45) !important;
           }
@@ -326,6 +233,137 @@ export default function BpmnEditor({ title, titleAddon, bpmnXml, highlightedActi
       }
     } catch (err) {
       console.error("Error while highlighting activities", err)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!containerRef.current || !bpmnXml) return
+
+    initializeModeler(bpmnXml).then()
+
+    return () => {
+      if (modelerRef.current) {
+        try {
+          modelerRef.current.destroy()
+        } catch (err) {
+          console.error("Error while destroying BPMN modeler", err)
+        }
+        modelerRef.current = null
+        setIsLoaded(false)
+      }
+
+      if (styleElementRef.current) {
+        document.head.removeChild(styleElementRef.current)
+        styleElementRef.current = null
+      }
+    }
+    // Mount-only lifecycle: the modeler owns the XML (edits flow back through
+    // onDiagramChanged); re-initializing on bpmnXml changes would reset the canvas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!containerRef.current || !modelerRef.current || !bpmnXml) return
+
+    disableEditingRef.current = disableEditing
+
+    modelerRef.current
+        .get('eventBus')
+        .fire(TOGGLE_MODE_EVENT, { active: disableEditing })
+
+    document
+        .querySelector('.djs-palette')
+        ?.toggleAttribute('hidden', disableEditing);
+  }, [disableEditing, bpmnXml])
+
+  useEffect(() => {
+    if (!modelerRef.current || !isLoaded || !highlightedActivityIds) return
+    highlightActivities(modelerRef.current, highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors)
+  }, [highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors, isLoaded, highlightActivities])
+
+  async function handleFileLoaded(content: string) {
+    onDiagramChanged(content)
+    initializeModeler(content).then()
+  }
+
+  async function initializeModeler(xml: string) {
+    try {
+      const BpmnModelerModule = await import("bpmn-js/dist/bpmn-modeler.production.min.js")
+      const BpmnModeler = BpmnModelerModule.default as unknown as BpmnModelerConstructor
+
+      if (modelerRef.current) {
+        try {
+          modelerRef.current.destroy()
+        } catch (err) {
+          console.error("Error while destroying existing BPMN modeler", err)
+        }
+        modelerRef.current = null
+      }
+
+      const modeler = new BpmnModeler({
+        container: containerRef.current,
+        additionalModules: [ DisableModelingModule ]
+      })
+
+      modelerRef.current = modeler
+
+      const eventBus = modeler.get("eventBus")
+
+      Object.values(BpmnEditorEvent).forEach(function(event) {
+        eventBus.on(event, function(e: unknown) {
+          if (onEvent) {
+            onEvent(event, e as BpmnEditorEventPayload)
+          }
+        });
+      });
+
+      modeler.on("commandStack.changed", () => {
+        try {
+          const commandStack = modeler.get("commandStack")
+          setCanUndo(commandStack.canUndo())
+          setCanRedo(commandStack.canRedo())
+
+          if (onDiagramChanged) {
+            modeler
+                .saveXML({ format: true })
+                .then(({ xml }: { xml: string }) => {
+                  onDiagramChanged(xml)
+                })
+                .catch((err: unknown) => {
+                  console.error("Error while saving XML after command stack change", err)
+                })
+          }
+        } catch (err) {
+          console.error("Error while handling command stack change", err)
+        }
+      })
+
+      try {
+        await modeler.importXML(xml)
+
+        const canvas = modeler.get("canvas");
+        canvas.zoom("fit-viewport");
+        modeler.get("zoomScroll").stepZoom(-1)
+
+        setIsLoaded(true)
+
+        try {
+          const commandStack = modeler.get("commandStack")
+          setCanUndo(commandStack.canUndo())
+          setCanRedo(commandStack.canRedo())
+        } catch (err) {
+          console.error("Error while initializing command stack state", err)
+        }
+
+        if (highlightedActivityIds) {
+          highlightActivities(modeler, highlightedActivityIds, highlightedActivityCategories, highlightedActivityLabelColors)
+        }
+      } catch (err) {
+        console.error("Error while importing BPMN XML", err)
+        setIsLoaded(false)
+      }
+    } catch (err) {
+      console.error("Error while initializing BPMN modeler", err)
     }
   }
 

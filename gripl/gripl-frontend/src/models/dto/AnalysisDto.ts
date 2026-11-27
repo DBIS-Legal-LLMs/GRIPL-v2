@@ -1,7 +1,7 @@
 import {GdprCategory, normalizeFrontendGdprCategories} from "@/models/GdprCategory";
 
 export interface AnalysisRequest {
-    bpmnXml: String
+    bpmnXml: string
 }
 
 export interface BinaryAnalysisResponse {

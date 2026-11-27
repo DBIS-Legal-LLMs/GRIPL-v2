@@ -14,7 +14,6 @@ import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {useRouter} from "next/navigation";
 import {Plus} from "lucide-react";
-import emptyDiagram from "@/data/empty-diagram.bpmn";
 import createDataset from "@/actions/create-dataset";
 import {useToast} from "@/components/ui/toast";
 import {toErrorMessage} from "@/lib/http-error";
@@ -32,7 +31,7 @@ export default function CreateDatasetButton() {
             return
         }
         const datasetDescription = (document.getElementById("dataset-description") as HTMLInputElement).value
-        createDataset(datasetName, datasetDescription).then().then(id => {
+        createDataset(datasetName, datasetDescription).then().then(() => {
             router.refresh()
             setShowCreateDatasetDialog(false)
         }).catch(error => {

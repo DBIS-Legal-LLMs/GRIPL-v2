@@ -14,8 +14,8 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
 
         const PLACEHOLDER_RE = /^\s*\$\{[^}]*\}\s*$/;
 
-        function isVisible(value: any) {
-            return visible || PLACEHOLDER_RE.test(String(value ?? "")) || value === "$" || value === "${" || (list && value.length === 0)
+        function isVisible(value: unknown): boolean {
+            return visible || PLACEHOLDER_RE.test(String(value ?? "")) || value === "$" || value === "${" || (list !== undefined && String(value ?? "").length === 0)
         }
 
         return (

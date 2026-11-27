@@ -30,6 +30,8 @@ export default function EvaluationConfigDatasetSettings({
     selectedDatasetsRef.current = selectedDatasets;
     const selectedTestCaseIdsRef = useRef(selectedTestCaseIds);
     selectedTestCaseIdsRef.current = selectedTestCaseIds;
+    const onTestCasesChangeRef = useRef(onTestCasesChange);
+    onTestCasesChangeRef.current = onTestCasesChange;
 
     useEffect(() => {
         const missing = selectedDatasets.filter(
@@ -54,10 +56,10 @@ export default function EvaluationConfigDatasetSettings({
                     new Set([...selectedTestCaseIdsRef.current, ...tcs.map((tc) => tc.id)])
                 );
                 selectedTestCaseIdsRef.current = merged;
-                onTestCasesChange(merged);
+                onTestCasesChangeRef.current(merged);
             });
         });
-    }, [selectedDatasets]);
+    }, [selectedDatasets, testCasesByDataset, loadingDatasets]);
 
     function toggleDataset(datasetId: number) {
         const isSelected = selectedDatasets.includes(datasetId);

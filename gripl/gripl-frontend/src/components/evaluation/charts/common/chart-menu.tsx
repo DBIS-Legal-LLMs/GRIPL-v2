@@ -31,8 +31,8 @@ export default function ChartMenu({ chartId, onColorConfig, onDownload }: ChartM
             const ApexChartsModule = (await import("apexcharts")).default
             const chart = ApexChartsModule.getChartByID(chartId)
             if (chart) {
-                // @ts-ignore
-                chart.dataURI().then((data: { imgURI: string }) => {
+                chart.dataURI().then((data) => {
+                    if (!("imgURI" in data)) return
                     const link = document.createElement("a")
                     link.href = data.imgURI
                     link.download = `${chartId.toLowerCase().replace(/\s+/g, "-")}-chart.png`

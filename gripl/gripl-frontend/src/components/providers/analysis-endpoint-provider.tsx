@@ -37,7 +37,7 @@ export function AnalysisEndpointProvider({children}: { children: ReactNode }) {
     const isMulticlass = selectedEndpointInfo?.responseType === "MULTICLASS";
     const mode: AnalysisEndpointMode = isMulticlass ? "multiclass" : "binary";
 
-    const setMode = (nextMode: AnalysisEndpointMode) => {
+    const setMode = useCallback((nextMode: AnalysisEndpointMode) => {
         const preferred = nextMode === "multiclass"
             ? DEFAULT_MULTICLASS_ENDPOINT
             : DEFAULT_BINARY_ENDPOINT;
@@ -62,7 +62,7 @@ export function AnalysisEndpointProvider({children}: { children: ReactNode }) {
             endpoint.responseType !== "MULTICLASS"
         );
         setSelectedEndpoint(promptMatch?.endpoint ?? nonMulticlass?.endpoint ?? preferred);
-    };
+    }, [availableEndpoints]);
 
     const refreshEndpoints = useCallback(() => {
         authenticatedFetch("/api/gdpr/analysis/endpoints")
@@ -141,7 +141,7 @@ export function AnalysisEndpointProvider({children}: { children: ReactNode }) {
             backendEndpoint: selectedEndpoint,
             refreshEndpoints,
         };
-    }, [mode, selectedEndpoint, availableEndpoints, isMulticlass, apiEndpoint, refreshEndpoints]);
+    }, [mode, setMode, selectedEndpoint, availableEndpoints, isMulticlass, apiEndpoint, refreshEndpoints]);
 
     return <AnalysisEndpointContext.Provider value={value}>{children}</AnalysisEndpointContext.Provider>;
 }

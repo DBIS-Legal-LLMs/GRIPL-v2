@@ -10,7 +10,7 @@ import UnsavedChangesGuard from "@/components/unsaved-changes-guard";
 import {getAnalysisElements} from "@/models/dto/AnalysisDto";
 import AnalysisResultCard, {humanizeType} from "@/components/sandbox/analysis-result-card";
 import RagContextCard from "@/components/sandbox/rag-context-card";
-import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
+import {BpmnEditorEvent, BpmnEditorEventPayload} from "@/models/BpmnEditorEvent";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
@@ -50,7 +50,7 @@ export default function ProcessModelDetailView({initialModel}: ProcessModelDetai
   const [pdfViewer, setPdfViewer] = useState<PdfViewerState | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(true)
 
-  function onEvent(type: BpmnEditorEvent, event: any) {
+  function onEvent(type: BpmnEditorEvent, event: BpmnEditorEventPayload) {
     if (type === BpmnEditorEvent.SelectionChanged) {
       setSelectedElementId(event.newSelection?.length === 1 ? event.newSelection[0].id : null)
     }
