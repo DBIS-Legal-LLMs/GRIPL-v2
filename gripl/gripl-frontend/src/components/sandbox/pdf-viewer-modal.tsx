@@ -66,7 +66,7 @@ export default function PdfViewerModal({ open, onClose, documentName, exactText 
             .catch((err) => {
                 showError("Could not locate excerpt in PDF", toErrorMessage(err));
             });
-    }, [open, documentName, exactText]);
+    }, [open, documentName, exactText, showError]);
 
     const handlePageLoadSuccess = (page: { width: number }) => {
         setPageWidth(page.width);

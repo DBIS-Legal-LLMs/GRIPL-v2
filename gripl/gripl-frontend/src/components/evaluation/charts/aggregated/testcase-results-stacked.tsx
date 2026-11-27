@@ -16,7 +16,7 @@ interface TestcaseResultsStackedProps {
 
 export default function TestcaseResultsStacked({ aggregatedEvaluationResults, repetisions }: TestcaseResultsStackedProps) {
     const [isClient, setIsClient] = useState(false)
-    const [customColors, setCustomColors] = useState({
+    const [customColors] = useState({
         passed: "#22c55e",
         failed: "#ef4444",
         error: "#fb923c",

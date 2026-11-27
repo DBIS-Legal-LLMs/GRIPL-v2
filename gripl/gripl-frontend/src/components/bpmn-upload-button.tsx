@@ -16,7 +16,6 @@ export default function BpmnUploadButton({ onFileLoaded }: FileUploadProps) {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      // @ts-ignore
       const file = e.target.files[0]
       processFile(file)
     }

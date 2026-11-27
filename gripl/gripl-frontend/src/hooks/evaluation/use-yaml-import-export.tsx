@@ -66,12 +66,42 @@ export function useYamlImportExport(props: {
         fileInputRef.current?.click();
     }
 
+    interface YamlLlmProps {
+        baseUrl?: unknown;
+        model?: unknown;
+        modelName?: unknown;
+        apiKey?: unknown;
+        timeoutSeconds?: unknown;
+        temperature?: unknown;
+        topP?: unknown;
+    }
+
+    interface YamlModelItem {
+        label?: unknown;
+        evaluationEndpoint?: unknown;
+        llmProps?: YamlLlmProps;
+    }
+
+    interface YamlConfig {
+        defaultEvaluationEndpoint?: unknown;
+        seed?: unknown;
+        maxConcurrent?: unknown;
+        maxConcurrency?: unknown;
+        repetitions?: unknown;
+        models?: YamlModelItem[];
+        datasets?: unknown[];
+        useRag?: unknown;
+        ragMode?: unknown;
+        evaluateRag?: unknown;
+        activitiesOnly?: unknown;
+    }
+
     async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
         try {
             const text = await file.text();
-            const parsed = yamlLoad(text) as any;
+            const parsed = yamlLoad(text) as YamlConfig;
             applyYamlConfig(parsed);
         } catch (err) {
             console.error("YAML parse error:", err);
@@ -81,13 +111,16 @@ export function useYamlImportExport(props: {
         }
     }
 
-    function applyYamlConfig(cfg: any) {
-        const defaultEvaluationEndpoint: string | undefined = cfg?.defaultEvaluationEndpoint;
+    function applyYamlConfig(cfg: YamlConfig) {
+        const defaultEvaluationEndpoint: string | undefined =
+            typeof cfg?.defaultEvaluationEndpoint === "string" ? cfg.defaultEvaluationEndpoint : undefined;
         const seedString = cfg?.seed;
-        const maxConc: number | undefined = cfg?.maxConcurrent ?? cfg?.maxConcurrency;
-        const reps: number | undefined = cfg?.repetitions;
-        const modelItems: any[] = Array.isArray(cfg?.models) ? cfg.models : [];
-        const datasets: number[] = Array.isArray(cfg?.datasets) ? cfg.datasets.map((d: any) => parseInt(d)) : [];
+        const maxConc = cfg?.maxConcurrent ?? cfg?.maxConcurrency;
+        const reps = cfg?.repetitions;
+        const modelItems: YamlModelItem[] = Array.isArray(cfg?.models) ? cfg.models : [];
+        const datasets: number[] = Array.isArray(cfg?.datasets)
+            ? cfg.datasets.map((d) => parseInt(String(d))).filter((n) => Number.isFinite(n))
+            : [];
 
         setSelectedDatasets(datasets);
 
@@ -120,10 +153,10 @@ export function useYamlImportExport(props: {
         if (typeof cfg?.activitiesOnly === "boolean") setActivitiesOnly(cfg.activitiesOnly);
 
         if (modelItems.length > 0) {
-            const next: ModelRowState[] = modelItems.map((model: any, idx: number) => {
+            const next: ModelRowState[] = modelItems.map((model, idx) => {
                 const label = String(model?.label ?? `Model ${idx + 1}`);
 
-                const endpoint = model?.evaluationEndpoint;
+                const endpoint = typeof model?.evaluationEndpoint === "string" ? model.evaluationEndpoint : undefined;
                 let endpointChoice: "default" | "preset" | "custom" = "default";
                 let selectedPresetEndpoint = "";
                 let customEndpoint = "";
@@ -140,9 +173,10 @@ export function useYamlImportExport(props: {
                 }
 
                 const llmProps = model?.llmProps ?? {};
-                const baseUrl = llmProps?.baseUrl ?? null;
-                const modelName = (llmProps?.modelName ?? llmProps?.model) ?? null;
-                const apiKey = llmProps?.apiKey ?? null;
+                const baseUrl = typeof llmProps?.baseUrl === "string" ? llmProps.baseUrl : null;
+                const modelNameCandidate = llmProps?.modelName ?? llmProps?.model;
+                const modelName = typeof modelNameCandidate === "string" ? modelNameCandidate : null;
+                const apiKey = typeof llmProps?.apiKey === "string" ? llmProps.apiKey : null;
                 const timeoutSeconds = typeof llmProps?.timeoutSeconds === "number" ? llmProps.timeoutSeconds : null;
                 const temperature = typeof llmProps?.temperature === "number" ? llmProps.temperature : null;
                 const topP = typeof llmProps?.topP === "number" ? llmProps.topP : null;

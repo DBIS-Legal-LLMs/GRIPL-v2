@@ -2,8 +2,7 @@
 
 import {useState} from "react";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
-import {Card, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
-import {ChevronDown, ChevronUp} from "lucide-react";
+import {Card, CardHeader, CardTitle} from "@/components/ui/card";import {ChevronDown, ChevronUp} from "lucide-react";
 import {EvaluationDataMeta} from "@/models/dto/EvaluationData";
 import TestCaseCard from "@/components/labeling/test-case-card";
 import CreateTestCaseButton from "@/components/labeling/create-test-case-button";
@@ -17,10 +16,9 @@ import {Dataset} from "@/models/dto/Dataset";
 interface DatasetListProps {
     dataset: Dataset;
     evaluationMetadata: EvaluationDataMeta[];
-    className?: string;
 }
 
-export default function DatasetListItem({ dataset, evaluationMetadata, className }: DatasetListProps) {
+export default function DatasetListItem({ dataset, evaluationMetadata }: DatasetListProps) {
     const [isOpen, setIsOpen] = useState<boolean>(false);
 
     return <Collapsible open={isOpen} onOpenChange={setIsOpen}>

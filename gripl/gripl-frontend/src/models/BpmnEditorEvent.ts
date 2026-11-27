@@ -10,3 +10,9 @@ export enum BpmnEditorEvent {
     DragInit = 'drag.init',
     SelectionChanged = 'selection.changed',
 }
+
+/** Payload shape of the bpmn-js events surfaced by the editor. */
+export interface BpmnEditorEventPayload {
+    newSelection?: { id: string; businessObject?: { name?: string } }[]
+    element?: { id: string; businessObject?: { name?: string } }
+}

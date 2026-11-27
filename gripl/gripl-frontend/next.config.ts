@@ -6,11 +6,7 @@ const nextConfig: NextConfig = {
         // Default is 10mb; dataset ZIP imports (/api/dataset/import) can be larger.
         middlewareClientMaxBodySize: "100mb",
     },
-    eslint: {
-        // Temporary unblocker: avoid failing production build on unrelated legacy lint findings.
-        ignoreDuringBuilds: true,
-    },
-    webpack(config, { isServer }) {
+    webpack(config) {
         config.module.rules.push({
             test: /\.bpmn$/,
             use: 'raw-loader'

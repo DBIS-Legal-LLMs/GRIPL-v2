@@ -1,12 +1,11 @@
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import {EvaluationMetadataReport, EvaluationReportSummary} from "@/models/dto/ReportData";
+import {EvaluationReportSummary} from "@/models/dto/ReportData";
 
 export default function EvaluationReportSummaryCardMulti({
- items,
- metadata
-}: { items: Array<{ label: string; summary: EvaluationReportSummary }>, metadata: EvaluationMetadataReport | null }) {
+ items
+}: { items: Array<{ label: string; summary: EvaluationReportSummary }> }) {
     const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
     return (

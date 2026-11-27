@@ -25,7 +25,9 @@ export const modelPalette = [
     "#f97316",
 ];
 
-export const mergeEvalColors = (getEvaluationColors?: () => any) => {
+type EvaluationColorOverrides = Partial<Record<keyof typeof defaultColors, string>>;
+
+export const mergeEvalColors = (getEvaluationColors?: () => EvaluationColorOverrides) => {
     try {
         const custom = getEvaluationColors?.();
         return { ...defaultColors, ...(custom ?? {}) };

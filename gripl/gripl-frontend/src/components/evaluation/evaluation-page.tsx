@@ -3,6 +3,7 @@
 import {Button} from "@/components/ui/button";
 import React, {useMemo, useState} from "react";
 import {
+    EvaluationMetadataReport,
     EvaluationReportError,
     EvaluationReportSummary,
     TestCaseReport
@@ -11,7 +12,6 @@ import TestCaseReportCard from "@/components/evaluation/test-case-report/test-ca
 import EvaluationReportSummaryCard from "@/components/evaluation/evaluation-report-summary-card";
 import MetricsCharts from "@/components/evaluation/metrics-charts";
 import {Spinner} from "@/components/ui/spinner";
-import {MultiEvaluationRequest} from "@/models/dto/MultiEvaluationRequest";
 import TestCaseErrorCard from "@/components/evaluation/test-case-report/test-case-error-card";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Card, CardContent, CardDescription, CardHeader} from "@/components/ui/card";
@@ -21,7 +21,7 @@ import {ChevronDown, FileText, Play} from "lucide-react";
 import TestcaseResultsStacked from "@/components/evaluation/charts/aggregated/testcase-results-stacked";
 import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluationResult";
 import MetricChart from "@/components/evaluation/charts/aggregated/metric-chart";
-import {ColorProvider, useColors} from "@/components/evaluation/charts/common/color-context";
+import {useColors} from "@/components/evaluation/charts/common/color-context";
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
 import {useToast} from "@/components/ui/toast";
 import {useEvaluationJob} from "@/components/providers/evaluation-job-provider";
@@ -63,8 +63,6 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const [selectedDataset, setSelectedDataset] = useState<string | undefined>(undefined);
     const [selectedClasses, setSelectedClasses] = useState<string[]>([ALL_CLASSES_FILTER]);
 
-    const [isMetricsSummaryOpen, setIsMetricsSummaryOpen] = useState<boolean>(false);
-
     const { colors, setColors } = useColors()
     const { showToast, showError } = useToast()
 
@@ -84,7 +82,10 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const showExactMatchMetric = isMulticlassEvaluation && isAllClassesSelected(selectedClasses);
     const showClassSpecificMetrics = isMulticlassEvaluation && !isAllClassesSelected(selectedClasses);
 
-    const testCases = testCasesByRun.get(selectedRun) || [];
+    const testCases = useMemo(
+        () => testCasesByRun.get(selectedRun) || [],
+        [testCasesByRun, selectedRun]
+    );
     const summary = useMemo(() => {
         const rawSummary = summaryByRun.get(selectedRun) || new Map();
 
@@ -99,7 +100,10 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
             ])
         );
     }, [summaryByRun, selectedRun, isMulticlassEvaluation, selectedClasses]);
-    const errors = errorsByRun.get(selectedRun) || [];
+    const errors = useMemo(
+        () => errorsByRun.get(selectedRun) || [],
+        [errorsByRun, selectedRun]
+    );
 
 
     const involvedDatasets = useMemo(() => {
@@ -444,17 +448,17 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
         }
 
         // Convert Maps to serializable format
-        const testCasesByRunObj: Record<number, any[]> = {};
+        const testCasesByRunObj: Record<number, (TestCaseReport & { modelLabel: string })[]> = {};
         for (const [runNum, cases] of testCasesByRun.entries()) {
             testCasesByRunObj[runNum] = cases;
         }
 
-        const summariesByRunObj: Record<number, any[]> = {};
+        const summariesByRunObj: Record<number, { label: string; summary: EvaluationReportSummary }[]> = {};
         for (const [runNum, runSummaries] of summaryByRun.entries()) {
             summariesByRunObj[runNum] = Array.from(runSummaries.entries()).map(([label, s]) => ({ label, summary: s }));
         }
 
-        const errorsByRunObj: Record<number, any[]> = {};
+        const errorsByRunObj: Record<number, (EvaluationReportError & { modelLabel: string })[]> = {};
         for (const [runNum, errs] of errorsByRun.entries()) {
             errorsByRunObj[runNum] = errs;
         }
@@ -489,20 +493,21 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 const text = e.target?.result;
                 if (typeof text !== "string") throw new Error("File content is not a string");
 
-                const parsed = JSON.parse(text);
+                const parsed = JSON.parse(text) as
+                    { metadata?: EvaluationMetadataReport | null; testCasesByRun?: Record<string, (TestCaseReport & { modelLabel: string })[]>; summariesByRun?: Record<string, { label: string; summary: EvaluationReportSummary }[]>; errorsByRun?: Record<string, (EvaluationReportError & { modelLabel: string })[]>; colors?: Record<string, string> };
 
                 setMetadata(parsed.metadata || null);
 
                 const tcMap = new Map<number, (TestCaseReport & { modelLabel: string })[]>();
-                for (const [runNum, cases] of Object.entries(parsed.testCasesByRun)) {
-                    tcMap.set(parseInt(runNum), cases as any);
+                for (const [runNum, cases] of Object.entries(parsed.testCasesByRun || {})) {
+                    tcMap.set(parseInt(runNum), cases);
                 }
                 setTestCasesByRun(tcMap);
 
                 const summaryMap = new Map<number, Map<string, EvaluationReportSummary>>();
-                for (const [runNum, summaries] of Object.entries(parsed.summariesByRun)) {
+                for (const [runNum, summaries] of Object.entries(parsed.summariesByRun || {})) {
                     const runSummaryMap = new Map<string, EvaluationReportSummary>();
-                    (summaries as any[]).forEach((s: { label: string; summary: EvaluationReportSummary }) => {
+                    summaries.forEach((s) => {
                         runSummaryMap.set(s.label, s.summary);
                     });
                     summaryMap.set(parseInt(runNum), runSummaryMap);
@@ -511,7 +516,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
 
                 const errorsMap = new Map<number, (EvaluationReportError & { modelLabel: string })[]>();
                 for (const [runNum, errs] of Object.entries(parsed.errorsByRun || {})) {
-                    errorsMap.set(parseInt(runNum), errs as any);
+                    errorsMap.set(parseInt(runNum), errs);
                 }
                 setErrorsByRun(errorsMap);
 
@@ -875,7 +880,6 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
 function groupBy<T>(arr: T[], key: (t: T) => string) {
     return arr.reduce<Record<string, T[]>>((acc, item) => {
         const k = key(item);
-        // @ts-ignore
         (acc[k] ||= []).push(item);
         return acc;
     }, {});
